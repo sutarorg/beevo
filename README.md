@@ -15,7 +15,7 @@ Production-ready SaaS for scheduling & publishing to **Instagram, Facebook, Twit
 | Payments | Razorpay Orders API (INR) + webhook signature verification |
 | Email | Resend **or** any SMTP server (nodemailer) |
 | Uploads | Vercel Blob (or local disk when self-hosting) |
-| Scheduler | DB-driven publisher run by Vercel Cron (`vercel.json`) |
+| Scheduler | DB-driven publisher — Vercel Cron (daily backstop) + free 5-min pinger (GitHub Action), or internal loop when self-hosted |
 
 Every external dependency is **optional at boot**: without keys the app runs in clearly-labelled demo modes (simulated connections, demo billing, local uploads). Set the keys and the same code paths go live.
 
@@ -116,7 +116,13 @@ Encrypts OAuth tokens at rest (AES-256-GCM).
 ### 4.4 Cron secret — `CRON_SECRET`
 
 1. Run `openssl rand -hex 32` → copy → `CRON_SECRET`.
-2. That's it — Vercel Cron automatically sends `Authorization: Bearer <CRON_SECRET>` to `/api/jobs/publish` and `/api/jobs/sync-analytics` (schedules in `vercel.json`). Manual run: `curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/jobs/publish`.
+2. Vercel Cron automatically sends `Authorization: Bearer <CRON_SECRET>` to `/api/jobs/publish` and `/api/jobs/sync-analytics` (schedules in `vercel.json`).
+3. **Hobby plan note:** Hobby allows only *daily* cron jobs, so `vercel.json` ships with daily backstops (both jobs ~04:00 UTC). For on-time publishing every 5 minutes, enable **one** external pinger (free, pick either):
+   - **GitHub Actions (included):** the repo contains `.github/workflows/beevo-scheduler.yml`. In your repo → **Settings → Secrets and variables → Actions** → _Variables_ tab → add `BEEVO_API_URL = https://your-app.vercel.app` → _Secrets_ tab → add `CRON_SECRET` (same value as your Vercel env). It pings the publisher every 5 minutes (allow ~5–10 min drift).
+   - **cron-job.org:** create a free account → **Cron jobs → Create** → URL `https://your-app.vercel.app/api/jobs/publish`, every 5 minutes → under _Advanced → Headers_ add `Authorization: Bearer <CRON_SECRET>`.
+   - **Vercel Pro:** unlocks native 5-minute cron — no pinger needed; just change the schedule in `vercel.json`.
+   - **Self-hosted (`npm start`, Docker, VM):** no pinger needed at all — the internal scheduler in `src/instrumentation.ts` runs every 60s automatically (disable with `ENABLE_INTERNAL_CRON=false`).
+4. Manual run anytime: `curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/jobs/publish`.
 
 ### 4.5 Email — choose **one**
 
@@ -209,7 +215,7 @@ Encrypts OAuth tokens at rest (AES-256-GCM).
 4. Click **Deploy** → wait ~2 minutes → open the deployment URL.
 5. Run the schema against your production DB once: locally set `DATABASE_URL` to the production string and run `npx drizzle-kit push` (or use Neon SQL Editor with the generated SQL from `drizzle-kit generate`).
 6. Set `APP_URL` / `NEXT_PUBLIC_APP_URL` to the final domain and **Redeploy** (Deployments → ⋯ → Redeploy) so OAuth redirects use it.
-7. Cron: Vercel reads `vercel.json` automatically — verify under Project → **Settings → Cron Jobs** (publishing every 5 min, analytics sync daily 03:17 UTC). On the Hobby plan cron runs once/day minimum; for 5-minute publishing use an external pinger (e.g. cron-job.org) hitting `/api/jobs/publish` with the Bearer secret.
+7. Cron: Vercel reads `vercel.json` automatically — verify under Project → **Settings → Cron Jobs**. On **Hobby** these run once daily (04:15/04:45 UTC) as a backstop; enable the included **GitHub Actions pinger** (or cron-job.org — see §4.4) for the real 5-minute publishing loop. On **Vercel Pro** you can raise the native schedule back to `*/5 * * * *` in `vercel.json`.
 
 **First real run checklist:** sign up a real account → connect a platform via OAuth → schedule a post 2 minutes ahead → watch it publish (or check `/api/jobs/publish` logs under Deployments → Logs) → upgrade to Pro with a Razorpay test card.
 

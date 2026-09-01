@@ -1,0 +1,36 @@
+# Free 5-minute publishing cadence for Hobby-plan deployments.
+# Vercel Hobby allows only daily cron, so this workflow pings the
+# scheduler endpoint instead. Runs on GitHub's free Actions minutes.
+#
+# Setup (one-time, ~1 minute):
+#   1. Repo → Settings → Secrets and variables → Actions → "Variables" tab
+#      → New repository variable:  BEEVO_API_URL = https://your-app.vercel.app
+#   2. "Secrets" tab → New repository secret:
+#      CRON_SECRET = <same value as your Vercel CRON_SECRET env var>
+#
+# Note: GitHub scheduled workflows can drift ±5–10 min under load — fine
+# for a planning cadence. For exact timing, use Vercel Pro's native cron
+# or any external pinger (cron-job.org) instead.
+
+name: beevo-scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping-publisher:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Beevo publish engine
+        if: ${{ vars.BEEVO_API_URL != '' }}
+        run: |
+          echo "pinging ${{ vars.BEEVO_API_URL }}/api/jobs/publish"
+          curl -fsS -X POST "${{ vars.BEEVO_API_URL }}/api/jobs/publish?limit=50" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            || echo "::warning::publish ping failed (non-fatal)"
+
+      - name: Skip notice (no BEEVO_API_URL configured)
+        if: ${{ vars.BEEVO_API_URL == '' }}
+        run: echo "Set the BEEVO_API_URL repository variable to activate."
