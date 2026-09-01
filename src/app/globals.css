@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@theme {
+  /* ---- Beevo honey palette ---- */
+  --color-honey-50: #fffaec;
+  --color-honey-100: #fdf1c8;
+  --color-honey-200: #fbe18c;
+  --color-honey-300: #f9cb50;
+  --color-honey-400: #f6b51f;
+  --color-honey-500: #f5a301; /* primary */
+  --color-honey-600: #d98206;
+  --color-honey-700: #b45309;
+  --color-honey-800: #8a3f0c;
+  --color-honey-900: #713112;
+
+  --color-ink-950: #100b06;
+  --color-ink-900: #171008;
+  --color-ink-800: #221809;
+  --color-ink-700: #2f2212;
+  --color-ink-600: #4a3823;
+
+  --color-cream-50: #fffdf7;
+  --color-cream-100: #fbf5e9;
+  --color-cream-200: #f4ead3;
+  --color-cream-300: #ead9b8;
+
+  --color-leaf-600: #4d7c0f;
+  --color-leaf-500: #65a30d;
+  --color-berry-600: #dc2626;
+
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --shadow-card: 0 1px 0 rgba(23, 16, 8, 0.04), 0 12px 32px -18px rgba(113, 49, 18, 0.22);
+  --shadow-lift: 0 2px 0 rgba(23, 16, 8, 0.05), 0 24px 48px -20px rgba(113, 49, 18, 0.32);
+  --shadow-gold: 0 8px 24px -8px rgba(245, 163, 1, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+
+  --animate-marquee: marquee 32s linear infinite;
+  --animate-float: floaty 7s ease-in-out infinite;
+  --animate-float-slow: floaty 11s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-spin-slow: spin 14s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream-100 text-ink-900 antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: rgba(245, 163, 1, 0.35);
+  color: #171008;
+}
+
+/* warm scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #e2cf9f transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: #e2cf9f; border-radius: 99px; }
+*::-webkit-scrollbar-thumb:hover { background: #d9b96f; }
+
+/* ---- Honeycomb textures (tessellating hexagons) ---- */
+.comb-light {
+  background-image: url("data:image/svg+xml,%3Csvg width='56' height='100' viewBox='0 0 56 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='%23713112' stroke-opacity='0.08'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' fill='none' stroke='%23713112' stroke-opacity='0.08'/%3E%3C/svg%3E");
+  background-size: 56px 100px;
+}
+.comb-gold {
+  background-image: url("data:image/svg+xml,%3Csvg width='56' height='100' viewBox='0 0 56 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='%23F5A301' stroke-opacity='0.16'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' fill='none' stroke='%23F5A301' stroke-opacity='0.16'/%3E%3C/svg%3E");
+  background-size: 56px 100px;
+}
+.comb-dark {
+  background-image: url("data:image/svg+xml,%3Csvg width='56' height='100' viewBox='0 0 56 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='%23F5A301' stroke-opacity='0.07'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' fill='none' stroke='%23F5A301' stroke-opacity='0.07'/%3E%3C/svg%3E");
+  background-size: 56px 100px;
+}
+
+.hex-clip {
+  clip-path: polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%);
+}
+
+.text-balance { text-wrap: balance; }
+
+/* skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #f4ead3 25%, #fbf5e9 40%, #f4ead3 60%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* focus rings */
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid #f5a301;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* number tabular for stats */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Hide number input arrows in datetime rows */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.4) sepia(0.6) saturate(3) hue-rotate(-15deg);
+}
