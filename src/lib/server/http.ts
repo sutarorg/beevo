@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodSchema } from "zod";
-import { ensureSchema, isConnectionError, isSchemaMissingError } from "./migrate";
+import { ensureSchema, isConnectionError, isSchemaMissingError, isUndefinedColumnError } from "./migrate";
 import { dbConfigured } from "@/db";
 
 export function ok<T>(data: T, status = 200): NextResponse {
@@ -58,11 +58,14 @@ export function handler<Args extends unknown[]>(
     } catch (err) {
       if (err instanceof ApiError) return fail(err.message, err.status, err.code);
 
-      // Missing schema on first deploy → kick self-heal and tell the client to retry.
-      if (isSchemaMissingError(err)) {
-        void ensureSchema(true);
+      // Missing table/column (fresh deploy or schema created by an older
+      // build) → kick self-heal synchronously, then tell the client to retry.
+      if (isSchemaMissingError(err) || isUndefinedColumnError(err)) {
+        const result = await ensureSchema(true).catch(() => ({ migrated: false }));
         return fail(
-          "Database schema is being initialised — please retry in a few seconds. (First-deploy self-heal; README §5)",
+          result.migrated || (result as { reason?: string }).reason === undefined
+            ? "Database schema was just auto-updated — please retry."
+            : "Database schema update in progress — please retry in a few seconds.",
           503,
           "SCHEMA_NOT_MIGRATED"
         );

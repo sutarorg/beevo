@@ -234,6 +234,13 @@ Almost always the database, in one of three states — open `https://your-app/ap
 | `down` | — | URL set but unreachable. A `127.0.0.1` / `localhost` URL **cannot be reached from Vercel** — use a hosted Postgres (§4.1). TLS is auto-enabled for remote hosts. |
 | `up` | `missing` | Tables were never created. The app **self-heals automatically**: on the next cold start (or API call) it applies the embedded schema once via an advisory lock. You can also run `npx drizzle-kit push` with `DATABASE_URL` set to production (§5 step 5). Retry signup a few seconds after the first error. |
 
+**`DrizzleError: Failed query: select ... "avatar_url", "prefs" ... from "users"`**
+The table exists but was created by an older build, so new columns are missing (`42703`). The boot migrator now runs `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` with constant defaults for every drift-prone column on every cold start — **redeploy (or restart) once and it's fixed automatically.** Instant manual fix in your DB console (Neon/Vercel Postgres → SQL Editor):
+```sql
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_url" text;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "prefs" jsonb NOT NULL DEFAULT '{"timezone":"Asia/Kolkata (GMT+5:30)","digest":true}'::jsonb;
+```
+
 **OAuth callback lands on `/accounts?oauth_error=...`** — check `APP_URL` matches your domain exactly, the redirect URI uses `https`, the app is Live (Meta) / the user is a test user (Google), and the secret wasn't rotated after copying.
 
 **Razorpay checkout does nothing** — `NEXT_PUBLIC_RAZORPAY_KEY_ID` must be set (same value as `RAZORPAY_KEY_ID`); verify **payment.captured** is ticked in the webhook.
