@@ -213,7 +213,7 @@ Encrypts OAuth tokens at rest (AES-256-GCM).
 2. https://vercel.com/new → **Import** the repository → **Configure Project** (Framework is auto-detected as Next.js — leave defaults).
 3. **Before clicking Deploy**, expand **Environment Variables** and paste every variable from your `.env` (section 4) for **Production** (and Preview if you like).
 4. Click **Deploy** → wait ~2 minutes → open the deployment URL.
-5. Run the schema against your production DB once: locally set `DATABASE_URL` to the production string and run `npx drizzle-kit push` (or use Neon SQL Editor with the generated SQL from `drizzle-kit generate`).
+5. Run the schema against your production DB once: locally set `DATABASE_URL` to the production string and run `npx drizzle-kit push`. **Or skip this** — from this version the app self-initialises the schema on its first cold start / first API call (advisory-locked, idempotent; disable with `AUTO_MIGRATE=false`).
 6. Set `APP_URL` / `NEXT_PUBLIC_APP_URL` to the final domain and **Redeploy** (Deployments → ⋯ → Redeploy) so OAuth redirects use it.
 7. Cron: Vercel reads `vercel.json` automatically — verify under Project → **Settings → Cron Jobs**. On **Hobby** these run once daily (04:15/04:45 UTC) as a backstop; enable the included **GitHub Actions pinger** (or cron-job.org — see §4.4) for the real 5-minute publishing loop. On **Vercel Pro** you can raise the native schedule back to `*/5 * * * *` in `vercel.json`.
 
@@ -221,7 +221,28 @@ Encrypts OAuth tokens at rest (AES-256-GCM).
 
 ---
 
-## 6. API reference (selected)
+## 6. Troubleshooting
+
+**"Internal server error" on signup after deploying to Vercel**
+Almost always the database, in one of three states — open `https://your-app/api/health` for a live checklist:
+
+| `db` | `schema` | Meaning & fix |
+|---|---|---|
+| `unconfigured` | — | `DATABASE_URL` missing → add it under Project → **Settings → Environment Variables** → **Redeploy**. |
+| `down` | — | URL set but unreachable. A `127.0.0.1` / `localhost` URL **cannot be reached from Vercel** — use a hosted Postgres (§4.1). TLS is auto-enabled for remote hosts. |
+| `up` | `missing` | Tables were never created. The app **self-heals automatically**: on the next cold start (or API call) it applies the embedded schema once via an advisory lock. You can also run `npx drizzle-kit push` with `DATABASE_URL` set to production (§5 step 5). Retry signup a few seconds after the first error. |
+
+**OAuth callback lands on `/accounts?oauth_error=...`** — check `APP_URL` matches your domain exactly, the redirect URI uses `https`, the app is Live (Meta) / the user is a test user (Google), and the secret wasn't rotated after copying.
+
+**Razorpay checkout does nothing** — `NEXT_PUBLIC_RAZORPAY_KEY_ID` must be set (same value as `RAZORPAY_KEY_ID`); verify **payment.captured** is ticked in the webhook.
+
+**Posts stay "scheduled"** — on Hobby, cron is daily: enable the GitHub Action pinger (§4.4) or hit `/api/jobs/publish` manually with the Bearer secret.
+
+**Signup works but no emails arrive** — email vars unset; check provider dashboard logs, or leave unset (the app intentionally no-ops).
+
+---
+
+## 7. API reference (selected)
 
 | Method & path | Purpose | Auth |
 |---|---|---|

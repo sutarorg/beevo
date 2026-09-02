@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodSchema } from "zod";
+import { ensureSchema, isConnectionError, isSchemaMissingError } from "./migrate";
+import { dbConfigured } from "@/db";
 
 export function ok<T>(data: T, status = 200): NextResponse {
   return NextResponse.json(data, { status });
@@ -38,17 +40,43 @@ export async function parseBody<T>(req: Request, schema: ZodSchema<T>): Promise<
   }
 }
 
-/** Wrap a handler and turn ApiErrors / unexpected throws into clean JSON. */
+/** Wrap a handler and turn ApiErrors / infra failures into actionable JSON. */
 export function handler<Args extends unknown[]>(
   fn: (...args: Args) => Promise<NextResponse>
 ): (...args: Args) => Promise<NextResponse> {
   return async (...args: Args) => {
     try {
+      // Fast, explicit signal when the database was never configured.
+      if (!dbConfigured) {
+        return fail(
+          "DATABASE_URL is not configured on this deployment — add it in Vercel → Settings → Environment Variables (README §4.1), then redeploy.",
+          503,
+          "DB_NOT_CONFIGURED"
+        );
+      }
       return await fn(...args);
     } catch (err) {
       if (err instanceof ApiError) return fail(err.message, err.status, err.code);
+
+      // Missing schema on first deploy → kick self-heal and tell the client to retry.
+      if (isSchemaMissingError(err)) {
+        void ensureSchema(true);
+        return fail(
+          "Database schema is being initialised — please retry in a few seconds. (First-deploy self-heal; README §5)",
+          503,
+          "SCHEMA_NOT_MIGRATED"
+        );
+      }
+      if (isConnectionError(err)) {
+        return fail(
+          "Cannot reach the database — verify DATABASE_URL points to a hosted Postgres (e.g. Neon pooled URL). 127.0.0.1/localhost cannot be reached from Vercel.",
+          503,
+          "DB_UNREACHABLE"
+        );
+      }
+
       console.error("[api]", err);
-      return fail("Internal server error", 500);
+      return fail("Internal server error", 500, "INTERNAL");
     }
   };
 }

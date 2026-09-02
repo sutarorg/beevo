@@ -12,7 +12,17 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  if (process.env.VERCEL) return; // Vercel: external cron handles it
+
+  // First-deploy self-heal: create the schema if tables are missing.
+  // Runs on every cold start but is a no-op once tables exist.
+  try {
+    const { ensureSchema } = await import("@/lib/server/migrate");
+    await ensureSchema();
+  } catch (err) {
+    console.warn("[beevo migrate] boot check skipped:", err instanceof Error ? err.message : err);
+  }
+
+  if (process.env.VERCEL) return; // Vercel: external cron handles scheduling
   if (process.env.ENABLE_INTERNAL_CRON === "false") return;
 
   const g = globalThis as typeof globalThis & {
