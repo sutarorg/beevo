@@ -62,7 +62,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <header className="sticky top-0 z-30 border-b border-cream-300/70 bg-cream-100/85 backdrop-blur-md lg:top-3 lg:rounded-t-[28px]">
+    <header className="sticky top-0 z-30 border-b border-cream-300/70 bg-cream-100/95 backdrop-blur-md lg:rounded-t-[28px]">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
         <button
           onClick={onMenu}
@@ -158,7 +158,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             width="w-64"
             trigger={
               <button className="cursor-pointer rounded-full transition-transform hover:scale-105" aria-label="Account">
-                <HexAvatar name={user?.name ?? "Bee Keeper"} hue={36} size={36} />
+                <HexAvatar name={user?.name ?? "Bee Keeper"} hue={36} size={36} src={user?.avatarUrl} />
               </button>
             }
           >

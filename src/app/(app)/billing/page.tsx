@@ -15,7 +15,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn, formatINR } from "@/lib/utils";
-import { GST_RATE, PLANS } from "@/lib/constants";
+import { PLANS } from "@/lib/constants";
+import { formatPaiseExact, priceFor } from "@/lib/pricing";
 import { Badge, Button, Card, CardHeader, Meter, Modal, Skeleton } from "@/components/ui/primitives";
 import { BeeMark } from "@/components/brand/bee-mark";
 import { useApp } from "@/providers/app-provider";
@@ -26,10 +27,20 @@ export default function BillingPage() {
   const [checkout, setCheckout] = React.useState(false);
   const [downgrade, setDowngrade] = React.useState(false);
   const [payPhase, setPayPhase] = React.useState<"choose" | "working" | "done">("choose");
-  const [method, setMethod] = React.useState<"upi" | "card">("upi");
 
-  const gst = Math.round(799 * GST_RATE * 100) / 100;
-  const total = 799 + gst;
+  /* Authoritative pricing — ₹799 base + 18% GST ₹143.82 = ₹942.82 */
+  const price = billing?.price
+    ? {
+        base: formatPaiseExact(billing.price.basePaise),
+        gst: formatPaiseExact(billing.price.gstPaise),
+        total: formatPaiseExact(billing.price.totalPaise),
+        gstPercent: billing.price.gstPercent,
+      }
+    : (() => {
+        const p = priceFor("monthly");
+        return { base: p.base, gst: p.gst, total: p.total, gstPercent: 18 };
+      })();
+  const methods = billing?.paymentMethods ?? [];
 
   async function pay() {
     setPayPhase("working");
@@ -82,7 +93,7 @@ export default function BillingPage() {
             </h2>
             <p className={cn("mt-1 text-sm", plan === "pro" ? "text-ink-950/75" : "text-cream-50/60")}>
               {plan === "pro"
-                ? `₹799/month · renews ${billing.renewsOn ? new Date(billing.renewsOn).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "soon"}`
+                ? `${price.total}/month (incl. ${price.gstPercent}% GST) · renews ${billing.renewsOn ? new Date(billing.renewsOn).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "soon"}`
                 : "₹0 forever · upgrade anytime to unlock the full hive"}
             </p>
           </div>
@@ -97,7 +108,7 @@ export default function BillingPage() {
                   <Meter value={billing.usage.postsThisMonth} max={billing.usage.postsLimit ?? 10} className="mt-1.5 !bg-white/15" />
                 </div>
                 <Button onClick={() => openCheckoutFor("pro")}>
-                  <Sparkles size={15} /> Upgrade — {formatINR(799)}/mo
+                  <Sparkles size={15} /> Upgrade — {price.total}/mo
                 </Button>
               </>
             ) : (
@@ -127,6 +138,11 @@ export default function BillingPage() {
                   <span className="tnum text-4xl font-bold tracking-tight text-ink-950">{formatINR(p.priceInr)}</span>
                   <span className="pb-1 text-sm text-ink-600/70">/ {p.cadence === "forever" ? "forever" : "month"}</span>
                 </div>
+                {p.id === "pro" && (
+                  <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.1em] text-ink-600/60">
+                    + {price.gstPercent}% GST {price.gst} = <b className="text-ink-800">{price.total}</b> / month
+                  </p>
+                )}
                 <p className="mt-1.5 text-[13px] leading-relaxed text-ink-600/80">{p.blurb}</p>
                 <ul className="mt-4 flex-1 space-y-2">
                   {p.features.map((f) => (
@@ -146,7 +162,7 @@ export default function BillingPage() {
                   disabled={current}
                   onClick={() => openCheckoutFor(p.id)}
                 >
-                  {current ? "Your plan" : p.id === "pro" ? `Upgrade — ${formatINR(p.priceInr)}/mo` : "Switch to Free"}
+                  {current ? "Your plan" : p.id === "pro" ? `Upgrade — ${price.total}/mo` : "Switch to Free"}
                 </Button>
               </Card>
             </motion.div>
@@ -157,35 +173,49 @@ export default function BillingPage() {
       {/* payment + invoices */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader title="Payment methods" subtitle="Cards & UPI on file" />
+          <CardHeader title="Payment methods" subtitle="Instruments you've actually paid with" />
           <div className="space-y-2.5 px-5 pb-5">
-            <div className="flex items-center gap-3 rounded-xl border border-cream-300 bg-white p-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink-900 text-honey-400">
-                <CreditCard size={16} />
-              </span>
-              <div className="flex-1">
-                <p className="text-[13px] font-semibold text-ink-900">HDFC Visa •••• 4282</p>
-                <p className="font-mono text-[10px] text-ink-600/55">expires 09/28</p>
+            {methods.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-cream-300 bg-cream-50/50 px-4 py-6 text-center">
+                <CreditCard size={18} className="mx-auto text-ink-600/40" />
+                <p className="mt-2 text-[13px] font-medium text-ink-800">No payment methods yet</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-ink-600/70">
+                  Your card or UPI ID is saved automatically the first time you pay — nothing is stored
+                  by Beevo, only the last four digits from the gateway.
+                </p>
+                {plan === "free" && (
+                  <Button size="xs" className="mt-3" onClick={() => openCheckoutFor("pro")}>
+                    Upgrade to Pro
+                  </Button>
+                )}
               </div>
-              <Badge tone="green">Default</Badge>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl border border-cream-300 bg-white p-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-honey-100 text-honey-700 border border-honey-300/50">
-                <Smartphone size={16} />
-              </span>
-              <div className="flex-1">
-                <p className="text-[13px] font-semibold text-ink-900">aarushi@okhdfc UPI</p>
-                <p className="font-mono text-[10px] text-ink-600/55">autopay enabled</p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => toast.success("Payment methods are mocked in this demo")}
-            >
-              + Add payment method
-            </Button>
+            ) : (
+              methods.map((m, i) => (
+                <div key={m.id} className="flex items-center gap-3 rounded-xl border border-cream-300 bg-white p-3">
+                  <span
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-lg",
+                      m.method === "upi"
+                        ? "border border-honey-300/50 bg-honey-100 text-honey-700"
+                        : "bg-ink-900 text-honey-400"
+                    )}
+                  >
+                    {m.method === "upi" ? <Smartphone size={16} /> : <CreditCard size={16} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold text-ink-900">{m.detail}</p>
+                    <p className="font-mono text-[10px] text-ink-600/55">
+                      last used {new Date(m.lastUsedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                  </div>
+                  {i === 0 && <Badge tone="green">Latest</Badge>}
+                </div>
+              ))
+            )}
+            <p className="flex items-start gap-1.5 pt-1 text-[11px] leading-relaxed text-ink-600/60">
+              <ShieldCheck size={11} className="mt-0.5 shrink-0 text-leaf-600" />
+              Card details never touch Beevo servers — payments are tokenised by Razorpay (PCI-DSS).
+            </p>
           </div>
         </Card>
 
@@ -215,7 +245,14 @@ export default function BillingPage() {
                       {new Date(inv.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </td>
                     <td className="hidden px-3 py-3 text-ink-600/80 sm:table-cell">{inv.description}</td>
-                    <td className="tnum px-3 py-3 text-right font-semibold text-ink-900">{formatINR(inv.amountInr)}</td>
+                    <td className="tnum px-3 py-3 text-right font-semibold text-ink-900">
+                      {inv.totalPaise ? formatPaiseExact(inv.totalPaise) : formatINR(inv.amountInr)}
+                      {inv.gstPaise ? (
+                        <span className="block font-mono text-[9.5px] font-normal text-ink-600/55">
+                          incl. {formatPaiseExact(inv.gstPaise)} GST
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-3 text-right">
                       <Badge tone="green">{inv.status}</Badge>
                     </td>
@@ -242,48 +279,34 @@ export default function BillingPage() {
           <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink-950">
             <Crown size={18} className="text-honey-600" /> Checkout — Beevo Pro
           </h3>
-          <p className="mt-0.5 text-[13px] text-ink-600/75">Secured by BeevoPay · auto-renews monthly</p>
+          <p className="mt-0.5 text-[13px] text-ink-600/75">Secure Razorpay checkout · auto-renews monthly</p>
 
           <div className="mt-4 space-y-2 rounded-2xl border border-cream-300 bg-white p-4 text-[13px]">
-            <Row label="Beevo Pro · monthly" value={formatINR(799)} />
-            <Row label={`GST (18%) · for ${user?.email ?? "you"}`} value={formatINR(gst, { decimals: 2 })} />
+            <Row label="Beevo Pro · monthly" value={price.base} />
+            <Row label={`GST (${price.gstPercent}%)`} value={price.gst} />
             <div className="my-1 border-t border-dashed border-cream-300" />
-            <Row label="Total due today" value={formatINR(total, { decimals: 2 })} bold />
+            <Row label="Total due today" value={price.total} bold />
             <p className="pt-1 font-mono text-[10px] uppercase tracking-wide text-ink-600/50">
-              Next renewal: {formatINR(total, { decimals: 2 })} in 30 days
+              Next renewal: {price.total} in 30 days · billed to {user?.email ?? "your email"}
             </p>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {(
-              [
-                { id: "upi", label: "UPI / GPay", icon: Smartphone },
-                { id: "card", label: "Visa •••• 4282", icon: CreditCard },
-              ] as const
-            ).map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMethod(m.id)}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-xl border px-3.5 py-3 text-[13px] font-medium transition-all",
-                  method === m.id
-                    ? "border-honey-500/70 bg-honey-50 text-ink-950 ring-2 ring-honey-500/20"
-                    : "border-cream-300 bg-white text-ink-700 hover:border-honey-400/50"
-                )}
-              >
-                <m.icon size={15} className={method === m.id ? "text-honey-700" : "opacity-60"} />
-                {m.label}
-                {method === m.id && <Check size={13} className="ml-auto text-honey-700" />}
-              </button>
-            ))}
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-cream-300 bg-cream-50/70 p-3.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-900 text-honey-400">
+              <CreditCard size={16} />
+            </span>
+            <p className="text-[12.5px] leading-relaxed text-ink-700">
+              Choose <b>UPI, card, net banking or wallet</b> on the next screen — Razorpay handles the
+              payment and we never see your card details.
+            </p>
           </div>
 
           <Button className="mt-5 w-full" size="lg" busy={payPhase === "working"} onClick={pay}>
             {payPhase === "working"
-              ? "Contacting your bank…"
+              ? "Opening secure checkout…"
               : payPhase === "done"
                 ? "Payment successful"
-                : `Pay ${formatINR(total, { decimals: 2 })}`}
+                : `Pay ${price.total}`}
           </Button>
           <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-ink-600/60">
             <ShieldCheck size={12} className="text-leaf-600" /> 256-bit encrypted · PCI-DSS compliant · cancel anytime

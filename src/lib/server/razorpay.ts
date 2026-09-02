@@ -1,18 +1,23 @@
 import { env } from "./env";
 import { hmacSha256, timingSafeEqual } from "./crypto";
+import { PRICING, cycleKey, gstPaise, priceFor, type BillingCycle } from "@/lib/pricing";
 
 /**
  * Razorpay over plain HTTPS (Orders flow) — no SDK needed.
  * Amounts are paise. Docs: https://razorpay.com/docs/api/orders
  */
 
+export { PRICING, cycleKey, gstPaise, priceFor };
+export type { BillingCycle };
+
+/** Legacy alias kept for existing imports. */
 export const PLAN_AMOUNTS = {
-  pro_monthly: { base: 79900, label: "Beevo Pro — Monthly", months: 1 },
-  pro_annual: { base: 799000, label: "Beevo Pro — Annual", months: 12 },
+  pro_monthly: { base: PRICING.pro_monthly.basePaise, label: PRICING.pro_monthly.label, months: 1 },
+  pro_annual: { base: PRICING.pro_annual.basePaise, label: PRICING.pro_annual.label, months: 12 },
 } as const;
 
 export function gstOf(paiseBase: number): number {
-  return Math.round(paiseBase * 0.18);
+  return gstPaise(paiseBase);
 }
 
 export interface RazorpayOrder {
@@ -40,6 +45,51 @@ export async function createOrder(opts: {
   });
   if (!res.ok) throw new Error(`Razorpay order failed: ${res.status} ${await res.text()}`);
   return (await res.json()) as RazorpayOrder;
+}
+
+export interface RazorpayPayment {
+  id: string;
+  method?: string;
+  card?: { last4?: string; network?: string };
+  vpa?: string;
+  bank?: string;
+  wallet?: string;
+  email?: string;
+  contact?: string;
+}
+
+/** Fetch the captured payment so we can store the real instrument used. */
+export async function fetchPayment(paymentId: string): Promise<RazorpayPayment | null> {
+  try {
+    const auth = Buffer.from(`${env.billing.keyId()}:${env.billing.keySecret()}`).toString("base64");
+    const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as RazorpayPayment;
+  } catch {
+    return null;
+  }
+}
+
+/** Human label for a stored payment method, e.g. "Visa •••• 4242" / "user@okhdfc". */
+export function describePayment(p: RazorpayPayment | null): { method: string | null; detail: string | null } {
+  if (!p) return { method: null, detail: null };
+  switch (p.method) {
+    case "card":
+      return {
+        method: "card",
+        detail: `${p.card?.network ?? "Card"} •••• ${p.card?.last4 ?? "____"}`,
+      };
+    case "upi":
+      return { method: "upi", detail: p.vpa ?? "UPI" };
+    case "netbanking":
+      return { method: "netbanking", detail: p.bank ?? "Net banking" };
+    case "wallet":
+      return { method: "wallet", detail: p.wallet ?? "Wallet" };
+    default:
+      return { method: p.method ?? null, detail: p.method ?? null };
+  }
 }
 
 /** Verify Checkout handler signature: HMAC(orderId|paymentId, keySecret). */

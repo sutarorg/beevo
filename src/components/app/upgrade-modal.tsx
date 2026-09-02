@@ -4,10 +4,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { X, Crown, Check, Sparkles, CalendarClock, Wand2, Users, BarChart3, Infinity as InfinityIcon } from "lucide-react";
-import { formatINR } from "@/lib/utils";
+import { priceFor } from "@/lib/pricing";
 import { Button, Modal } from "@/components/ui/primitives";
 import { BeeMark } from "@/components/brand/bee-mark";
 import { useApp } from "@/providers/app-provider";
+
+const PRICE = priceFor("monthly");
 
 const REASON_COPY: Record<string, { title: string; body: string }> = {
   "post-limit": {
@@ -111,11 +113,11 @@ export function UpgradeModal() {
               </p>
 
               <div className="mt-4 flex items-end justify-center gap-1.5">
-                <span className="tnum text-4xl font-bold tracking-tight text-ink-950">{formatINR(799)}</span>
+                <span className="tnum text-4xl font-bold tracking-tight text-ink-950">{PRICE.base}</span>
                 <span className="pb-1 text-sm text-ink-600/70">/ month</span>
               </div>
               <p className="mt-0.5 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600/55">
-                + 18% GST · cancel anytime
+                + 18% GST {PRICE.gst} = {PRICE.total} / month · cancel anytime
               </p>
 
               <ul className="mt-5 space-y-2">
@@ -138,7 +140,7 @@ export function UpgradeModal() {
 
               <Button className="mt-5 w-full" size="lg" busy={busy} onClick={upgradeNow}>
                 <Sparkles size={16} />
-                {busy ? "Processing payment…" : `Upgrade now — ${formatINR(799)}/mo`}
+                {busy ? "Processing payment…" : `Upgrade now — ${PRICE.total}/mo`}
               </Button>
               <p className="mt-2.5 text-center text-[11px] text-ink-600/60">
                 Secured checkout · UPI, cards & net banking · GST invoice emailed

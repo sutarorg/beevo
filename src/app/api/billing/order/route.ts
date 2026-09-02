@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { payments } from "@/db/schema";
 import { handler, ok, parseBody, ApiError } from "@/lib/server/http";
 import { requireUser } from "@/lib/server/session";
-import { PLAN_AMOUNTS, createOrder, gstOf } from "@/lib/server/razorpay";
+import { createOrder } from "@/lib/server/razorpay";
+import { priceFor } from "@/lib/pricing";
 import { env } from "@/lib/server/env";
 import { randomToken } from "@/lib/server/crypto";
 
@@ -12,25 +13,31 @@ export const dynamic = "force-dynamic";
 const schema = z.object({ cycle: z.enum(["monthly", "annual"]).default("monthly") });
 
 /**
- * Creates a Razorpay order (amount in paise, INR).
+ * Creates a Razorpay order for ₹799 + 18% GST = ₹942.82 (94282 paise).
  * When Razorpay keys aren't configured the client falls back to
- * /api/billing/demo-activate (demo billing is flagged in the README).
+ * /api/billing/demo-activate (only if ALLOW_DEMO_BILLING=true).
  */
 export const POST = handler(async (req: Request) => {
   const { workspace, member, user } = await requireUser();
   if (member.role === "viewer") throw new ApiError(403, "Viewers can't manage billing");
   const { cycle } = await parseBody(req, schema);
+  const price = priceFor(cycle);
 
   if (!env.billing.configured()) {
-    return ok({ configured: false, demoAllowed: env.allowDemoBilling() });
+    return ok({
+      configured: false,
+      demoAllowed: env.allowDemoBilling(),
+      breakdown: {
+        basePaise: price.basePaise,
+        gstPaise: price.gstPaise,
+        totalPaise: price.totalPaise,
+      },
+    });
   }
 
-  const planDef = PLAN_AMOUNTS[`pro_${cycle}`];
-  const totalPaise = planDef.base + gstOf(planDef.base);
   const receipt = `beevo_${workspace.id.slice(0, 8)}_${randomToken(6)}`;
-
   const order = await createOrder({
-    amountPaise: totalPaise,
+    amountPaise: price.totalPaise,
     receipt,
     notes: { workspaceId: workspace.id, plan: "pro", cycle, email: user.email },
   });
@@ -39,7 +46,10 @@ export const POST = handler(async (req: Request) => {
     workspaceId: workspace.id,
     plan: "pro",
     cycle,
-    amountInr: Math.round(totalPaise / 100),
+    amountInr: Math.round(price.totalPaise / 100),
+    basePaise: price.basePaise,
+    gstPaise: price.gstPaise,
+    totalPaise: price.totalPaise,
     currency: "INR",
     razorpayOrderId: order.id,
     status: "created",
@@ -48,9 +58,10 @@ export const POST = handler(async (req: Request) => {
   return ok({
     configured: true,
     orderId: order.id,
-    amount: totalPaise,
+    amount: price.totalPaise,
     currency: "INR",
     keyId: env.billing.keyId(),
-    label: planDef.label,
+    label: price.label,
+    breakdown: { basePaise: price.basePaise, gstPaise: price.gstPaise, totalPaise: price.totalPaise },
   });
 });

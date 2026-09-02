@@ -1,7 +1,4 @@
-/* Auto-generated from drizzle-kit generate — embedded DDL for boot-time
-   self-healing schema initialisation. Regenerate: npx drizzle-kit generate */
-export const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS "api_keys" (
+CREATE TABLE "api_keys" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"created_by_id" uuid,
@@ -16,7 +13,7 @@ CREATE TABLE IF NOT EXISTS "api_keys" (
 	CONSTRAINT "api_keys_token_hash_unique" UNIQUE("token_hash")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "invoices" (
+CREATE TABLE "invoices" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"number" text NOT NULL,
@@ -31,7 +28,7 @@ CREATE TABLE IF NOT EXISTS "invoices" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "media_assets" (
+CREATE TABLE "media_assets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"uploaded_by_id" uuid,
@@ -43,7 +40,7 @@ CREATE TABLE IF NOT EXISTS "media_assets" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "metrics_snapshots" (
+CREATE TABLE "metrics_snapshots" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"date" varchar(10) NOT NULL,
@@ -53,7 +50,7 @@ CREATE TABLE IF NOT EXISTS "metrics_snapshots" (
 	"followers" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "notifications" (
+CREATE TABLE "notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"kind" varchar(20) DEFAULT 'tip' NOT NULL,
@@ -63,7 +60,7 @@ CREATE TABLE IF NOT EXISTS "notifications" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "payments" (
+CREATE TABLE "payments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"plan" varchar(10) DEFAULT 'pro' NOT NULL,
@@ -83,7 +80,7 @@ CREATE TABLE IF NOT EXISTS "payments" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "post_targets" (
+CREATE TABLE "post_targets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"post_id" uuid NOT NULL,
 	"platform" varchar(20) NOT NULL,
@@ -97,7 +94,7 @@ CREATE TABLE IF NOT EXISTS "post_targets" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "posts" (
+CREATE TABLE "posts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"created_by_id" uuid,
@@ -113,7 +110,7 @@ CREATE TABLE IF NOT EXISTS "posts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "sessions" (
+CREATE TABLE "sessions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"token_hash" text NOT NULL,
@@ -126,7 +123,7 @@ CREATE TABLE IF NOT EXISTS "sessions" (
 	CONSTRAINT "sessions_token_hash_unique" UNIQUE("token_hash")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "social_accounts" (
+CREATE TABLE "social_accounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"platform" varchar(20) NOT NULL,
@@ -145,7 +142,7 @@ CREATE TABLE IF NOT EXISTS "social_accounts" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "users" (
+CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"email" text NOT NULL,
@@ -156,7 +153,7 @@ CREATE TABLE IF NOT EXISTS "users" (
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "workspace_invites" (
+CREATE TABLE "workspace_invites" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"email" text NOT NULL,
@@ -168,7 +165,7 @@ CREATE TABLE IF NOT EXISTS "workspace_invites" (
 	CONSTRAINT "workspace_invites_token_hash_unique" UNIQUE("token_hash")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "workspace_members" (
+CREATE TABLE "workspace_members" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -176,7 +173,7 @@ CREATE TABLE IF NOT EXISTS "workspace_members" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "workspaces" (
+CREATE TABLE "workspaces" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"slug" text NOT NULL,
@@ -203,20 +200,19 @@ ALTER TABLE "social_accounts" ADD CONSTRAINT "social_accounts_workspace_id_works
 ALTER TABLE "workspace_invites" ADD CONSTRAINT "workspace_invites_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "api_keys_ws_idx" ON "api_keys" USING btree ("workspace_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "invoices_ws_idx" ON "invoices" USING btree ("workspace_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "media_ws_idx" ON "media_assets" USING btree ("workspace_id");--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "snapshot_unique" ON "metrics_snapshots" USING btree ("workspace_id","date","platform");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "notif_ws_idx" ON "notifications" USING btree ("workspace_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "payments_ws_idx" ON "payments" USING btree ("workspace_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "targets_post_idx" ON "post_targets" USING btree ("post_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "targets_status_idx" ON "post_targets" USING btree ("status");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "posts_ws_idx" ON "posts" USING btree ("workspace_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "posts_status_idx" ON "posts" USING btree ("status");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "posts_due_idx" ON "posts" USING btree ("status","scheduled_at");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "sessions_user_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "account_unique" ON "social_accounts" USING btree ("workspace_id","platform","platform_account_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "account_ws_idx" ON "social_accounts" USING btree ("workspace_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "invites_ws_idx" ON "workspace_invites" USING btree ("workspace_id");--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "members_unique" ON "workspace_members" USING btree ("workspace_id","user_id");
-`;
+CREATE INDEX "api_keys_ws_idx" ON "api_keys" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "invoices_ws_idx" ON "invoices" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "media_ws_idx" ON "media_assets" USING btree ("workspace_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "snapshot_unique" ON "metrics_snapshots" USING btree ("workspace_id","date","platform");--> statement-breakpoint
+CREATE INDEX "notif_ws_idx" ON "notifications" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "payments_ws_idx" ON "payments" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "targets_post_idx" ON "post_targets" USING btree ("post_id");--> statement-breakpoint
+CREATE INDEX "targets_status_idx" ON "post_targets" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "posts_ws_idx" ON "posts" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "posts_status_idx" ON "posts" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "posts_due_idx" ON "posts" USING btree ("status","scheduled_at");--> statement-breakpoint
+CREATE INDEX "sessions_user_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "account_unique" ON "social_accounts" USING btree ("workspace_id","platform","platform_account_id");--> statement-breakpoint
+CREATE INDEX "account_ws_idx" ON "social_accounts" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "invites_ws_idx" ON "workspace_invites" USING btree ("workspace_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "members_unique" ON "workspace_members" USING btree ("workspace_id","user_id");

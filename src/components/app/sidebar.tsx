@@ -152,7 +152,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               className="mt-3 w-full"
               onClick={() => openUpgrade("sidebar")}
             >
-              <Crown size={14} /> Upgrade — ₹799/mo
+              <Crown size={14} /> Upgrade — ₹942.82/mo
             </Button>
           </div>
         ) : (
@@ -176,7 +176,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* user */}
       <div className="flex items-center gap-3 border-t border-white/[0.06] px-5 py-4">
-        <HexAvatar name={user?.name ?? "Bee Keeper"} hue={36} size={34} />
+        <HexAvatar name={user?.name ?? "Bee Keeper"} hue={36} size={34} src={user?.avatarUrl} />
         <div className="min-w-0">
           <p className="truncate text-[13px] font-semibold text-cream-50">{user?.name ?? "…"}</p>
           <p className="truncate font-mono text-[10px] text-cream-50/40">{user?.workspace ?? "Hive"}</p>

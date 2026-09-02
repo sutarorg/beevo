@@ -79,6 +79,13 @@ export function PricingCards({ compact = false }: { compact?: boolean }) {
               <p className={cn("mt-1 font-mono text-[10.5px] uppercase tracking-[0.14em]", pro ? "text-cream-50/50" : "text-ink-600/55")}>
                 {price.note}
               </p>
+              {pro && (
+                <p className="mt-1 font-mono text-[10.5px] text-honey-300/90">
+                  {cycle === "monthly"
+                    ? "₹799 + 18% GST ₹143.82 = ₹942.82 / month"
+                    : "₹7,990 + 18% GST ₹1,438.20 = ₹9,428.20 / year"}
+                </p>
+              )}
               <p className={cn("mt-3 text-sm leading-relaxed", pro ? "text-cream-50/65" : "text-ink-600/80")}>{p.blurb}</p>
 
               <ul className={cn("mt-6 flex-1 space-y-2.5", compact && "space-y-2")}>

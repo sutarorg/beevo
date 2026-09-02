@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { invoices, notifications, payments, workspaces } from "@/db/schema";
 import { handler, ok, parseBody, ApiError } from "@/lib/server/http";
 import { requireUser } from "@/lib/server/session";
-import { verifyPaymentSignature, PLAN_AMOUNTS } from "@/lib/server/razorpay";
+import { verifyPaymentSignature, fetchPayment, describePayment } from "@/lib/server/razorpay";
+import { priceFor, formatPaiseExact, type BillingCycle } from "@/lib/pricing";
 import { emails, sendMail } from "@/lib/server/email";
 import { randomToken } from "@/lib/server/crypto";
 
@@ -17,25 +18,28 @@ const schema = z.object({
   signature: z.string().min(10),
 });
 
-export async function activatePro(workspaceId: string, opts: {
-  months: number;
-  description: string;
-  razorpayPaymentId?: string | null;
-  status?: string;
-}) {
-  const renewsAt = addMonths(new Date(), opts.months);
-  await db
-    .update(workspaces)
-    .set({ plan: "pro", planRenewsAt: renewsAt })
-    .where(eq(workspaces.id, workspaceId));
+export async function activatePro(
+  workspaceId: string,
+  opts: {
+    cycle: BillingCycle;
+    razorpayPaymentId?: string | null;
+    demo?: boolean;
+  }
+) {
+  const price = priceFor(opts.cycle);
+  const renewsAt = addMonths(new Date(), price.months);
+  await db.update(workspaces).set({ plan: "pro", planRenewsAt: renewsAt }).where(eq(workspaces.id, workspaceId));
+
   const invoiceNo = `INV-${new Date().getFullYear()}-${randomToken(3).toUpperCase()}`;
-  const base = Math.round((797 / 1.18) * opts.months);
   await db.insert(invoices).values({
     workspaceId,
     number: invoiceNo,
-    description: opts.description,
-    amountInr: Math.round(base * 1.18),
-    gstInr: Math.round(base * 0.18),
+    description: `${price.label}${opts.demo ? " (demo)" : ""}`,
+    amountInr: Math.round(price.totalPaise / 100),
+    gstInr: Math.round(price.gstPaise / 100),
+    basePaise: price.basePaise,
+    gstPaise: price.gstPaise,
+    totalPaise: price.totalPaise,
     status: "paid",
     razorpayPaymentId: opts.razorpayPaymentId ?? null,
   });
@@ -43,9 +47,9 @@ export async function activatePro(workspaceId: string, opts: {
     workspaceId,
     kind: "plan",
     title: "Welcome to Beevo Pro",
-    body: "Unlimited posts, Hive Writer and the best-time engine are now active.",
+    body: `Payment of ${price.total} received (incl. ${price.gst} GST). Unlimited posts and Hive Writer are active.`,
   });
-  return { renewsAt, invoiceNo };
+  return { renewsAt, invoiceNo, price };
 }
 
 export const POST = handler(async (req: Request) => {
@@ -66,6 +70,13 @@ export const POST = handler(async (req: Request) => {
     .where(and(eq(payments.razorpayOrderId, body.orderId), eq(payments.workspaceId, workspace.id)))
     .limit(1);
   if (!payment) throw new ApiError(404, "Order not found for this workspace");
+  if (payment.status === "paid") {
+    return ok({ plan: "pro", alreadyProcessed: true });
+  }
+
+  // Record the real instrument the customer paid with.
+  const rzp = await fetchPayment(body.paymentId);
+  const { method, detail } = describePayment(rzp);
 
   await db
     .update(payments)
@@ -73,23 +84,23 @@ export const POST = handler(async (req: Request) => {
       status: "paid",
       razorpayPaymentId: body.paymentId,
       razorpaySignature: body.signature,
+      method,
+      methodDetail: detail,
       updatedAt: new Date(),
     })
     .where(eq(payments.id, payment.id));
 
-  const months = payment.cycle === "annual" ? 12 : 1;
-  const { renewsAt, invoiceNo } = await activatePro(workspace.id, {
-    months,
-    description: PLAN_AMOUNTS[payment.cycle === "annual" ? "pro_annual" : "pro_monthly"].label,
+  const cycle = (payment.cycle === "annual" ? "annual" : "monthly") as BillingCycle;
+  const { renewsAt, invoiceNo, price } = await activatePro(workspace.id, {
+    cycle,
     razorpayPaymentId: body.paymentId,
-    status: "paid",
   });
 
   void sendMail({
     to: user.email,
     subject: `Beevo Pro invoice ${invoiceNo}`,
-    html: emails.invoice(`₹${payment.amountInr.toLocaleString("en-IN")}`, invoiceNo),
+    html: emails.invoice(formatPaiseExact(price.totalPaise), invoiceNo),
   });
 
-  return ok({ plan: "pro", renewsOn: renewsAt.toISOString(), invoice: invoiceNo });
+  return ok({ plan: "pro", renewsOn: renewsAt.toISOString(), invoice: invoiceNo, total: price.total });
 });

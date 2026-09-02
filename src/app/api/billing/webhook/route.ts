@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { payments } from "@/db/schema";
 import { NextResponse } from "next/server";
-import { verifyWebhookSignature } from "@/lib/server/razorpay";
+import { verifyWebhookSignature, fetchPayment, describePayment } from "@/lib/server/razorpay";
 import { activatePro } from "@/app/api/billing/verify/route";
 
 export const dynamic = "force-dynamic";
@@ -32,13 +32,20 @@ export async function POST(req: Request) {
     if (entity?.order_id) {
       const [payment] = await db.select().from(payments).where(eq(payments.razorpayOrderId, entity.order_id)).limit(1);
       if (payment && payment.status !== "paid") {
+        const rzp = entity.id ? await fetchPayment(entity.id) : null;
+        const { method, detail } = describePayment(rzp);
         await db
           .update(payments)
-          .set({ status: "paid", razorpayPaymentId: entity.id ?? null, updatedAt: new Date() })
+          .set({
+            status: "paid",
+            razorpayPaymentId: entity.id ?? null,
+            method,
+            methodDetail: detail,
+            updatedAt: new Date(),
+          })
           .where(eq(payments.id, payment.id));
         await activatePro(payment.workspaceId, {
-          months: payment.cycle === "annual" ? 12 : 1,
-          description: payment.cycle === "annual" ? "Beevo Pro — Annual" : "Beevo Pro — Monthly",
+          cycle: payment.cycle === "annual" ? "annual" : "monthly",
           razorpayPaymentId: entity.id ?? null,
         });
       }

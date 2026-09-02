@@ -264,7 +264,7 @@ export default function AnalyticsPage() {
                 </span>
                 <p className="text-sm font-semibold text-ink-950">Best-time engine is a Pro feature</p>
                 <Button size="sm" onClick={() => openUpgrade("best-time")}>
-                  Unlock heatmap — ₹799/mo
+                  Unlock heatmap — ₹942.82/mo
                 </Button>
               </div>
             )}

@@ -430,11 +430,14 @@ export function HexAvatar({
   hue = 40,
   size = 36,
   className,
+  src,
 }: {
   name: string;
   hue?: number;
   size?: number;
   className?: string;
+  /** When present, renders the uploaded avatar image instead of initials. */
+  src?: string | null;
 }) {
   const ini = name
     .replace(/^@/, "")
@@ -444,6 +447,19 @@ export function HexAvatar({
     .slice(0, 2)
     .join("")
     .toUpperCase();
+
+  if (src) {
+    return (
+      <span
+        className={cn("hex-clip inline-block overflow-hidden bg-cream-200 align-middle", className)}
+        style={{ width: size, height: size }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={name} className="h-full w-full object-cover" />
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn("hex-clip inline-flex items-center justify-center font-semibold text-white select-none", className)}

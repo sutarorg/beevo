@@ -25,8 +25,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
         <AppSidebar menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} />
         <div className="relative lg:pl-[272px]">
-          <main className="min-h-screen px-0 py-0 lg:px-3 lg:pt-3">
-            <div className="min-h-screen bg-cream-100 lg:min-h-[calc(100vh-12px)] lg:rounded-t-[28px] lg:border-x lg:border-t lg:border-ink-800/80 overflow-clip shadow-[var(--shadow-lift)]">
+          {/* No top padding: the panel starts flush with the viewport so the
+              sticky header pins to y=0 with no dark gap above it. */}
+          <main className="min-h-screen px-0 py-0 lg:px-3">
+            <div className="min-h-screen bg-cream-100 lg:rounded-t-[28px] lg:border-x lg:border-t lg:border-ink-800/80 shadow-[var(--shadow-lift)]">
               <Topbar onMenu={() => setMenuOpen(true)} />
               <div className="px-4 pb-16 pt-6 sm:px-6 lg:px-8">{children}</div>
             </div>

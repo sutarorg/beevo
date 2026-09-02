@@ -70,7 +70,24 @@ export interface Invoice {
   date: string;
   description: string;
   amountInr: number;
+  basePaise?: number;
+  gstPaise?: number;
+  totalPaise?: number;
   status: "paid" | "refunded";
+}
+
+export interface PaymentMethod {
+  id: string;
+  method: string;
+  detail: string;
+  lastUsedAt: string;
+}
+
+export interface PlanPrice {
+  basePaise: number;
+  gstPaise: number;
+  totalPaise: number;
+  gstPercent: number;
 }
 
 export interface MediaAsset {
@@ -120,12 +137,23 @@ export interface AnalyticsPayload {
 export interface BillingPayload {
   plan: PlanId;
   renewsOn: string | null;
+  price?: PlanPrice;
+  paymentMethods?: PaymentMethod[];
   invoices: Invoice[];
   usage: { postsThisMonth: number; postsLimit: number | null; accountsUsed: number; accountsLimit: number | null };
 }
 
 export interface AppStatePayload {
-  user: { name: string; email: string; workspace: string; plan: PlanId; timezone: string; digest: boolean };
+  user: {
+    name: string;
+    email: string;
+    workspace: string;
+    plan: PlanId;
+    timezone: string;
+    digest: boolean;
+    avatarUrl?: string | null;
+    role?: string;
+  };
   plan: PlanId;
   accounts: SocialAccount[];
   notifications: NotificationItem[];

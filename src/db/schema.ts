@@ -17,9 +17,29 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  avatarUrl: text("avatar_url"),
   prefs: jsonb("prefs").$type<{ timezone: string; digest: boolean }>().notNull().default({ timezone: "Asia/Kolkata (GMT+5:30)", digest: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Personal access tokens — only a hash is stored; plaintext shown once. */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    prefix: varchar("prefix", { length: 24 }).notNull(),
+    lastFour: varchar("last_four", { length: 8 }).notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    scopes: text("scopes").notNull().default("posts:read posts:write analytics:read"),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("api_keys_ws_idx").on(t.workspaceId)]
+);
 
 export const sessions = pgTable(
   "sessions",
@@ -205,7 +225,14 @@ export const payments = pgTable(
     plan: varchar("plan", { length: 10 }).notNull().default("pro"),
     cycle: varchar("cycle", { length: 10 }).notNull().default("monthly"),
     amountInr: integer("amount_inr").notNull(),
+    /** Authoritative amounts in paise (base + 18% GST). */
+    basePaise: integer("base_paise").notNull().default(0),
+    gstPaise: integer("gst_paise").notNull().default(0),
+    totalPaise: integer("total_paise").notNull().default(0),
     currency: varchar("currency", { length: 6 }).notNull().default("INR"),
+    /** Real payment instrument returned by Razorpay (card/upi/netbanking…). */
+    method: varchar("method", { length: 20 }),
+    methodDetail: text("method_detail"),
     razorpayOrderId: text("razorpay_order_id"),
     razorpayPaymentId: text("razorpay_payment_id"),
     razorpaySignature: text("razorpay_signature"),
@@ -225,6 +252,10 @@ export const invoices = pgTable(
     description: text("description").notNull(),
     amountInr: integer("amount_inr").notNull(),
     gstInr: integer("gst_inr").notNull().default(0),
+    /** Authoritative amounts in paise. */
+    basePaise: integer("base_paise").notNull().default(0),
+    gstPaise: integer("gst_paise").notNull().default(0),
+    totalPaise: integer("total_paise").notNull().default(0),
     status: varchar("status", { length: 10 }).notNull().default("paid"),
     razorpayPaymentId: text("razorpay_payment_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

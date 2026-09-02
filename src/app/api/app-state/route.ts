@@ -1,17 +1,18 @@
-import { and, count, desc, eq, gte, lt, ne } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, mediaAssets, notifications, posts, socialAccounts } from "@/db/schema";
+import { invoices, mediaAssets, notifications, payments, posts, socialAccounts } from "@/db/schema";
 import { handler, ok } from "@/lib/server/http";
 import { requireUser } from "@/lib/server/session";
 import { buildAnalytics } from "@/lib/server/analytics-service";
+import { priceFor } from "@/lib/pricing";
 import type { AppStatePayload, PlatformId, SocialAccount } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const GET = handler(async () => {
-  const { user, workspace } = await requireUser();
+  const { user, workspace, member } = await requireUser();
 
-  const [accounts, notifs, media, analytics, invoiceRows, monthPosts, allPosts, mediaUsage] =
+  const [accounts, notifs, media, analytics, invoiceRows, monthPosts, allPosts, paymentRows] =
     await Promise.all([
       db.select().from(socialAccounts).where(eq(socialAccounts.workspaceId, workspace.id)),
       db
@@ -34,9 +35,13 @@ export const GET = handler(async () => {
           )
         ),
       db.select({ media: posts.media }).from(posts).where(eq(posts.workspaceId, workspace.id)),
-      Promise.resolve(1),
+      db
+        .select()
+        .from(payments)
+        .where(and(eq(payments.workspaceId, workspace.id), inArray(payments.status, ["paid", "demo"])))
+        .orderBy(desc(payments.createdAt))
+        .limit(10),
     ]);
-  void mediaUsage;
 
   const usedUrls = new Map<string, number>();
   for (const row of allPosts) for (const url of row.media ?? []) usedUrls.set(url, (usedUrls.get(url) ?? 0) + 1);
@@ -56,6 +61,7 @@ export const GET = handler(async () => {
 
   const plan = workspace.plan === "pro" ? "pro" : "free";
   const connectedCount = accounts.filter((a) => a.status === "connected" || a.status === "simulated").length;
+  const monthlyPrice = priceFor("monthly");
 
   const payload: AppStatePayload = {
     user: {
@@ -65,6 +71,8 @@ export const GET = handler(async () => {
       plan,
       timezone: user.prefs?.timezone ?? "Asia/Kolkata (GMT+5:30)",
       digest: user.prefs?.digest ?? true,
+      avatarUrl: user.avatarUrl ?? null,
+      role: member.role,
     },
     plan,
     accounts: mappedAccounts,
@@ -88,11 +96,36 @@ export const GET = handler(async () => {
     billing: {
       plan,
       renewsOn: plan === "pro" && workspace.planRenewsAt ? workspace.planRenewsAt.toISOString() : null,
+      price: {
+        basePaise: monthlyPrice.basePaise,
+        gstPaise: monthlyPrice.gstPaise,
+        totalPaise: monthlyPrice.totalPaise,
+        gstPercent: 18,
+      },
+      /** Real instruments actually used — no hardcoded cards. */
+      paymentMethods: Array.from(
+        new Map(
+          paymentRows
+            .filter((p) => p.methodDetail)
+            .map((p) => [
+              p.methodDetail!,
+              {
+                id: p.id,
+                method: p.method ?? "card",
+                detail: p.methodDetail!,
+                lastUsedAt: p.updatedAt.toISOString(),
+              },
+            ])
+        ).values()
+      ),
       invoices: invoiceRows.map((i) => ({
         id: i.number,
         date: i.createdAt.toISOString(),
         description: i.description,
         amountInr: i.amountInr,
+        basePaise: i.basePaise || Math.round((i.amountInr - i.gstInr) * 100),
+        gstPaise: i.gstPaise || Math.round(i.gstInr * 100),
+        totalPaise: i.totalPaise || Math.round(i.amountInr * 100),
         status: "paid" as const,
       })),
       usage: {
