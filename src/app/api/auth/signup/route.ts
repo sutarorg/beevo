@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { users, workspaces, workspaceMembers } from "@/db/schema";
 import { handler, ok, parseBody, clientIp, ApiError } from "@/lib/server/http";
 import { createSession, hashPassword, setSessionCookie } from "@/lib/server/session";
-import { rateLimit } from "@/lib/server/rate-limit";
 import { seedWorkspace } from "@/lib/server/seed";
 import { env } from "@/lib/server/env";
 import { emails, sendMail } from "@/lib/server/email";
@@ -32,9 +31,7 @@ function slugify(name: string) {
 
 export const POST = handler(async (req: Request) => {
   const ip = clientIp(req);
-  const rl = rateLimit(`signup:${ip}`, 10, 10 * 60 * 1000);
-  if (!rl.ok) throw new ApiError(429, `Too many attempts — retry in ${rl.retryAfterSec}s`);
-
+  void ip;
   const body = await parseBody(req, schema);
   const email = body.email.toLowerCase();
 

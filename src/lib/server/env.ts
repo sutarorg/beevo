@@ -39,10 +39,10 @@ export const env = {
     return crypto.createHash("sha256").update(key).digest();
   },
 
-  /** Demo conveniences — disable both for real launches (see README). */
-  demoSeed: () => bool(process.env.DEMO_SEED, true),
-  allowDemoBilling: () => bool(process.env.ALLOW_DEMO_BILLING, true),
-  allowSimulatedConnections: () => bool(process.env.ALLOW_SIMULATED_CONNECTIONS, true),
+  /** Demo conveniences — OFF by default; enable explicitly for sandboxes. */
+  demoSeed: () => bool(process.env.DEMO_SEED, false),
+  allowDemoBilling: () => bool(process.env.ALLOW_DEMO_BILLING, false),
+  allowSimulatedConnections: () => bool(process.env.ALLOW_SIMULATED_CONNECTIONS, false),
 
   billing: {
     keyId: () => process.env.RAZORPAY_KEY_ID || "",
@@ -60,7 +60,7 @@ export const env = {
 
   openAiKey: () => process.env.OPENAI_API_KEY || "",
   blobToken: () => process.env.BLOB_READ_WRITE_TOKEN || "",
-  allowLocalUploads: () => bool(process.env.ALLOW_LOCAL_UPLOADS, true) && !process.env.VERCEL,
+  allowLocalUploads: () => bool(process.env.ALLOW_LOCAL_UPLOADS, false) && !process.env.VERCEL,
 
   oauth: {
     google: () => ({ id: process.env.GOOGLE_CLIENT_ID || "", secret: process.env.GOOGLE_CLIENT_SECRET || "" }),

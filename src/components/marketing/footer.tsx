@@ -8,7 +8,7 @@ const COLS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/#features", label: "Features" },
       { href: "/#platforms", label: "Platforms" },
       { href: "/pricing", label: "Pricing" },
-      { href: "/dashboard", label: "Live demo" },
+      { href: "/pricing#pro", label: "Beevo Pro" },
     ],
   },
   {

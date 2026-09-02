@@ -30,14 +30,14 @@ npx drizzle-kit push          # create tables in your Postgres
 npm run build && npm start    # or: npm run dev
 ```
 
-Open http://localhost:3000 → **Log in → “Explore the demo workspace”** for a fully seeded hive, or create a real account.
+Open http://localhost:3000 → **Sign up** (email or **Continue with Google**). Set `DEMO_SEED=true` if you want new workspaces pre-filled with sample content for demos.
 
-Demo modes that are ON by default (flip to `false` for production):
+Demo conveniences are **off by default** — enable explicitly per-environment:
 
 | Flag | What it does when `true` |
 |---|---|
-| `DEMO_SEED` | New workspaces get clearly-flagged demo content; enables `/api/auth/demo` |
-| `ALLOW_SIMULATED_CONNECTIONS` | Connect buttons work without OAuth apps (accounts marked *simulated*) |
+| `DEMO_SEED` | New workspaces get clearly-flagged sample content |
+| `ALLOW_SIMULATED_CONNECTIONS` | Connect works without OAuth apps (accounts marked *simulated*) |
 | `ALLOW_DEMO_BILLING` | Upgrade works without Razorpay keys (payments marked *demo*) |
 | `ALLOW_LOCAL_UPLOADS` | Media uploads written to `public/uploads` (self-hosted only) |
 
@@ -154,8 +154,10 @@ Encrypts OAuth tokens at rest (AES-256-GCM).
 2. Left menu → **APIs & Services → OAuth consent screen** → **External** → **Create** → fill app name + your email → **Save and continue** through Scopes (no additions needed) → add yourself under **Test users** → Save.
 3. **APIs & Services → Library** → search **YouTube Data API v3** → **Enable**.
 4. **APIs & Services → Credentials** → **+ Create Credentials → OAuth client ID** → Application type **Web application**.
-5. Under **Authorized redirect URIs** → **Add URI** → `https://your-domain/api/oauth/youtube/callback` (plus `http://localhost:3000/...` for dev) → **Create**.
-6. Copy **Client ID** / **Client secret** → env vars.
+5. Under **Authorized redirect URIs** → **Add URIs** →
+   `https://your-domain/api/oauth/youtube/callback` (YouTube connection) **and**
+   `https://your-domain/api/auth/google/callback` (**"Continue with Google" sign-in**) — plus the `http://localhost:3000/...` pair for dev → **Create**.
+6. Copy **Client ID** / **Client secret** → env vars. The same app powers both Google sign-in and YouTube publishing.
 
 ### 4.8 Meta — Facebook + Instagram — `META_APP_ID` / `META_APP_SECRET`
 
@@ -246,7 +248,7 @@ Almost always the database, in one of three states — open `https://your-app/ap
 
 | Method & path | Purpose | Auth |
 |---|---|---|
-| `POST /api/auth/signup` · `login` · `logout` · `GET /api/auth/me` | Session auth | — / cookie |
+| `POST /api/auth/signup` · `login` · `logout` · `GET /api/auth/me` · `GET /api/auth/google/start` + `callback` | Email + Google sign-in (sessions) | — / cookie |
 | `GET /api/oauth/{platform}/authorize` → `{url}` | Start OAuth (or `{simulated:true}`) | owner/admin/editor |
 | `GET /api/oauth/{platform}/callback` | OAuth callback (HTML redirect) | state cookie |
 | `GET/POST /api/posts`, `PATCH/DELETE /api/posts/{id}`, `POST …/duplicate` | Planner CRUD (zod-validated, free-plan limit enforced) | member |

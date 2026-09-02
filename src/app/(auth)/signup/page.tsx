@@ -4,10 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowRight, Check, Crown } from "lucide-react";
+import { ArrowRight, Check, Crown, Eye, EyeOff } from "lucide-react";
 import { cn, formatINR } from "@/lib/utils";
 import { api, getErrorMessage } from "@/lib/api";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
 import { Button, Input, Label } from "@/components/ui/primitives";
 import type { PlanId } from "@/lib/types";
 
@@ -19,6 +20,7 @@ function SignupForm() {
   const [workspace, setWorkspace] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [showPw, setShowPw] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -85,6 +87,9 @@ function SignupForm() {
         ))}
       </div>
 
+      <GoogleButton disabled={busy} />
+      <AuthDivider />
+
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -102,7 +107,24 @@ function SignupForm() {
         </div>
         <div>
           <Label>Password</Label>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="8+ characters" autoComplete="new-password" />
+          <div className="relative">
+            <Input
+              type={showPw ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="8+ characters"
+              autoComplete="new-password"
+              className="!pr-11"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-ink-600/50 transition-colors hover:text-ink-900"
+            >
+              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         </div>
         <Button type="submit" size="lg" className="w-full" busy={busy}>
           {plan === "pro" ? "Create hive & start Pro" : "Create free hive"} <ArrowRight size={15} />

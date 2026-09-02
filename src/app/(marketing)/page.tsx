@@ -451,9 +451,6 @@ export default function LandingPage() {
             <Link href="/signup">
               <Button size="lg">Start free <Zap size={15} /></Button>
             </Link>
-            <Link href="/dashboard">
-              <Button size="lg" variant="white">Explore the live demo</Button>
-            </Link>
           </div>
         </motion.div>
         <HexCell size={220} className="absolute -left-16 -bottom-20 opacity-60" stroke="#F5A301" opacity={0.12} />
