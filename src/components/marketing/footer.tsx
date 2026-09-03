@@ -21,6 +21,15 @@ const COLS: { title: string; links: { href: string; label: string }[] }[] = [
     ],
   },
   {
+    title: "Legal",
+    links: [
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms of Service" },
+      { href: "/refund-policy", label: "Refund & Cancellation" },
+      { href: "/cookies", label: "Cookie Policy" },
+    ],
+  },
+  {
     title: "Channels",
     links: [
       { href: "/#platforms", label: "Instagram" },
@@ -42,7 +51,7 @@ export function MarketingFooter() {
         style={{ background: "radial-gradient(500px 240px at 50% 0%, rgba(245,163,1,0.12), transparent 65%)" }}
       />
       <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.9fr_0.9fr_0.9fr_1.2fr]">
           <div>
             <BeeWordmark dark />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-cream-50/55">

@@ -130,7 +130,15 @@ function SignupForm() {
           {plan === "pro" ? "Create hive & start Pro" : "Create free hive"} <ArrowRight size={15} />
         </Button>
         <p className="text-center text-[11px] leading-relaxed text-ink-600/60">
-          By creating an account you agree to our Terms & Privacy Policy.
+          By creating an account you agree to our{" "}
+          <Link href="/terms" className="font-semibold text-honey-700 hover:text-honey-800">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-semibold text-honey-700 hover:text-honey-800">
+            Privacy Policy
+          </Link>
+          .
           {plan === "pro" ? " Pro starts after a free 14-day trial — we'll remind you before billing." : ""}
         </p>
       </form>
