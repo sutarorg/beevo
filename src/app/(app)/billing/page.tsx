@@ -28,7 +28,7 @@ export default function BillingPage() {
   const [downgrade, setDowngrade] = React.useState(false);
   const [payPhase, setPayPhase] = React.useState<"choose" | "working" | "done">("choose");
 
-  /* Authoritative pricing — ₹799 base + 18% GST ₹143.82 = ₹942.82 */
+  /* Authoritative pricing — ₹499 with 18% GST included (₹422.88 + ₹76.12) */
   const price = billing?.price
     ? {
         base: formatPaiseExact(billing.price.basePaise),
@@ -140,7 +140,7 @@ export default function BillingPage() {
                 </div>
                 {p.id === "pro" && (
                   <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.1em] text-ink-600/60">
-                    + {price.gstPercent}% GST {price.gst} = <b className="text-ink-800">{price.total}</b> / month
+                    final price <b className="text-ink-800">{price.total}</b> / month · {price.gstPercent}% GST ({price.gst}) already included
                   </p>
                 )}
                 <p className="mt-1.5 text-[13px] leading-relaxed text-ink-600/80">{p.blurb}</p>

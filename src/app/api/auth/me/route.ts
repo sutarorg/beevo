@@ -16,6 +16,8 @@ export const GET = handler(async () => {
       role: member.role,
       timezone: user.prefs?.timezone ?? "Asia/Kolkata (GMT+5:30)",
       digest: user.prefs?.digest ?? true,
+      authProvider: user.authProvider,
+      hasPassword: !!user.passwordSetAt,
     },
     plan: workspace.plan,
   });

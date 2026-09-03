@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s · Beevo",
   },
   description:
-    "Plan, schedule and publish to Instagram, Facebook, X, LinkedIn, Pinterest and YouTube from one honey-organised hive. Free forever plan — Pro at ₹799/month.",
+    "Plan, schedule and publish to Instagram, Facebook, X, LinkedIn, Pinterest and YouTube from one honey-organised hive. Free forever plan — Pro at ₹499/month, GST included.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

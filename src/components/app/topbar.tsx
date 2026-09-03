@@ -169,7 +169,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
                   <p className="truncate font-mono text-[11px] text-ink-600/70">{user?.email}</p>
                   <div className="mt-2">
                     {plan === "pro" ? (
-                      <Badge tone="gold"><Crown size={11} /> Pro · ₹799/mo</Badge>
+                      <Badge tone="gold"><Crown size={11} /> Pro · ₹499/mo</Badge>
                     ) : (
                       <Badge tone="neutral">Free plan</Badge>
                     )}

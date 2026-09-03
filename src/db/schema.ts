@@ -18,6 +18,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   avatarUrl: text("avatar_url"),
+  /** How the account authenticates — drives password flows. */
+  authProvider: varchar("auth_provider", { length: 20 }).notNull().default("email"),
+  /** NULL until the user has set their own password (OAuth-created accounts). */
+  passwordSetAt: timestamp("password_set_at", { withTimezone: true }),
   prefs: jsonb("prefs").$type<{ timezone: string; digest: boolean }>().notNull().default({ timezone: "Asia/Kolkata (GMT+5:30)", digest: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

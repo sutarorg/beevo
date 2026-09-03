@@ -13,13 +13,15 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-  // First-deploy self-heal: create the schema if tables are missing.
-  // Runs on every cold start but is a no-op once tables exist.
-  try {
-    const { ensureSchema } = await import("@/lib/server/migrate");
-    await ensureSchema();
-  } catch (err) {
-    console.warn("[beevo migrate] boot check skipped:", err instanceof Error ? err.message : err);
+  // Schema self-heal (tables + column drift) on cold start. Never blocks
+  // boot — the request-time handler also heals+retries transparently.
+  if (process.env.AUTO_MIGRATE_BOOT !== "false") {
+    try {
+      const { ensureSchema } = await import("@/lib/server/migrate");
+      await ensureSchema();
+    } catch (err) {
+      console.warn("[beevo migrate] boot migrate deferred:", err instanceof Error ? err.message : err);
+    }
   }
 
   if (process.env.VERCEL) return; // Vercel: external cron handles scheduling

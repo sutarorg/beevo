@@ -42,8 +42,20 @@ export interface PlatformAdapter {
   authorizeUrl: (p: { state: string; redirectUri: string; codeChallenge?: string }) => string;
   exchangeCode: (code: string, redirectUri: string, codeVerifier?: string) => Promise<TokenSet>;
   fetchProfile: (tokens: TokenSet) => Promise<ProfileInfo>;
+  /** Refresh an expiring/expired access token when the platform allows it. */
+  refresh?: (tokens: TokenSet) => Promise<TokenSet>;
   publish: (tokens: TokenSet, input: PublishInput) => Promise<PublishResult>;
 }
+
+/** ISO-8601 YouTube duration → seconds. PT3M / PT58S etc. */
+export function parseIsoDurationSeconds(iso: string): number | null {
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
+  if (!m) return null;
+  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
+}
+
+/** Shorts ceiling enforced both client- and server-side. */
+export const YOUTUBE_SHORTS_MAX_SECONDS = 180;
 
 class PlatformError extends Error {
   code = "PLATFORM";
@@ -117,6 +129,24 @@ function metaAdapter(platform: "facebook" | "instagram"): PlatformAdapter {
     configured: () => !!(env.oauth.meta().id && env.oauth.meta().secret),
     authorizeUrl: (p) => metaAuthorizeUrl(platform, p),
     exchangeCode: metaExchangeCode,
+    /** Meta long-lived tokens (~60d) can be exchanged again while still valid. */
+    async refresh(tokens) {
+      const { id, secret } = env.oauth.meta();
+      const q = new URLSearchParams({
+        grant_type: "fb_exchange_token",
+        client_id: id,
+        client_secret: secret,
+        fb_exchange_token: tokens.accessToken,
+      });
+      const res = await must<{ access_token: string; expires_in?: number }>(
+        await fetch(`${META_GRAPH}/oauth/access_token?${q}`),
+        "Meta token refresh"
+      );
+      return {
+        accessToken: res.access_token,
+        expiresAt: res.expires_in ? new Date(Date.now() + res.expires_in * 1000) : null,
+      };
+    },
     async fetchProfile(tokens) {
       const pages = await metaPages(tokens.accessToken);
       const page = platform === "instagram" ? pages.find((pg) => pg.instagram_business_account) : pages[0];
@@ -244,9 +274,37 @@ const youtube: PlatformAdapter = {
       avatarUrl: ch.snippet.thumbnails?.default?.url ?? null,
     };
   },
+  /** Google access tokens last 1h — refresh them in the engine. */
+  async refresh(tokens) {
+    if (!tokens.refreshToken)
+      throw new PlatformError("YouTube account needs to be reconnected (no refresh token stored)");
+    const { id, secret } = env.oauth.google();
+    const res = await must<{ access_token: string; expires_in: number }>(
+      await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: tokens.refreshToken!,
+          client_id: id,
+          client_secret: secret,
+        }),
+      }),
+      "Google token refresh"
+    );
+    return {
+      accessToken: res.access_token,
+      refreshToken: tokens.refreshToken,
+      expiresAt: new Date(Date.now() + res.expires_in * 1000),
+    };
+  },
   async publish(tokens, input) {
+    // Shorts-only channel: reject images outright, require a video file.
+    const image = input.media.find((m) => /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(m));
+    if (image)
+      throw new PlatformError("YouTube posts cannot include images — attach a Short (vertical video ≤ 3 min)");
     const video = input.media.find((m) => /\.(mp4|mov|webm|mkv)(\?|$)/i.test(m));
-    if (!video) throw new PlatformError("YouTube requires a video file (mp4/mov/webm)");
+    if (!video) throw new PlatformError("YouTube Shorts require a video file (mp4/mov/webm)");
     // Resumable upload — initiate.
     const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
       method: "POST",
@@ -264,7 +322,29 @@ const youtube: PlatformAdapter = {
       await fetch(sessionUri, { method: "PUT", headers: { "Content-Type": "video/*" }, body: bytes }),
       "YouTube video upload"
     );
-    return { platformPostId: uploaded.id, url: `https://youtu.be/${uploaded.id}` };
+
+    /* ---- Shorts-only enforcement (server-side, cannot be bypassed) ----
+       Read contentDetails; anything longer than 3 minutes is deleted again. */
+    const details = await must<{ items?: { contentDetails?: { duration?: string } }[] }>(
+      await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${uploaded.id}`,
+        { headers: jsonHeaders(tokens.accessToken) }
+      ),
+      "YouTube video details"
+    );
+    const isoDur = details.items?.[0]?.contentDetails?.duration;
+    const seconds = isoDur ? parseIsoDurationSeconds(isoDur) : null;
+    if (seconds === null || seconds > YOUTUBE_SHORTS_MAX_SECONDS) {
+      // Enforce: remove the offending upload before Beevo counts it.
+      await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${uploaded.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${tokens.accessToken}` },
+      }).catch(() => undefined);
+      throw new PlatformError(
+        `Only YouTube Shorts are allowed — this video is over 3 minutes long. The violating upload was deleted.`
+      );
+    }
+    return { platformPostId: uploaded.id, url: `https://youtube.com/shorts/${uploaded.id}` };
   },
 };
 
@@ -324,17 +404,48 @@ const x: PlatformAdapter = {
       avatarUrl: null,
     };
   },
+  /** X access tokens expire after ~2h — refresh or every later publish 401s. */
+  async refresh(tokens) {
+    if (!tokens.refreshToken)
+      throw new PlatformError("X account needs to be reconnected (no refresh token stored)");
+    const { id, secret } = env.oauth.x();
+    const res = await must<{ access_token: string; refresh_token?: string; expires_in: number; scope?: string }>(
+      await fetch("https://api.twitter.com/2/oauth2/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          ...(secret ? { Authorization: basic(id, secret) } : {}),
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: tokens.refreshToken!,
+          client_id: id,
+        }),
+      }),
+      "X token refresh"
+    );
+    return {
+      accessToken: res.access_token,
+      refreshToken: res.refresh_token ?? tokens.refreshToken,
+      expiresAt: new Date(Date.now() + res.expires_in * 1000),
+      scope: res.scope,
+    };
+  },
   async publish(tokens, input) {
     if (input.caption.length > 280) throw new PlatformError("Tweet exceeds 280 characters");
-    const res = await must<{ data: { id: string } }>(
-      await fetch("https://api.twitter.com/2/tweets", {
-        method: "POST",
-        headers: jsonHeaders(tokens.accessToken),
-        body: JSON.stringify({ text: input.caption }),
-      }),
-      "X publish"
-    );
-    return { platformPostId: res.data.id, url: null };
+    const res = await fetch("https://api.twitter.com/2/tweets", {
+      method: "POST",
+      headers: jsonHeaders(tokens.accessToken),
+      body: JSON.stringify({ text: input.caption }),
+    });
+    if (res.status === 401 || res.status === 403) {
+      const detail = (await res.text()).slice(0, 160);
+      throw new PlatformError(
+        `X rejected the publish (${res.status}) — reconnect X; also verify the app has "Read and write" permission. ${detail}`
+      );
+    }
+    const out = await must<{ data: { id: string } }>(res, "X publish");
+    return { platformPostId: out.data.id, url: null };
   },
 };
 
@@ -416,6 +527,27 @@ const pinterest: PlatformAdapter = {
       state,
     });
     return `https://www.pinterest.com/oauth/?${q}`;
+  },
+  async refresh(tokens) {
+    if (!tokens.refreshToken)
+      throw new PlatformError("Pinterest account needs to be reconnected (no refresh token stored)");
+    const { id, secret } = env.oauth.pinterest();
+    const res = await must<{ access_token: string; refresh_token?: string; expires_in?: number }>(
+      await fetch("https://api.pinterest.com/v5/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: basic(id, secret) },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: tokens.refreshToken!,
+        }),
+      }),
+      "Pinterest token refresh"
+    );
+    return {
+      accessToken: res.access_token,
+      refreshToken: res.refresh_token ?? tokens.refreshToken,
+      expiresAt: res.expires_in ? new Date(Date.now() + res.expires_in * 1000) : null,
+    };
   },
   async exchangeCode(code, redirectUri) {
     const { id, secret } = env.oauth.pinterest();

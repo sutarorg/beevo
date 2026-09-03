@@ -31,6 +31,14 @@ export const POST = handler(async (req: Request) => {
   const key = `beevo/avatars/${user.id}/${randomToken(10)}.${ext}`;
   let url: string;
 
+  /*
+   * Storage fallback chain — works on EVERY deployment, no 501s:
+   *   1. Vercel Blob (when BLOB_READ_WRITE_TOKEN is configured)     → public CDN URL
+   *   2. Local disk (self-hosted, ALLOW_LOCAL_UPLOADS=true)         → /api/uploads/…
+   *   3. Database-inlined data URL (no storage env at all)          → users.avatar_url
+   *      The client downscales to 256px (~100 KB), so option 3 is a
+   *      production-safe stand-in on unconfigured Vercel projects.
+   */
   if (env.blobToken()) {
     const blob = await put(key, file, { access: "public", token: env.blobToken(), contentType: file.type });
     url = blob.url;
@@ -41,7 +49,15 @@ export const POST = handler(async (req: Request) => {
     await writeFile(path.join(dir, filename), new Uint8Array(await file.arrayBuffer()));
     url = `/api/uploads/${filename}`;
   } else {
-    throw new ApiError(501, "Avatar uploads need BLOB_READ_WRITE_TOKEN on this deployment");
+    const bytes = Buffer.from(await file.arrayBuffer());
+    if (bytes.length > 400_000) {
+      throw new ApiError(
+        422,
+        "No object storage configured and the image is too large to store inline — add BLOB_READ_WRITE_TOKEN (README §4.12) or choose a smaller image."
+      );
+    }
+    url = `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${bytes.toString("base64")}`;
+    // `key` isn't an external storage object in this branch.
   }
 
   const [updated] = await db.update(users).set({ avatarUrl: url }).where(eq(users.id, user.id)).returning();

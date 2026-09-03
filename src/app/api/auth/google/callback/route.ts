@@ -88,7 +88,13 @@ export async function GET(req: Request) {
     } else {
       [user] = await db
         .insert(users)
-        .values({ name, email, passwordHash: await hashPassword(randomToken(24)) })
+        .values({
+          name,
+          email,
+          passwordHash: await hashPassword(randomToken(24)),
+          authProvider: "google",
+          passwordSetAt: null,
+        })
         .returning();
       const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "hive"}-${randomToken(3)}`;
       const [ws] = await db

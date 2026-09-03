@@ -71,7 +71,7 @@ export function MarketingFooter() {
         <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-6">
           <p className="font-mono text-[11px] text-cream-50/40">© 2026 Beevo Labs Pvt. Ltd. · All rights reserved</p>
           <p className="font-mono text-[11px] text-cream-50/40">
-            Free ₹0 · Pro ₹799/mo · GST invoices included
+            Free ₹0 · Pro ₹499/mo · GST included
           </p>
         </div>
       </div>

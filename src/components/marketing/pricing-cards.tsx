@@ -7,6 +7,10 @@ import { Check, Crown, Sparkles } from "lucide-react";
 import { cn, formatINR } from "@/lib/utils";
 import { PLANS } from "@/lib/constants";
 import { Button, Segmented } from "@/components/ui/primitives";
+import { priceFor } from "@/lib/pricing";
+
+const PRICE_M = priceFor("monthly");
+const PRICE_A = priceFor("annual");
 
 export function PricingCards({ compact = false }: { compact?: boolean }) {
   const [cycle, setCycle] = React.useState<"monthly" | "annual">("monthly");
@@ -82,8 +86,8 @@ export function PricingCards({ compact = false }: { compact?: boolean }) {
               {pro && (
                 <p className="mt-1 font-mono text-[10.5px] text-honey-300/90">
                   {cycle === "monthly"
-                    ? "₹799 + 18% GST ₹143.82 = ₹942.82 / month"
-                    : "₹7,990 + 18% GST ₹1,438.20 = ₹9,428.20 / year"}
+                    ? `${PRICE_M.total} incl. GST (${PRICE_M.base} + 18% GST ${PRICE_M.gst})`
+                    : `${PRICE_A.total} incl. GST (${PRICE_A.base} + 18% GST ${PRICE_A.gst})`}
                 </p>
               )}
               <p className={cn("mt-3 text-sm leading-relaxed", pro ? "text-cream-50/65" : "text-ink-600/80")}>{p.blurb}</p>

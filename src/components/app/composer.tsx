@@ -40,6 +40,7 @@ export function ComposerModal() {
     openUpgrade,
     aiAssist,
     analytics,
+    accounts,
   } = useApp();
 
   const editing = composer?.options.post ?? null;
@@ -61,8 +62,11 @@ export function ComposerModal() {
   React.useEffect(() => {
     if (!composer?.open) return;
     const p = composer.options.post;
+    const avail = new Set(accounts.filter((a: { platform: PlatformId; connected: boolean }) => a.connected).map((a: { platform: PlatformId }) => a.platform));
+    const desired = p?.platforms ?? composer.options.platforms ?? ["instagram"];
+    const allowed = desired.filter((pl) => avail.has(pl));
     setCaption(p?.caption ?? "");
-    setPlatforms(p?.platforms ?? composer.options.platforms ?? ["instagram"]);
+    setPlatforms(allowed.length ? allowed : Array.from(avail)[0] ? [Array.from(avail)[0] as PlatformId] : ["instagram"]);
     setSelectedMedia(p?.media ?? composer.options.media ?? []);
     const base =
       p?.scheduledAt ??
@@ -75,13 +79,38 @@ export function ComposerModal() {
     setBusy(null);
   }, [composer]);
 
-  const togglePlatform = (id: PlatformId) =>
+  const connectedPlatforms = React.useMemo(
+    () => new Set(accounts.filter((a) => a.connected).map((a) => a.platform)),
+    [accounts]
+  );
+  const isAvailable = React.useCallback(
+    (id: PlatformId) => connectedPlatforms.has(id),
+    [connectedPlatforms]
+  );
+  const connectedCount = connectedPlatforms.size;
+
+  const togglePlatform = (id: PlatformId) => {
+    if (!isAvailable(id)) {
+      toast.error(
+        `No connected ${platformById(id).name} account — connect one from Accounts first.`,
+        { action: { label: "Open Accounts", onClick: () => { closeComposer(); window.location.assign("/accounts"); } } }
+      );
+      return;
+    }
     setPlatforms((prev) =>
       prev.includes(id) ? (prev.length > 1 ? prev.filter((p) => p !== id) : prev) : [...prev, id]
     );
+  };
 
-  const toggleMedia = (src: string) =>
+  const isImageSrc = (src: string) => /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(src) || src.startsWith("data:image/");
+
+  const toggleMedia = (src: string) => {
+    if (platforms.includes("youtube") && isImageSrc(src)) {
+      toast.error("YouTube accepts only Shorts (vertical video ≤ 3 min) — images can't be attached");
+      return;
+    }
     setSelectedMedia((prev) => (prev.includes(src) ? prev.filter((m) => m !== src) : [...prev, src]));
+  };
 
   const strictest = platforms.length
     ? Math.min(...platforms.map((p) => platformById(p).charLimit))
@@ -194,7 +223,7 @@ export function ComposerModal() {
               {editing ? "Edit post" : "Compose new post"}
             </h2>
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-600/60">
-              {platforms.length} of {PLATFORMS.length} channels selected
+              {platforms.length} of {connectedCount} connected channels selected
             </p>
           </div>
         </div>
@@ -209,23 +238,35 @@ export function ComposerModal() {
           {/* platforms */}
           <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-600/90">Publish to</p>
+            {connectedCount === 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2.5 rounded-xl border border-honey-400/60 bg-honey-50 px-3.5 py-2.5 text-[12.5px] text-ink-800">
+                <Lock size={13} className="text-honey-700" />
+                <span>You haven&apos;t connected any channels yet — connect one to publish.</span>
+                <a href="/accounts" className="ml-auto font-bold text-honey-700 underline underline-offset-2">Open Accounts</a>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => {
                 const active = platforms.includes(p.id);
+                const available = isAvailable(p.id);
                 return (
                   <button
                     key={p.id}
                     onClick={() => togglePlatform(p.id)}
+                    title={available ? undefined : `Connect ${p.name} in Accounts first`}
                     className={cn(
                       "flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium transition-all",
                       active
                         ? "border-honey-500/60 bg-honey-50 text-ink-950 shadow-[var(--shadow-card)]"
-                        : "border-cream-300 bg-white/60 text-ink-600/70 hover:border-honey-400/50 hover:text-ink-900"
+                        : available
+                          ? "border-cream-300 bg-white/60 text-ink-600/70 hover:border-honey-400/50 hover:text-ink-900"
+                          : "border-cream-300/70 bg-cream-50/50 text-ink-600/40 cursor-not-allowed"
                     )}
                   >
                     <PlatformChip platform={p.id} size={20} active={active} />
                     {p.name}
                     {active && <Check size={13} className="text-honey-600" />}
+                    {!available && <Lock size={11} className="opacity-70" />}
                   </button>
                 );
               })}
@@ -264,10 +305,17 @@ export function ComposerModal() {
           {/* media */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-600/90">Media</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-600/90">
+                Media
+                {platforms.includes("youtube") && (
+                  <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 font-sans text-[10px] font-bold normal-case tracking-normal text-berry-600 border border-red-200">
+                    YouTube: Shorts only · video required · ≤ 3 min
+                  </span>
+                )}
+              </p>
               <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-honey-700 hover:text-honey-800">
                 <ImagePlus size={14} /> Upload
-                <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" className="hidden" onChange={onUpload} />
               </label>
             </div>
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
@@ -296,7 +344,7 @@ export function ComposerModal() {
               <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-cream-300 text-ink-600/50 transition-colors hover:border-honey-400/70 hover:text-honey-700">
                 <ImagePlus size={18} />
                 <span className="text-[10px] font-medium">Add</span>
-                <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" className="hidden" onChange={onUpload} />
               </label>
             </div>
           </div>

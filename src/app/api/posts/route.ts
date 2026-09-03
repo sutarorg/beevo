@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { posts } from "@/db/schema";
 import { handler, ok, parseBody, ApiError } from "@/lib/server/http";
 import { requireUser } from "@/lib/server/session";
-import { createPost, listPosts } from "@/lib/post-store";
+import { createPost, listPosts, gateForPublish } from "@/lib/post-store";
 import { PLATFORMS } from "@/lib/constants";
 import type { PlatformId, PostStatus } from "@/lib/types";
 
@@ -40,6 +40,12 @@ export const POST = handler(async (req: Request) => {
     if (body.caption.length > meta.charLimit) {
       throw new ApiError(422, `Caption exceeds the ${meta.name} limit of ${meta.charLimit} characters`);
     }
+  }
+
+  // Only platforms with a live connected account may be selected.
+  {
+    const gate = await gateForPublish(workspace.id, body.platforms, body.media);
+    if (!gate.ok) throw new ApiError(422, gate.error!, "PLATFORM_GATE");
   }
 
   if (body.status === "scheduled") {

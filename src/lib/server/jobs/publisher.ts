@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { db } from "@/db";
 import { notifications, posts, postTargets, socialAccounts, users } from "@/db/schema";
 import { adapterFor, isSimulatedToken, simulatedPublish, type PlatformAdapter } from "../platforms";
-import { decrypt } from "../crypto";
+import { decrypt, encrypt } from "../crypto";
 import { emails, sendMail } from "../email";
 import { env } from "../env";
 import type { PlatformId } from "@/lib/types";
@@ -49,12 +49,46 @@ async function publishOneTarget(
     return { ok: false, error: `${platform} app credentials are not configured on the server` };
   }
   try {
-    const accessToken = account.accessTokenEnc ? decrypt(account.accessTokenEnc) : "";
-    const refreshToken = account.refreshTokenEnc ? decrypt(account.refreshTokenEnc) : null;
-    const out = await adapter.publish(
-      { accessToken, refreshToken, expiresAt: account.tokenExpiresAt },
-      { caption, media: toAbsoluteMedia(media) }
-    );
+    let tokens = {
+      accessToken: account.accessTokenEnc ? decrypt(account.accessTokenEnc) : "",
+      refreshToken: account.refreshTokenEnc ? decrypt(account.refreshTokenEnc) : null,
+      expiresAt: account.tokenExpiresAt ?? null,
+    };
+
+    /* Refresh expiring tokens BEFORE publishing (X dies after ~2h, Google 1h,
+       Pinterest ~30d, Meta long-lived can be exchanged while valid). */
+    const expiring = !tokens.expiresAt || tokens.expiresAt.getTime() - Date.now() < 90_000;
+    if (expiring && adapter.refresh) {
+      try {
+        const fresh = await adapter.refresh(tokens);
+        tokens = {
+          accessToken: fresh.accessToken,
+          refreshToken: fresh.refreshToken ?? tokens.refreshToken,
+          expiresAt: fresh.expiresAt ?? null,
+        };
+        await db
+          .update(socialAccounts)
+          .set({
+            accessTokenEnc: encrypt(tokens.accessToken),
+            refreshTokenEnc: tokens.refreshToken ? encrypt(tokens.refreshToken) : null,
+            tokenExpiresAt: tokens.expiresAt ?? null,
+            status: "connected",
+            lastSyncAt: new Date(),
+          })
+          .where(eq(socialAccounts.id, account.id));
+      } catch (refreshErr) {
+        await db
+          .update(socialAccounts)
+          .set({ status: "expiring" })
+          .where(eq(socialAccounts.id, account.id));
+        return {
+          ok: false,
+          error: `${platform} connection expired: ${refreshErr instanceof Error ? refreshErr.message : "refresh failed"} — reconnect the account`,
+        };
+      }
+    }
+
+    const out = await adapter.publish(tokens, { caption, media: toAbsoluteMedia(media) });
     return { ok: true, platformPostId: out.platformPostId, url: out.url };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message.slice(0, 400) : "Unknown platform error" };

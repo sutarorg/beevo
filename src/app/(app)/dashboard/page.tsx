@@ -257,7 +257,7 @@ export default function DashboardPage() {
                     <Meter value={billing?.usage.accountsUsed ?? 0} max={billing?.usage.accountsLimit ?? 2} className="mt-1.5" />
                   </div>
                   <Button className="w-full" onClick={() => openUpgrade("sidebar")}>
-                    <Crown size={15} /> Upgrade to Pro — ₹942.82/mo
+                    <Crown size={15} /> Upgrade to Pro — ₹499/mo
                   </Button>
                   <p className="text-center text-[11px] text-ink-600/60">
                     Unlimited posts · AI writer · best-time engine
@@ -280,7 +280,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center gap-2 px-5 py-3.5 text-[12px] text-ink-600/80">
                   <Sparkles size={13} className="text-honey-600" />
-                  Renews {billing?.renewsOn ? new Date(billing.renewsOn).toLocaleDateString("en-IN", { day: "numeric", month: "long" }) : "soon"} · ₹942.82/mo
+                  Renews {billing?.renewsOn ? new Date(billing.renewsOn).toLocaleDateString("en-IN", { day: "numeric", month: "long" }) : "soon"} · ₹499/mo
                 </div>
               </Card>
             )}

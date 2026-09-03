@@ -39,7 +39,7 @@ export const POST = handler(async (req: Request) => {
   if (existing[0]) throw new ApiError(409, "An account with this email already exists — log in instead", "EMAIL_TAKEN");
 
   const passwordHash = await hashPassword(body.password);
-  const [user] = await db.insert(users).values({ name: body.name, email, passwordHash }).returning();
+  const [user] = await db.insert(users).values({ name: body.name, email, passwordHash, authProvider: "email", passwordSetAt: new Date() }).returning();
 
   const wsName = body.workspaceName || `${body.name.split(" ")[0]}'s hive`;
   const [workspace] = await db

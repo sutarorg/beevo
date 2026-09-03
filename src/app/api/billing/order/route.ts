@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 const schema = z.object({ cycle: z.enum(["monthly", "annual"]).default("monthly") });
 
 /**
- * Creates a Razorpay order for ₹799 + 18% GST = ₹942.82 (94282 paise).
+ * Creates a Razorpay order for ₹499 — 18% GST already included (422.88 base + 76.12 GST = 49900 paise total).
  * When Razorpay keys aren't configured the client falls back to
  * /api/billing/demo-activate (only if ALLOW_DEMO_BILLING=true).
  */

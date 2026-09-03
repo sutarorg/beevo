@@ -14,35 +14,62 @@ interface Mail {
   text?: string;
 }
 
-async function sendViaResend(mail: Mail): Promise<void> {
+export interface MailResult {
+  ok: boolean;
+  provider: "resend" | "smtp" | null;
+  providerMessageId?: string;
+  error?: string;
+}
+
+async function sendViaResend(mail: Mail): Promise<{ id?: string }> {
+  const from = env.email.from();
+  if (from.includes("hello@beevo.app")) {
+    console.warn(
+      "[email] EMAIL_FROM uses the fallback hello@beevo.app — Resend only delivers from VERIFIED domains (or onboarding@resend.dev). Sending anyway to surface the provider error."
+    );
+  }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.email.resendKey()}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: env.email.from(), to: mail.to, subject: mail.subject, html: mail.html, text: mail.text }),
+    body: JSON.stringify({ from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text }),
   });
-  if (!res.ok) throw new Error(`Resend: ${res.status} ${await res.text()}`);
-}
-
-async function sendViaSmtp(mail: Mail): Promise<void> {
-  const transport = nodemailer.createTransport(env.email.smtpUrl());
-  await transport.sendMail({ from: env.email.from(), ...mail });
-}
-
-export async function sendMail(mail: Mail): Promise<boolean> {
+  const bodyText = await res.text();
+  if (!res.ok) {
+    console.error(`[email] Resend rejected (${res.status}):`, bodyText);
+    throw new Error(`Resend ${res.status}: ${bodyText.slice(0, 300)}`);
+  }
   try {
-    if (env.email.resendKey()) await sendViaResend(mail);
-    else if (env.email.smtpUrl()) await sendViaSmtp(mail);
-    else {
-      console.log(`[email:unconfigured] to=${mail.to} subject="${mail.subject}"`);
-      return false;
+    return JSON.parse(bodyText) as { id?: string };
+  } catch {
+    return {};
+  }
+}
+
+async function sendViaSmtp(mail: Mail): Promise<{ id?: string }> {
+  const transport = nodemailer.createTransport(env.email.smtpUrl());
+  const info = await transport.sendMail({ from: env.email.from(), ...mail });
+  return { id: info.messageId };
+}
+
+export async function sendMail(mail: Mail): Promise<MailResult> {
+  try {
+    if (env.email.resendKey()) {
+      const { id } = await sendViaResend(mail);
+      return { ok: true, provider: "resend", providerMessageId: id };
     }
-    return true;
+    if (env.email.smtpUrl()) {
+      const { id } = await sendViaSmtp(mail);
+      return { ok: true, provider: "smtp", providerMessageId: id };
+    }
+    console.log(`[email:unconfigured] to=${mail.to} subject="${mail.subject}"`);
+    return { ok: false, provider: null, error: "No email provider configured" };
   } catch (err) {
-    console.error("[email] delivery failed:", err);
-    return false;
+    const message = err instanceof Error ? err.message : "Unknown email error";
+    console.error("[email] delivery failed:", message);
+    return { ok: false, provider: env.email.resendKey() ? "resend" : env.email.smtpUrl() ? "smtp" : null, error: message };
   }
 }
 

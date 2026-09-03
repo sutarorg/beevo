@@ -68,7 +68,7 @@ export default function LandingPage() {
             <motion.p {...reveal(0.16)} className="mt-5 max-w-lg text-[17px] leading-relaxed text-ink-600">
               Beevo is the social media planner that keeps your whole hive in order — craft one
               post and schedule it to Instagram, Facebook, X, LinkedIn, Pinterest and YouTube.
-              Free forever, Pro at just ₹799/month.
+              Free forever, Pro at just ₹499/month — GST included.
             </motion.p>
             <motion.div {...reveal(0.24)} className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/signup">
@@ -83,7 +83,7 @@ export default function LandingPage() {
               </Link>
             </motion.div>
             <motion.div {...reveal(0.32)} className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2">
-              {["Free plan forever", "Pro ₹799/mo + GST", "Cancel anytime"].map((t) => (
+              {["Free plan forever", "Pro ₹499/mo · GST incl.", "Cancel anytime"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-700">
                   <Check size={14} className="text-leaf-600" /> {t}
                 </span>
@@ -365,7 +365,7 @@ export default function LandingPage() {
               Honest as honey. <span className="font-display italic font-medium text-honey-600">Free to start.</span>
             </h2>
             <p className="mt-4 text-[15px] leading-relaxed text-ink-600">
-              Start on ₹0 forever. Move to Pro at ₹799/month when the hive outgrows the jar —
+              Start on ₹0 forever. Move to Pro at ₹499/month when the hive outgrows the jar —
               GST invoice included, cancel anytime.
             </p>
           </motion.div>
@@ -444,7 +444,7 @@ export default function LandingPage() {
             <span className="font-display italic font-medium text-honey-300"> starts today.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-cream-50/60">
-            Free forever for 10 posts a month. When you're ready, Pro is ₹799/month —
+            Free forever for 10 posts a month. When you're ready, Pro is ₹499/month —
             less than one boosted post.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -562,7 +562,7 @@ function MiniChart() {
 /* ---------------- FAQ accordion ---------------- */
 const FAQS = [
   { q: "Is the Free plan really free forever?", a: "Yes — ₹0, no card required. You get 10 scheduled posts every month, 2 connected accounts, the visual calendar and basic analytics. It resets on the 1st of each month, forever." },
-  { q: "What does Pro at ₹799/month add?", a: "Unlimited posts, up to 12 connected accounts, the Hive Writer AI caption assistant, the best-time-to-post engine, bulk scheduling via CSV, 12-month analytics with exports, and 3 team seats. Billed in INR with an 18% GST invoice." },
+  { q: "What does Pro at ₹499/month add?", a: "Unlimited posts, up to 12 connected accounts, the Hive Writer AI caption assistant, the best-time-to-post engine, bulk scheduling via CSV, 12-month analytics with exports, and 3 team seats. Billed in INR with an 18% GST invoice." },
   { q: "Can I pay with UPI?", a: "Absolutely. UPI, credit/debit cards and net banking are all supported at checkout, and you can enable UPI autopay so renewals never interrupt your streak." },
   { q: "Which platforms can I schedule to?", a: "Instagram, Facebook, Twitter/X, LinkedIn, Pinterest and YouTube — including reels, carousels, threads, pins and shorts. Beevo formats each post natively per platform." },
   { q: "What happens if a post fails to publish?", a: "You get an instant alert in-app and by email with the exact reason (usually an expired token). One click retries it once you reconnect the account." },

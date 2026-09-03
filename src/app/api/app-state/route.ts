@@ -73,6 +73,8 @@ export const GET = handler(async () => {
       digest: user.prefs?.digest ?? true,
       avatarUrl: user.avatarUrl ?? null,
       role: member.role,
+      authProvider: user.authProvider,
+      hasPassword: !!user.passwordSetAt,
     },
     plan,
     accounts: mappedAccounts,

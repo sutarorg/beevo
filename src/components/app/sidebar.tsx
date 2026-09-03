@@ -152,7 +152,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               className="mt-3 w-full"
               onClick={() => openUpgrade("sidebar")}
             >
-              <Crown size={14} /> Upgrade — ₹942.82/mo
+              <Crown size={14} /> Upgrade — ₹499/mo
             </Button>
           </div>
         ) : (

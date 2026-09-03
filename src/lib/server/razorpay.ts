@@ -1,23 +1,27 @@
 import { env } from "./env";
 import { hmacSha256, timingSafeEqual } from "./crypto";
-import { PRICING, cycleKey, gstPaise, priceFor, type BillingCycle } from "@/lib/pricing";
+import { priceFor, type BillingCycle } from "@/lib/pricing";
 
 /**
  * Razorpay over plain HTTPS (Orders flow) — no SDK needed.
  * Amounts are paise. Docs: https://razorpay.com/docs/api/orders
+ *
+ * Customer-facing totals in @/lib/pricing already INCLUDE 18 % GST
+ * (₹499 = ₹422.88 base + ₹76.12 GST). We charge exactly the total,
+ * never GST-on-top.
  */
 
-export { PRICING, cycleKey, gstPaise, priceFor };
+export { priceFor };
 export type { BillingCycle };
 
-/** Legacy alias kept for existing imports. */
+/** Legacy alias kept for existing imports — amounts are the GST-inclusive totals. */
 export const PLAN_AMOUNTS = {
-  pro_monthly: { base: PRICING.pro_monthly.basePaise, label: PRICING.pro_monthly.label, months: 1 },
-  pro_annual: { base: PRICING.pro_annual.basePaise, label: PRICING.pro_annual.label, months: 12 },
+  pro_monthly: { base: priceFor("monthly").totalPaise, label: "Beevo Pro — Monthly", months: 1 },
+  pro_annual: { base: priceFor("annual").totalPaise, label: "Beevo Pro — Annual", months: 12 },
 } as const;
 
-export function gstOf(paiseBase: number): number {
-  return gstPaise(paiseBase);
+export function gstOf(paiseTotalIncludingGst: number): number {
+  return paiseTotalIncludingGst - Math.round(paiseTotalIncludingGst / 1.18);
 }
 
 export interface RazorpayOrder {

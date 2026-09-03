@@ -90,7 +90,7 @@ export default function MediaPage() {
           <span className="inline-flex h-8.5 items-center gap-2 rounded-xl border border-honey-600/30 bg-gradient-to-b from-honey-300 to-honey-500 px-3.5 text-[13px] font-semibold text-ink-950 shadow-[var(--shadow-gold)] transition-all hover:brightness-105 active:scale-[0.98]">
             <ImagePlus size={15} /> Upload
           </span>
-          <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" className="hidden" onChange={onUpload} />
         </label>
       </div>
 
@@ -128,7 +128,7 @@ export default function MediaPage() {
           </span>
           <span className="text-xs font-medium">Drop or browse</span>
           <span className="font-mono text-[9.5px] uppercase tracking-wider opacity-60">PNG · JPG · MP4 ≤ 50MB</span>
-          <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" className="hidden" onChange={onUpload} />
         </label>
       </div>
 

@@ -90,7 +90,7 @@ export const PLANS: PlanMeta[] = [
   {
     id: "pro",
     name: "Pro",
-    priceInr: 799,
+    priceInr: 499,
     cadence: "per month",
     blurb: "The full hive. For brands & teams posting every day.",
     postsPerMonth: null,

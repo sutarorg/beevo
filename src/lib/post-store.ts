@@ -2,6 +2,48 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { posts, postTargets, socialAccounts } from "@/db/schema";
 import type { PlatformId, Post, PostStatus } from "./types";
+import { platformById } from "./constants";
+
+/** Platforms the workspace has actually connected (live or simulated). */
+export async function connectedPlatforms(workspaceId: string): Promise<Set<PlatformId>> {
+  const rows = await db
+    .select({ platform: socialAccounts.platform })
+    .from(socialAccounts)
+    .where(and(eq(socialAccounts.workspaceId, workspaceId), inArray(socialAccounts.status, ["connected", "simulated"])));
+  return new Set(rows.map((r) => r.platform as PlatformId));
+}
+
+export interface PlatformGateResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Server-side publication gate (cannot be bypassed by the client):
+ *  - every selected platform must have a LIVE connected account
+ *  - YouTube targets reject image assets entirely (Shorts-only)
+ */
+export async function gateForPublish(
+  workspaceId: string,
+  platforms: PlatformId[],
+  media: string[]
+): Promise<PlatformGateResult> {
+  const live = await connectedPlatforms(workspaceId);
+  const missing = platforms.filter((p) => !live.has(p));
+  if (missing.length) {
+    return {
+      ok: false,
+      error: `No connected ${missing.map((m) => platformById(m).name).join(", ")} account — connect ${missing.length > 1 ? "them" : "it"} from Accounts first.`,
+    };
+  }
+  if (platforms.includes("youtube")) {
+    const images = media.filter((m) => /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(m));
+    if (images.length) {
+      return { ok: false, error: "YouTube posts cannot include images — attach a Short (vertical video ≤ 3 min)." };
+    }
+  }
+  return { ok: true };
+}
 
 /**
  * Workspace-scoped post persistence (PostgreSQL via Drizzle).

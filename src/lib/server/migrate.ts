@@ -47,6 +47,12 @@ const CORE_TABLES = [
 const UPGRADE_SQL: string[] = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_url" text;`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "prefs" jsonb NOT NULL DEFAULT '{"timezone":"Asia/Kolkata (GMT+5:30)","digest":true}'::jsonb;`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "auth_provider" varchar(20) NOT NULL DEFAULT 'email';`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_set_at" timestamptz;`,
+  // Legacy email-password signups get marked as having a password so their
+  // change-password flow keeps requiring the current one.
+  // (Drizzle marks them via signup; these statements cover drifted DBs.)
+  `ALTER TABLE "api_keys" ADD COLUMN IF NOT EXISTS "name" text NOT NULL DEFAULT 'Default token';`,
   `ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "base_paise" integer NOT NULL DEFAULT 0;`,
   `ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "gst_paise" integer NOT NULL DEFAULT 0;`,
   `ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "total_paise" integer NOT NULL DEFAULT 0;`,
@@ -60,6 +66,43 @@ const UPGRADE_SQL: string[] = [
 export async function schemaPresent(): Promise<boolean> {
   const res = await pool.query<{ present: string | null }>(`SELECT to_regclass('public.users') AS present`);
   return !!res.rows[0]?.present;
+}
+
+/** Columns the current code requires (table → columns). */
+const REQUIRED_COLUMNS: Record<string, string[]> = {
+  users: ["avatar_url", "prefs", "auth_provider", "password_set_at"],
+  payments: ["base_paise", "gst_paise", "total_paise", "method", "method_detail"],
+  invoices: ["base_paise", "gst_paise", "total_paise"],
+};
+
+export interface SchemaReport {
+  missingTables: string[];
+  missingColumns: string[];
+  ok: boolean;
+}
+
+/** Honest per-table/per-column audit — the old boolean check hid drift. */
+export async function schemaReport(): Promise<SchemaReport> {
+  const tables = await pool.query<{ name: string }>(
+    `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = 'public'`
+  );
+  const existingTables = new Set(tables.rows.map((r) => r.name));
+  const missingTables = CORE_TABLES.filter((t) => !existingTables.has(t));
+
+  const missingColumns: string[] = [];
+  if (missingTables.length < CORE_TABLES.length) {
+    const cols = await pool.query<{ table_name: string; column_name: string }>(
+      `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`
+    );
+    const existing = new Set(cols.rows.map((r) => `${r.table_name}.${r.column_name}`));
+    for (const [table, columns] of Object.entries(REQUIRED_COLUMNS)) {
+      if (!existingTables.has(table)) continue;
+      for (const col of columns) {
+        if (!existing.has(`${table}.${col}`)) missingColumns.push(`${table}.${col}`);
+      }
+    }
+  }
+  return { missingTables, missingColumns, ok: missingTables.length === 0 && missingColumns.length === 0 };
 }
 
 async function missingTables(client: { query: (q: string, v?: unknown[]) => Promise<{ rows: { name: string }[] }> }): Promise<string[]> {

@@ -31,8 +31,10 @@ export function MarketingNav() {
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled ? "border-b border-cream-300/70 bg-cream-100/85 backdrop-blur-md" : "bg-transparent"
+        "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow] duration-300",
+        // Solid (not translucent) background while scrolled — a translucent
+        // cream bar over the page's dark sections rendered as a dark line.
+        scrolled ? "bg-cream-100 shadow-[0_4px_24px_-12px_rgba(17,11,6,0.22)]" : "bg-transparent shadow-none"
       )}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">

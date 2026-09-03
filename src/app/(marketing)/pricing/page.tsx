@@ -6,9 +6,9 @@ import { PricingCards } from "@/components/marketing/pricing-cards";
 import { Button } from "@/components/ui/primitives";
 
 export const metadata: Metadata = {
-  title: "Pricing — Free ₹0 · Pro ₹799/month",
+  title: "Pricing — Free ₹0 · Pro ₹499/month",
   description:
-    "Beevo pricing in INR: a free forever plan and Beevo Pro at ₹799/month with unlimited posts, AI captions and best-time scheduling. GST invoice included.",
+    "Beevo pricing in INR: a free forever plan and Beevo Pro at ₹499/month (GST included) with unlimited posts, AI captions and best-time scheduling. GST invoice included.",
 };
 
 const ROWS: { label: string; free: string | boolean; pro: string | boolean }[] = [
@@ -41,7 +41,7 @@ export default function PricingPage() {
             <span className="font-display italic font-medium text-honey-600">honest.</span>
           </h1>
           <p className="mt-4 text-[15.5px] leading-relaxed text-ink-600">
-            ₹0 forever for light schedulers. ₹799/month when your hive needs unlimited posts,
+            ₹0 forever for light schedulers. ₹499/month when your hive needs unlimited posts,
             AI captions and the best-time engine. GST invoice on every payment.
           </p>
         </div>
@@ -84,7 +84,7 @@ export default function PricingPage() {
         <div className="mt-8 grid gap-3 sm:grid-cols-3">
           {[
             { icon: ShieldCheck, t: "14-day money-back", d: "Full refund if Pro isn't for you." },
-            { icon: ReceiptText, t: "GST invoices", d: "18% GST breakdown on every email." },
+            { icon: ReceiptText, t: "GST invoices", d: "GST is ALREADY included in every price shown." },
             { icon: RefreshCw, t: "Cancel anytime", d: "Two clicks in Billing. No calls, no guilt." },
           ].map((x) => (
             <div key={x.t} className="flex items-start gap-3 rounded-2xl border border-cream-300 bg-white/80 p-4">
@@ -105,7 +105,7 @@ export default function PricingPage() {
             <span className="font-display italic text-honey-300">one boosted post.</span>
           </h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-cream-50/60">
-            ₹799/month · UPI, cards & net banking · cancel anytime.
+            ₹499/month GST-inclusive · UPI, cards & net banking · cancel anytime.
           </p>
           <Link href="/signup?plan=pro" className="mt-6 inline-block">
             <Button size="lg">Start with Pro</Button>

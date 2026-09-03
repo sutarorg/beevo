@@ -25,7 +25,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
   const state = url.searchParams.get("state");
   const errParam = url.searchParams.get("error");
 
-  if (errParam) return redirect(`/accounts?oauth_error=${encodeURIComponent(errParam)}`);
+  if (errParam) {
+    // Meta/Google append human-readable detail — surface it verbatim.
+    const detail =
+      url.searchParams.get("error_description") ||
+      url.searchParams.get("error_subcode") ||
+      url.searchParams.get("error_uri") ||
+      "";
+    const message = errParam === "access_denied"
+      ? `${platform} denied access: ${detail || "the consent was cancelled or the app user isn't allowed (check app status/test users in the provider console)"}`
+      : detail ? `${errParam} — ${detail}` : errParam;
+    return redirect(`/accounts?oauth_error=${encodeURIComponent(message.slice(0, 260))}`);
+  }
   if (!code || !state) return redirect(`/accounts?oauth_error=missing_code`);
 
   const jar = await cookies();

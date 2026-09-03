@@ -35,6 +35,35 @@ import {
 } from "@/components/ui/primitives";
 import { useApp } from "@/providers/app-provider";
 
+/** Canvas downscale to a square JPEG — keeps uploads tiny and consistent. */
+function downscaleImage(file: File, size: number, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas unavailable"));
+      // Center-crop to square.
+      const side = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Could not process image"))),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Unsupported image file"));
+    };
+    img.src = url;
+  });
+}
+
 const TIMEZONES = [
   "Asia/Kolkata (GMT+5:30)",
   "Asia/Dubai (GMT+4:00)",
@@ -110,8 +139,11 @@ export default function SettingsPage() {
     e.target.value = "";
     setAvatarBusy(true);
     try {
+      // Downscale to 256×256 JPEG before upload — tiny payloads, fast loads,
+      // and it fits the no-storage fallback path on unconfigured deployments.
+      const resized = await downscaleImage(file, 256, 0.85);
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", resized, "avatar.jpg");
       const { data } = await api.post<{ avatarUrl: string }>("/api/account/avatar", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -275,14 +307,20 @@ export default function SettingsPage() {
               <Lock size={15} />
             </span>
             <div>
-              <p className="text-[13.5px] font-medium text-ink-900">Password</p>
+              <p className="text-[13.5px] font-medium text-ink-900">
+                {user?.hasPassword ? "Password" : "Add a password"}
+              </p>
               <p className="text-xs text-ink-600/65">
-                Changing it signs out every other device automatically.
+                {user?.hasPassword
+                  ? "Changing it signs out every other device automatically."
+                  : user?.authProvider === "google"
+                    ? "Signed in with Google — optional email + password login."
+                    : "No password set on this account yet."}
               </p>
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={() => setPwOpen(true)}>
-            Change password
+            {user?.hasPassword ? "Change password" : "Create password"}
           </Button>
         </div>
       </Card>
@@ -525,6 +563,8 @@ export default function SettingsPage() {
 
 /* ------------------------- change password modal ------------------------- */
 function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user } = useApp();
+  const hasPassword = !!user?.hasPassword;
   const [current, setCurrent] = React.useState("");
   const [next, setNext] = React.useState("");
   const [confirm, setConfirm] = React.useState("");
@@ -555,7 +595,8 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true);
     try {
       const { data } = await api.post<{ message: string }>("/api/account/password", {
-        currentPassword: current,
+        // Only send the current password when the account actually has one
+        ...(hasPassword ? { currentPassword: current } : {}),
         newPassword: next,
         confirmPassword: confirm,
       });
@@ -602,14 +643,18 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
     <Modal open={open} onClose={onClose} size="sm">
       <form onSubmit={submit} className="p-6">
         <h3 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink-950">
-          <Lock size={17} className="text-honey-600" /> Change password
+          <Lock size={17} className="text-honey-600" /> {hasPassword ? "Change password" : "Create a password"}
         </h3>
         <p className="mt-1.5 text-[13px] text-ink-600/85">
-          For your security, all other signed-in devices will be logged out.
+          {hasPassword
+            ? "For your security, all other signed-in devices will be logged out."
+            : user?.authProvider === "google"
+              ? "Your account was created with Google — set a password to also log in with email + password."
+              : "Set a sign-in password for this account."}
         </p>
 
         <div className="mt-4 space-y-3.5">
-          {field("Current password", current, setCurrent, "current-password", "••••••••")}
+          {hasPassword && field("Current password", current, setCurrent, "current-password", "••••••••")}
           {field("New password", next, setNext, "new-password", "8+ chars, letters & numbers")}
           {next && (
             <div className="flex items-center gap-1.5">
@@ -637,7 +682,7 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" className="flex-1" busy={busy} disabled={!current || !next || next !== confirm}>
+          <Button type="submit" className="flex-1" busy={busy} disabled={(hasPassword && !current) || !next || next !== confirm}>
             Update password
           </Button>
         </div>

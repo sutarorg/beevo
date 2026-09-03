@@ -234,12 +234,18 @@ Almost always the database, in one of three states — open `https://your-app/ap
 | `down` | — | URL set but unreachable. A `127.0.0.1` / `localhost` URL **cannot be reached from Vercel** — use a hosted Postgres (§4.1). TLS is auto-enabled for remote hosts. |
 | `up` | `missing` | Tables were never created. The app **self-heals automatically**: on the next cold start (or API call) it applies the embedded schema once via an advisory lock. You can also run `npx drizzle-kit push` with `DATABASE_URL` set to production (§5 step 5). Retry signup a few seconds after the first error. |
 
-**`DrizzleError: Failed query: select ... "avatar_url", "prefs" ... from "users"`**
-The table exists but was created by an older build, so new columns are missing (`42703`). The boot migrator now runs `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` with constant defaults for every drift-prone column on every cold start — **redeploy (or restart) once and it's fixed automatically.** Instant manual fix in your DB console (Neon/Vercel Postgres → SQL Editor):
+**`DrizzleError: Failed query: select ... "avatar_url", "prefs" ... from "users"` (login/Google sign-in)**
+The table exists but was created by an older build — columns added later (`avatar_url`, `prefs`, billing paise columns/…) are missing, Postgres error `42703`. Recovery ladder, any one of these works:
+
+1. **Nothing to do** — ≥ v2.1.0 trades the 500 for an automatic heal-then-retry: the request runs the upgrade synchronously and retries transparently.
+2. Boot migrator runs `ALTER TABLE … ADD COLUMN IF NOT EXISTS` on every cold start — redeploy/restart once.
+3. **One-click:** visit `https://<your-domain>/api/admin/migrate?key=<CRON_SECRET>` — it prints `before`/`after` drift and applies the upgrade immediately.
+4. Manual SQL in the DB console:
 ```sql
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_url" text;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "prefs" jsonb NOT NULL DEFAULT '{"timezone":"Asia/Kolkata (GMT+5:30)","digest":true}'::jsonb;
 ```
+Verify afterwards via `https://<your-domain>/api/health` → `schema` must be `"ok"` with no `missingColumns`.
 
 **OAuth callback lands on `/accounts?oauth_error=...`** — check `APP_URL` matches your domain exactly, the redirect URI uses `https`, the app is Live (Meta) / the user is a test user (Google), and the secret wasn't rotated after copying.
 
@@ -247,7 +253,25 @@ ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "prefs" jsonb NOT NULL DEFAULT '{"t
 
 **Posts stay "scheduled"** — on Hobby, cron is daily: enable the GitHub Action pinger (§4.4) or hit `/api/jobs/publish` manually with the Bearer secret.
 
-**Signup works but no emails arrive** — email vars unset; check provider dashboard logs, or leave unset (the app intentionally no-ops).
+**Signup works but no emails arrive**
+Run the built-in diagnostics first: log in as owner → POST `/api/account/email-test` (or curl with your session) — it returns the exact Resend API error instead of failing silently. The three root causes, in frequency order:
+
+1. **Sender domain not verified (most common):** Resend *rejects* (HTTP 422) every send from an unverified domain — nothing is even queued. Fix: https://dashboard.resend.com/domains → **Add Domain** → enter `beevo.in` → it shows 1 TXT (DKIM) + optional MX/SPF records → add them in your DNS provider → wait until status shows **Verified** → set `EMAIL_FROM=Beevo <hello@beevo.in>` → redeploy.
+2. **Using `onboarding@resend.dev`:** only delivers to the Resend account OWNER's own email — fine for smoke tests, wrong for users.
+3. **Bad/revoked key (HTTP 401):** dashboard.resend.com → API Keys → create → replace `RESEND_API_KEY` → restart.
+
+Also check Resend → **Logs** (per-message delivery/bounce status) and make sure you're not silently using the old default sender `hello@beevo.app` (the code now warns loudly in server logs if so).
+
+**Meta login: "App not active / This app is not accessible right now"**
+Your Meta app is in **Development mode**. In Development mode only accounts with a role can OAuth: developers.facebook.com → your app → **App Review** (left nav) → toggle **"Live"** on the top banner to public. While it stays in Development: **Settings → Roles → Test Users/People** and add the Instagram/Facebook user there. Without one of these you get exactly this dialog. Also confirm both products are installed: **Products → Facebook Login** AND **Instagram Graph API**, and the redirect URIs include `https://beevo.in/api/oauth/facebook/callback` and `.../instagram/callback` (Section 4.8).
+
+**YouTube connect: "Error 403: access_denied"**
+This is a Google OAuth consent screen message — meaning the app is in **Testing** and the account isn't whitelisted, OR the sensitive YouTube scopes were never added to the consent screen. console.cloud.google.com → your project → **APIs & Services → OAuth consent screen**:
+1. **Publishing status** — either **Publish app** (public; YouTube scopes will need Google verification for production) or keep **Testing** and
+2. **Audience → Test users → ADD USERS** → add the exact Gmail address connecting. The Google owner of the channel must be listed.
+3. **Data access (Scopes) → Add or remove scopes** → add `.../auth/youtube.upload` + `.../auth/youtube.readonly` (the 403 appears when the consent screen never declared them).
+4. **APIs & Services → Library** → confirm **YouTube Data API v3** shows Enabled.
+5. Reconnect from Beevo → Accounts.
 
 ---
 

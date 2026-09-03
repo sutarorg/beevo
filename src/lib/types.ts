@@ -153,6 +153,8 @@ export interface AppStatePayload {
     digest: boolean;
     avatarUrl?: string | null;
     role?: string;
+    authProvider?: string;
+    hasPassword?: boolean;
   };
   plan: PlanId;
   accounts: SocialAccount[];

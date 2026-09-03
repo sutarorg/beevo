@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { postTargets } from "@/db/schema";
 import { handler, ok, parseBody, ApiError } from "@/lib/server/http";
 import { requireUser } from "@/lib/server/session";
-import { deletePost, getPost, updatePost } from "@/lib/post-store";
+import { deletePost, getPost, updatePost, gateForPublish } from "@/lib/post-store";
 import { publishDuePosts } from "@/lib/server/jobs/publisher";
 import { PLATFORMS } from "@/lib/constants";
 
@@ -70,6 +70,8 @@ export const PATCH = handler(async (req: Request, ctx: Ctx) => {
         throw new ApiError(422, `Caption exceeds the ${meta.name} limit of ${meta.charLimit} characters`);
       }
     }
+    const gate = await gateForPublish(workspace.id, body.platforms, body.media ?? existing.media);
+    if (!gate.ok) throw new ApiError(422, gate.error!, "PLATFORM_GATE");
   }
 
   const post = await updatePost(workspace.id, id, {
