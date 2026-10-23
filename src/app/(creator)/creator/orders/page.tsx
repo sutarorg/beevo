@@ -10,7 +10,6 @@ import { formatDateTime } from "@/lib/utils";
 import { Modal } from "@/components/creator/dialogs";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -61,10 +60,8 @@ export default function CreatorOrdersPage() {
     <div>
       <PageHeader
         title="Orders"
-        sub="Every checkout attempt that reached you. Commission maths shown per order."
-      >
-        <DemoChip />
-      </PageHeader>
+        sub="Every course sale that reached you. Commission maths shown per order."
+      />
 
       {state.status === "success" ? (
         <div className="mb-5 grid grid-cols-3 gap-3">
@@ -72,19 +69,16 @@ export default function CreatorOrdersPage() {
             icon={<IndianRupee className="size-4.5" aria-hidden="true" />}
             label="Gross (paid)"
             value={formatINR(totals.gross)}
-            demo
           />
           <StatCard
             icon={<ReceiptText className="size-4.5" aria-hidden="true" />}
             label="Paid orders"
             value={String(totals.paid)}
-            demo
           />
           <StatCard
             icon={<RotateCcw className="size-4.5" aria-hidden="true" />}
             label="Refunded"
             value={String(totals.refunded)}
-            demo
           />
         </div>
       ) : null}
@@ -190,7 +184,6 @@ export default function CreatorOrdersPage() {
                 <p className="mt-0.5 text-base font-bold text-ink">{selected.buyerName}</p>
                 <p className="text-sm text-smoke">{selected.buyerEmail}</p>
               </div>
-              <DemoChip />
             </div>
             <dl className="rounded-2xl border-2 border-ink bg-white p-4">
               <div className="flex justify-between border-b border-dashed border-ink/20 pb-2 text-sm">
@@ -203,7 +196,7 @@ export default function CreatorOrdersPage() {
               </div>
               <div className="flex justify-between border-b border-dashed border-ink/20 py-2 text-sm">
                 <dt className="text-smoke">Status</dt>
-                <dd className="font-semibold text-ink capitalize">{selected.status} (demo)</dd>
+                <dd className="font-semibold text-ink capitalize">{selected.status}</dd>
               </div>
               <div className="flex justify-between py-2 text-sm">
                 <dt className="text-smoke">Buyer paid</dt>
@@ -223,8 +216,8 @@ export default function CreatorOrdersPage() {
               </div>
             </dl>
             <p className="text-[11px] leading-relaxed text-smoke">
-              Demo order — not a real payment. Refunds follow the Refund Policy: no standard
-              refunds, except where applicable law requires a remedy; contact support to action one.
+              Refunds follow the Refund Policy: no standard refunds, except where applicable law
+              requires a remedy; contact support to action one.
             </p>
           </div>
         ) : null}

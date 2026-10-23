@@ -9,7 +9,7 @@ import { LegalPage } from "@/components/legal/legal-page";
 export const metadata: Metadata = {
   title: "Refund Policy",
   description:
-    "Course purchases on CourseKit are non-refundable once access is granted, except where a refund or other remedy is required by applicable law.",
+    "Course purchases on Beevo are non-refundable once access is granted, except where a refund or other remedy is required by applicable law.",
 };
 
 function stripNumber(heading: string): string {

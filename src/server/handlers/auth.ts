@@ -52,14 +52,14 @@ async function sendVerificationEmail(user: typeof users.$inferSelect, baseUrl: s
   await queueEmail({
     userId: user.id,
     to: user.email,
-    subject: "Verify your CourseKit email",
+    subject: "Verify your Beevo email",
     template: "email_verification",
     dedupeKey: `verify:${user.id}:${token.slice(0, 8)}`,
     html: emailShell(
       "Verify your email",
       `<p>Hi ${user.name.split(" ")[0]},</p><p>Confirm this email to activate your creator profile.</p><p style="margin:20px 0"><a href="${url}" style="background:#e8490f;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700">Verify email</a></p><p style="font-size:12px;color:#5c543f">Or paste: ${url}</p>`,
     ),
-    text: `Verify your CourseKit email: ${url}`,
+    text: `Verify your Beevo email: ${url}`,
   });
 }
 
@@ -184,14 +184,14 @@ route("POST", "auth/forgot", async (req) => {
     await queueEmail({
       userId: user.id,
       to: user.email,
-      subject: "Reset your CourseKit password",
+      subject: "Reset your Beevo password",
       template: "password_reset",
       dedupeKey: `reset:${user.id}:${token.slice(0, 8)}`,
       html: emailShell(
         "Reset your password",
         `<p>We received a request to reset your password.</p><p style="margin:20px 0"><a href="${url}" style="background:#17130b;color:#f6f0e2;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:700">Choose a new password</a></p><p style="font-size:12px;color:#5c543f">This link expires in 60 minutes. If you didn't ask for it, ignore this email.</p>`,
       ),
-      text: `Reset your CourseKit password (valid 60 min): ${url}`,
+      text: `Reset your Beevo password (valid 60 min): ${url}`,
     });
   }
   // Anti-enumeration: identical response regardless.

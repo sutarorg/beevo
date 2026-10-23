@@ -23,12 +23,12 @@ import { cn, formatDate } from "@/lib/utils";
 import { ConfirmDialog, Modal } from "@/components/creator/dialogs";
 import { AutosaveField, OutcomesEditor } from "@/components/creator/wizard/fields";
 import { CoverUpload } from "@/components/creator/wizard/uploads";
-import { DemoChip, StatusChip, CopyButton } from "@/components/creator/ui";
+import { StatusChip, CopyButton } from "@/components/creator/ui";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
 export function coursePublicUrl(course: CourseEditor): string {
-  return `https://coursekit.app/@${course.creatorHandle}/${course.slug ?? "draft"}`;
+  return `https://beevo.in/@${course.creatorHandle}/${course.slug ?? "draft"}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,8 +271,8 @@ export function PricingStage({
           Commission is computed in integer paise: fee = Math.round(price × 8%), i.e. rounded to the
           nearest paise (half up). Example: ₹1,000 → ₹80 fee → ₹920 remaining before other
           deductions. This is a frontend estimate only — the authoritative calculation happens
-          server-side at checkout (Prompt 5), and payment-gateway charges and applicable taxes are
-          settled separately per the provider&apos;s terms.
+          server-side at checkout, and payment-gateway charges and applicable taxes are settled
+          separately per the provider&apos;s terms.
         </p>
       </div>
     </div>
@@ -280,7 +280,7 @@ export function PricingStage({
 }
 
 // ---------------------------------------------------------------------------
-// Storefront preview (mock illustration)
+// Storefront preview
 // ---------------------------------------------------------------------------
 
 export function StorefrontPreviewModal({
@@ -296,8 +296,10 @@ export function StorefrontPreviewModal({
   return (
     <Modal open={open} onClose={onClose} title="Storefront preview" wide>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <DemoChip label="Mock preview" />
-        <p className="text-[11px] text-smoke">How your sales page could look once published.</p>
+        <span className="inline-flex items-center rounded-full border-2 border-ink bg-lime px-2 py-0.5 text-[10px] font-bold tracking-[0.14em] text-ink uppercase">
+          {course.status === "published" ? "Storefront preview" : "Draft preview"}
+        </span>
+        <p className="text-[11px] text-smoke">How your sales page looks to buyers.</p>
       </div>
       <div className="overflow-hidden rounded-2xl border-2 border-ink bg-white">
         <div className="relative aspect-[16/9] bg-parchment">
@@ -464,7 +466,7 @@ export function ReviewStage({
     }
   };
 
-  // After a successful (mock) publish.
+  // After a successful publish.
   if (justPublished && course.status === "published") {
     return (
       <div className="rounded-3xl border-2 border-ink bg-white p-6 text-center shadow-hard sm:p-10">
@@ -493,8 +495,8 @@ export function ReviewStage({
           </Button>
         </div>
         <p className="mx-auto mt-5 max-w-md text-[11px] leading-relaxed text-smoke">
-          Simulated publish — this demo doesn't create a live public page. The real storefront
-          routes ship once the backend connects in Prompt 5.
+          Your course page is now public. Anyone with the link can read the sales page and check out
+          securely.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 border-t-2 border-dashed border-ink/15 pt-5">
           <Button href="/creator/courses" variant="ink" size="sm">
@@ -613,8 +615,8 @@ export function ReviewStage({
         ) : null}
       </div>
       <p className="text-[11px] leading-relaxed text-smoke">
-        Publishing here is a frontend simulation through the mock adapter — it validates readiness
-        exactly as the server will, but no real storefront or database record is created in this phase.
+        Publishing validates the same readiness checklist the server enforces. Once published, your
+        course page goes live on your storefront and can be purchased through your link.
       </p>
 
       <ConfirmDialog

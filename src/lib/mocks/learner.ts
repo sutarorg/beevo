@@ -22,7 +22,7 @@ export const DEMO_LEARNER = {
 /** One small text file used when the learner downloads a simulated resource. */
 export function simulatedDownloadText(fileName: string): string {
   return [
-    "CourseKit — simulated download",
+    "Beevo — simulated download",
     "================================",
     "",
     `You requested: ${fileName}`,

@@ -21,7 +21,6 @@ import { formatDateTime } from "@/lib/utils";
 import { EventIcon } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   FailedState,
   PageHeader,
   StatCard,
@@ -41,8 +40,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
-      <PageHeader title="Platform overview" sub="Live-ish picture of the whole business. All figures derive from the mock ledger.">
-        <DemoChip />
+      <PageHeader title="Platform overview" sub="A live picture of the whole business. Every figure derives from settled orders and payouts.">
       </PageHeader>
 
       {state.status === "loading" || state.status === "idle" ? (
@@ -55,14 +53,14 @@ export default function AdminDashboardPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard icon={<ShieldCheck className="size-4.5" aria-hidden="true" />} label="Creators" value={String(state.data.kpis.creators)} demo />
-            <StatCard icon={<GraduationCap className="size-4.5" aria-hidden="true" />} label="Learners" value={String(state.data.kpis.learners)} demo />
-            <StatCard icon={<Clapperboard className="size-4.5" aria-hidden="true" />} label="Published courses" value={String(state.data.kpis.publishedCourses)} demo />
-            <StatCard icon={<ReceiptText className="size-4.5" aria-hidden="true" />} label="Confirmed sales" value={String(state.data.kpis.confirmedSales)} demo />
-            <StatCard icon={<IndianRupee className="size-4.5" aria-hidden="true" />} label="Gross revenue" value={formatINR(state.data.kpis.grossInPaise)} demo />
-            <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Platform commission (8%)" value={formatINR(state.data.kpis.commissionInPaise)} demo />
-            <StatCard icon={<Scale className="size-4.5" aria-hidden="true" />} label="Pending reconciliation" value={formatINR(state.data.kpis.pendingReconciliationInPaise)} hint="Paid orders not yet settled" demo />
-            <StatCard icon={<Landmark className="size-4.5" aria-hidden="true" />} label="Outstanding earnings" value={formatINR(state.data.kpis.outstandingEarningsInPaise)} hint={`${state.data.kpis.pendingPayouts} payout records pending · ${formatINR(state.data.kpis.pendingPayoutsInPaise)}`} demo />
+            <StatCard icon={<ShieldCheck className="size-4.5" aria-hidden="true" />} label="Creators" value={String(state.data.kpis.creators)} />
+            <StatCard icon={<GraduationCap className="size-4.5" aria-hidden="true" />} label="Learners" value={String(state.data.kpis.learners)} />
+            <StatCard icon={<Clapperboard className="size-4.5" aria-hidden="true" />} label="Published courses" value={String(state.data.kpis.publishedCourses)} />
+            <StatCard icon={<ReceiptText className="size-4.5" aria-hidden="true" />} label="Confirmed sales" value={String(state.data.kpis.confirmedSales)} />
+            <StatCard icon={<IndianRupee className="size-4.5" aria-hidden="true" />} label="Gross revenue" value={formatINR(state.data.kpis.grossInPaise)} />
+            <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Platform commission (8%)" value={formatINR(state.data.kpis.commissionInPaise)} />
+            <StatCard icon={<Scale className="size-4.5" aria-hidden="true" />} label="Pending reconciliation" value={formatINR(state.data.kpis.pendingReconciliationInPaise)} hint="Paid orders not yet settled" />
+            <StatCard icon={<Landmark className="size-4.5" aria-hidden="true" />} label="Outstanding earnings" value={formatINR(state.data.kpis.outstandingEarningsInPaise)} hint={`${state.data.kpis.pendingPayouts} payout records pending · ${formatINR(state.data.kpis.pendingPayoutsInPaise)}`} />
           </div>
 
           {/* Watchlist */}
@@ -125,7 +123,7 @@ export default function AdminDashboardPage() {
               </ul>
               <p className="mt-3 flex items-center gap-1.5 text-[10px] text-smoke">
                 <UsersRound className="size-3" aria-hidden="true" />
-                Every admin action in this demo appends to the audit trail automatically.
+                Every admin action appends to the audit trail automatically.
               </p>
             </section>
           </div>

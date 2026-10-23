@@ -11,7 +11,6 @@ import { formatDate } from "@/lib/utils";
 import { DetailRow, SearchInput, StatusPill } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -37,7 +36,7 @@ const ACTION_COPY: Record<Action, { title: string; confirm: string; body: (cours
   flag: {
     title: "Flag for review?",
     confirm: "Flag course",
-    body: (course) => `“${course.title}” is marked for content review. The creator is not notified in this demo.`,
+    body: (course) => `“${course.title}” is marked for content review. The creator is not notified automatically.`,
   },
   unflag: {
     title: "Clear the review flag?",
@@ -98,7 +97,6 @@ export default function AdminCoursesPage() {
   return (
     <div>
       <PageHeader title="Courses" sub="Catalog administration — moderation, publication state, and enrolment visibility.">
-        <DemoChip />
       </PageHeader>
 
       <div className="mb-5 flex flex-col gap-3">

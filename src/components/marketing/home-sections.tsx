@@ -1,6 +1,7 @@
 import { ArrowRight, Check, Sparkle } from "lucide-react";
+import Image from "next/image";
 import { BENEFITS, HOW_IT_WORKS_STEPS, MARQUEE_ITEMS, FAQS } from "@/lib/content";
-import { MOCK_CREATORS, MOCK_DATA_NOTICE } from "@/lib/mocks/creators";
+import { MOCK_CREATORS } from "@/lib/mocks/creators";
 import { PLATFORM_COMMISSION_LABEL } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import {
@@ -43,7 +44,7 @@ export function HeroSection() {
           </Reveal>
           <Reveal delay={0.16}>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-pretty text-smoke sm:text-lg">
-              CourseKit gives creators a personal storefront to sell courses
+              Beevo gives creators a personal storefront to sell courses
               directly — through the links you already share. No public
               catalogue, no algorithm deciding who sees you. Just your page,
               your price, and secure checkout.
@@ -122,7 +123,7 @@ export function BenefitsSection() {
               button
             </>
           }
-          lede="You did the hard part — building an audience that trusts you. CourseKit turns that trust into a course business without renting it back to you."
+          lede="You did the hard part — building an audience that trusts you. Beevo turns that trust into a course business without renting it back to you."
         />
       </Reveal>
       <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:gap-6">
@@ -183,7 +184,7 @@ export function NotMarketplaceSection() {
                 you.
               </>
             }
-            lede="Marketplaces are wonderful — until the algorithm decides your course competes with 40,000 others for a slot on page nine. CourseKit skips the catalogue entirely. Discovery happens on your channels, where it always did."
+            lede="Marketplaces are wonderful — until the algorithm decides your course competes with 40,000 others for a slot on page nine. Beevo skips the catalogue entirely. Discovery happens on your channels, where it always did."
           />
         </Reveal>
         <div className="mt-12 grid gap-5 sm:grid-cols-3">
@@ -267,7 +268,7 @@ export function HowItWorksSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Storefront showcase (demo data)
+// Storefront showcase
 // ---------------------------------------------------------------------------
 
 export function ShowcaseSection() {
@@ -284,7 +285,7 @@ export function ShowcaseSection() {
                 not like us
               </>
             }
-            lede="A profile with your face, your courses with your prices, your links where your audience already clicks. These fictional storefronts show the shape of the product."
+            lede="A profile with your face, your courses with your prices, your links where your audience already clicks. This is the shape of every Beevo storefront."
           />
         </Reveal>
         <div className="mt-12 grid gap-6 md:grid-cols-3">
@@ -298,9 +299,6 @@ export function ShowcaseSection() {
             </Reveal>
           ))}
         </div>
-        <p className="mt-8 text-center text-xs font-semibold text-smoke">
-          {MOCK_DATA_NOTICE}
-        </p>
       </div>
     </section>
   );
@@ -392,14 +390,34 @@ export function CreateLearnSection() {
                   </li>
                 ))}
               </ul>
-              {panelIndex === 1 ? (
+              {panelIndex === 0 ? (
+                <div className="mt-6">
+                  <div className="mx-auto max-w-xs -rotate-1 overflow-hidden rounded-2xl border-2 border-ink bg-cream shadow-hard-xs">
+                    <div className="relative aspect-[4/3] border-b-2 border-ink">
+                      <Image
+                        src="/images/studio/creator-studio.jpg"
+                        alt="A creator's home recording setup, ready for a course lesson"
+                        fill
+                        sizes="(max-width: 768px) 80vw, 320px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                      <p className="text-xs font-bold text-ink">Course studio</p>
+                      <span className="rounded-full border-2 border-ink bg-lime px-2 py-0.5 text-[10px] font-bold">
+                        Draft · autosaved
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
                 <div className="mt-6">
                   <CourseCard
                     course={MOCK_CREATORS[0].courses[0]}
                     className="mx-auto max-w-xs rotate-1 text-ink"
                   />
                 </div>
-              ) : null}
+              )}
             </div>
           </Reveal>
         ))}

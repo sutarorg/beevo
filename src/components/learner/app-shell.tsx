@@ -9,6 +9,7 @@ import { isMockAuth } from "@/lib/services/auth";
 import { getLearnerService, resetLearnerMockData } from "@/lib/services/learner";
 import { cn } from "@/lib/utils";
 import { RequireSession } from "@/components/auth/gates";
+import { LogoMark } from "@/components/site/chrome";
 import { FailedState } from "@/components/creator/ui";
 import { UnavailablePanel } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -41,8 +42,8 @@ export function LearnerShell({ children }: { children: ReactNode }) {
     return (
       <main id="main" className="grid min-h-dvh place-items-center bg-cream px-4">
         <UnavailablePanel
-          title="The learner area isn’t connected yet"
-          message="Learner accounts, enrolment checks, and media delivery connect in Prompt 5."
+          title="The learner area isn’t available"
+          message="We couldn't reach the learning services. Check your connection and reload."
         />
       </main>
     );
@@ -117,7 +118,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
             </p>
             <div className="mt-5 border-t-2 border-dashed border-ink/15 pt-4 text-center">
               <Link href="/" className="text-xs font-semibold text-smoke underline underline-offset-4 hover:text-accent">
-                ← Back to CourseKit
+                ← Back to Beevo
               </Link>
             </div>
           </div>
@@ -155,7 +156,8 @@ export function LearnerShell({ children }: { children: ReactNode }) {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r-2 border-ink bg-cream lg:flex">
         <div className="flex h-16 items-center border-b-2 border-ink px-5">
           <Link href="/learn/courses" className="text-lg font-bold tracking-tight text-ink">
-            Course<span className="text-accent">Kit</span>{" "}
+            <LogoMark className="mr-2 inline-grid size-8 align-middle" />
+            Beevo{" "}
             <span className="font-editorial text-sm font-normal text-smoke italic">learn</span>
           </Link>
         </div>
@@ -212,7 +214,8 @@ export function LearnerShell({ children }: { children: ReactNode }) {
       <div className={cn("fixed inset-x-0 z-40 border-b-2 border-ink bg-cream/95 backdrop-blur-sm lg:hidden", demo ? "top-9" : "top-0")}>
         <div className="flex h-13 items-center justify-between px-4">
           <Link href="/learn/courses" className="text-lg font-bold tracking-tight text-ink">
-            Course<span className="text-accent">Kit</span>{" "}
+            <LogoMark className="mr-2 inline-grid size-7 align-middle" />
+            Beevo{" "}
             <span className="font-editorial text-xs font-normal text-smoke italic">learn</span>
           </Link>
           <button

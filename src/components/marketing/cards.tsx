@@ -2,10 +2,8 @@ import { Bell, Clock3, Video } from "lucide-react";
 import Image from "next/image";
 import type { CourseSummary, CreatorPublicProfile } from "@/lib/domain";
 import { formatINR } from "@/lib/domain";
-import { MOCK_DATA_NOTICE } from "@/lib/mocks/creators";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Sticker } from "@/components/ui/primitives";
 
 export function CourseCard({
   course,
@@ -58,7 +56,7 @@ export function CourseCard({
   );
 }
 
-/** Fictional creator storefront preview used on public marketing pages. */
+/** Illustrative creator storefront preview used on public marketing pages. */
 export function CreatorShowcaseCard({
   creator,
   rotate = 0,
@@ -76,9 +74,6 @@ export function CreatorShowcaseCard({
       )}
       style={{ transform: `rotate(${rotate}deg)` }}
     >
-      <div className="absolute -top-3.5 right-5 z-10">
-        <Sticker color="accent">Demo</Sticker>
-      </div>
       <div className="flex items-start gap-4">
         <div className="relative size-14 shrink-0 overflow-hidden rounded-full border-2 border-ink">
           <Image
@@ -161,7 +156,7 @@ export function CreatorShowcaseCard({
 }
 
 /**
- * Illustrative phone frame showing a mock storefront in the hero.
+ * Illustrative phone frame showing a storefront in the hero.
  * Purely decorative illustration — pointer events and AT exposure disabled.
  */
 export function StorefrontPhoneMock({ className }: { className?: string }) {
@@ -226,11 +221,10 @@ export function StorefrontPhoneMock({ className }: { className?: string }) {
           </div>
         </div>
         <p className="mt-3 text-center font-editorial text-xs text-smoke italic">
-          coursekit.app/@meera-shoots
+          beevo.in/@meera-shoots
         </p>
       </div>
     </div>
   );
 }
 
-export { MOCK_DATA_NOTICE };

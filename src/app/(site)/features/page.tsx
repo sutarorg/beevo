@@ -10,7 +10,7 @@ import { Sticker } from "@/components/ui/primitives";
 export const metadata: Metadata = {
   title: "Features",
   description:
-    "Creator profile, course storefront, video lessons, file uploads, secure payments, and a learner dashboard — everything in CourseKit's single free plan.",
+    "Creator profile, course storefront, video lessons, file uploads, secure payments, and a learner dashboard — everything in Beevo's single free plan.",
 };
 
 const ABSENT_BY_DESIGN = [

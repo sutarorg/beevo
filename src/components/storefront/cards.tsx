@@ -131,7 +131,7 @@ export function CreatorNotFound() {
         </p>
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <Button href="/" variant="ink" size="sm">
-            Back to CourseKit
+            Back to Beevo
           </Button>
           <Button href="/signup" variant="outline" size="sm">
             Start your own page
@@ -159,7 +159,7 @@ export function CourseNotFound({ handle }: { handle: string }) {
             View @{handle}
           </Button>
           <Button href="/" variant="outline" size="sm">
-            CourseKit home
+            Beevo home
           </Button>
         </div>
       </div>
@@ -167,14 +167,14 @@ export function CourseNotFound({ handle }: { handle: string }) {
   );
 }
 
-/** "Powered by CourseKit" strip at the bottom of every storefront. */
+/** "Powered by Beevo" strip at the bottom of every storefront. */
 export function PoweredByBanner() {
   return (
     <section className="border-t-2 border-ink bg-ink">
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 px-4 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
         <p className="flex items-center gap-2 text-sm font-semibold text-cream/80">
           <Sparkles className="size-4 text-lime" aria-hidden="true" />
-          This storefront runs on CourseKit — free plan, 8% only per sale.
+          This storefront runs on Beevo — free plan, 8% only per sale.
         </p>
         <Button href="/signup" variant="lime" size="sm">
           Create yours free

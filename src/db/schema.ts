@@ -14,7 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * CourseKit production schema (Prompt 5).
+ * Beevo production schema (Prompt 5).
  * Money = integer paise. Historical financial rows are never deleted
  * (courses/orders cascade only where no financial history can exist).
  * RLS is enabled via src/db/rls.sql; the API additionally verifies
@@ -31,6 +31,16 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   niche: text("niche").notNull().default(""),
   links: jsonb("links").$type<{ label: string; url: string }[]>().notNull().default([]),
+  /** Payout destination captured from the creator (used by admins to transfer earnings). */
+  payoutAccountNumber: text("payout_account_number"),
+  payoutIfsc: text("payout_ifsc"),
+  payoutDetailsUpdatedAt: timestamp("payout_details_updated_at", { withTimezone: true }),
+  /** Email notification preferences (in-app notifications are always recorded). */
+  notifySaleEmails: boolean("notify_sale_emails").notNull().default(true),
+  notifyWeeklySummary: boolean("notify_weekly_summary").notNull().default(true),
+  notifyProductTips: boolean("notify_product_tips").notNull().default(false),
+  notifyLessonEmails: boolean("notify_lesson_emails").notNull().default(true),
+  notifyReceiptEmails: boolean("notify_receipt_emails").notNull().default(true),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   suspendedReason: text("suspended_reason"),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),

@@ -92,7 +92,7 @@ export function CommissionCalculator() {
         <div className="flex items-center justify-between gap-4">
           <dt className="flex items-center gap-2 text-sm font-semibold">
             <span className="inline-block size-3 rounded-full bg-accent" aria-hidden="true" />
-            CourseKit fee (8%)
+            Beevo fee (8%)
           </dt>
           <dd className="text-lg font-bold text-cream tabular-nums">
             {formatINR(split.platformFeeInPaise, { decimals: true })}

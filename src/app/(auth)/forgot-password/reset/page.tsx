@@ -3,7 +3,7 @@ import { ResetPasswordForm } from "@/components/auth/forms";
 
 export const metadata: Metadata = {
   title: "Choose a new password",
-  description: "Complete your CourseKit password reset.",
+  description: "Complete your Beevo password reset.",
 };
 
 export default async function ResetPasswordPage({

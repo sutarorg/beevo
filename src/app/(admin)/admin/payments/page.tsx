@@ -10,7 +10,6 @@ import { formatDateTime } from "@/lib/utils";
 import { DetailRow, SearchInput, StatusPill, type PillTone } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -70,14 +69,13 @@ export default function AdminPaymentsPage() {
   return (
     <div>
       <PageHeader title="Payments" sub="Gateway-level payment events: attempts, successes, failures, and operational signals.">
-        <DemoChip />
       </PageHeader>
 
       {state.status === "success" ? (
         <div className="mb-5 grid grid-cols-3 gap-3">
-          <StatCard icon={<Banknote className="size-4.5" aria-hidden="true" />} label="Succeeded" value={String(counts.succeeded)} demo />
-          <StatCard icon={<TriangleAlert className="size-4.5" aria-hidden="true" />} label="Failed events" value={String(counts.failed)} demo />
-          <StatCard icon={<Banknote className="size-4.5" aria-hidden="true" />} label="Pending / initiated" value={String(counts.pendingInitiated)} demo />
+          <StatCard icon={<Banknote className="size-4.5" aria-hidden="true" />} label="Succeeded" value={String(counts.succeeded)} />
+          <StatCard icon={<TriangleAlert className="size-4.5" aria-hidden="true" />} label="Failed events" value={String(counts.failed)} />
+          <StatCard icon={<Banknote className="size-4.5" aria-hidden="true" />} label="Pending / initiated" value={String(counts.pendingInitiated)} />
         </div>
       ) : null}
 
@@ -162,8 +160,8 @@ export default function AdminPaymentsPage() {
               <DetailRow label="Time">{formatDateTime(selected.at)}</DetailRow>
             </div>
             <p className="rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
-              These are simulated gateway events — no real Razorpay traffic exists yet. Webhook
-              reconciliation and signature-verified events ship in Prompt 5.
+              Every event here comes from the payment provider's webhook. Signature verification
+              runs on each delivery, so unverified events never appear.
             </p>
           </div>
         ) : null}

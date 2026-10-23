@@ -21,7 +21,6 @@ import type {
   LessonType,
   MediaRef,
 } from "@/lib/creator-types";
-import { SIMULATED_UPLOAD_NOTE } from "@/lib/creator-types";
 import type { CourseService } from "@/lib/services/courses";
 import { UPLOAD_RULES } from "@/lib/services/media";
 import { formatBytes, cn } from "@/lib/utils";
@@ -202,7 +201,7 @@ function LessonDialog({
                   <p className="truncate text-sm font-bold text-ink">{ref.fileName}</p>
                   <p className="text-[11px] text-smoke">
                     {formatBytes(ref.sizeBytes)}
-                    {ref.durationLabel ? ` · ${ref.durationLabel}` : ""} · simulated
+                    {ref.durationLabel ? ` · ${ref.durationLabel}` : ""}
                   </p>
                 </div>
                 <button
@@ -287,7 +286,6 @@ function LessonDialog({
         {mediaError ? (
           <p role="alert" className="text-xs font-bold text-accent-deep">{mediaError}</p>
         ) : null}
-        <p className="text-[11px] text-smoke italic">{SIMULATED_UPLOAD_NOTE}</p>
 
         <div className="flex flex-col-reverse gap-2.5 border-t-2 border-ink/10 pt-4 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>

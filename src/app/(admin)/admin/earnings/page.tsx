@@ -10,7 +10,6 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { DetailRow, HistoryTimeline, SearchInput, StatusPill, type PillTone } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -74,7 +73,6 @@ export default function AdminEarningsPage() {
   return (
     <div>
       <PageHeader title="Creator earnings" sub="What every creator has earned, what's been paid out, and what's still outstanding. Outstanding ≠ paid.">
-        <DemoChip />
       </PageHeader>
 
       <div className="mb-5">

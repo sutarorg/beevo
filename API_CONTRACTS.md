@@ -22,7 +22,13 @@ Client-side via Supabase SDK implementing the `AuthService` interface from `src/
 | `/api/creators/check-handle?handle=` | GET | Availability probe for the profile form. |
 | `/api/creators/[handle]` | GET | Public storefront payload = `CreatorPublicProfile`. 404s render the public not-found UI. |
 
-Media: avatar upload via `/api/uploads` (signed R2 PUT URLs), max 5 MB, images only; server stores the R2 key and returns `avatarUrl`.
+Media: avatar upload via `/api/v1/uploads/session` (`kind: "avatar"`, `courseId: ""`) → signed PUT URL → `/api/v1/uploads/complete`; 5 MB, JPEG/PNG/WebP only. The resulting asset id is attached with `PATCH /api/v1/creator/profile { avatarAssetId }` (send `null` to clear), and the asset must be verified and owned by the caller.
+
+| Route | Methods | Notes |
+| --- | --- | --- |
+| `/api/v1/creator/payout-details` | GET, PUT | `{ accountNumber, ifsc, updatedAt }`. Account `^\d{9,18}$` after spaces are stripped; IFSC `^[A-Z]{4}0[A-Z0-9]{6}$` (upper-cased). Validation failures return `validation_failed` with `fieldErrors.accountNumber` / `fieldErrors.ifsc`. Stored on `users.payout_account_number` / `payout_ifsc` — admins use it to transfer earnings manually. |
+| `/api/v1/creator/settings` | GET, PATCH | `{ email, notifySaleEmails, notifyWeeklySummary, notifyProductTips }`. PATCH accepts any subset of the three booleans and returns the full object. |
+| `/api/v1/learn/settings` | GET, PATCH | `{ name, email, notifyLessonEmails, notifyReceiptEmails }`. Same partial-update semantics for learners. |
 
 ## 3. Courses
 

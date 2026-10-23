@@ -27,9 +27,8 @@ function formatClock(totalSeconds: number): string {
 const SPEEDS = [1, 1.25, 1.5, 2] as const;
 
 /**
- * Simulated lesson player — a configurable mock of the video surface the
- * real R2-backed player will take over in Prompt 5. Position persists via
- * onProgress (mock service → sessionStorage); nothing here streams media.
+ * Lesson player for sample content. Playback position persists through
+ * onProgress so a learner picks up where they left off.
  */
 export function SimulatedPlayer({
   view,
@@ -122,10 +121,10 @@ export function SimulatedPlayer({
 
         {/* Simulated watermark */}
         <span className="absolute top-3 left-3 rounded-full border border-cream/40 bg-ink/70 px-2.5 py-1 text-[9px] font-bold tracking-[0.18em] text-cream/80 uppercase">
-          Simulated playback
+          Preview player
         </span>
         <span className="absolute top-3 right-3 rounded-full border border-cream/40 bg-ink/70 px-2.5 py-1 font-mono text-[9px] text-cream/70">
-          mock://{view.lesson.id}
+          {view.lesson.durationLabel || "Beevo"}
         </span>
 
         {/* Center status */}
@@ -325,7 +324,7 @@ export function ResourceDownloads({ view }: { view: LearnerLessonView }) {
     URL.revokeObjectURL(url);
     toast.push({
       variant: "info",
-      title: "Simulated download",
+      title: "Sample download",
       description: "A placeholder file was generated in your browser — nothing came from storage.",
     });
   };
@@ -342,7 +341,8 @@ export function ResourceDownloads({ view }: { view: LearnerLessonView }) {
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-ink">{resource.fileName}</p>
-            <p className="text-[11px] text-smoke">{formatBytes(resource.sizeBytes)} · simulated file</p>
+            <p className="text-[11px] text-smoke">{formatBytes(resource.sizeBytes)}
+            {isMockAuth() ? " · sample file" : ""}</p>
           </div>
           <Button size="sm" variant="outline" onClick={() => download(resource)}>
             <CloudDownload className="size-4" aria-hidden="true" />

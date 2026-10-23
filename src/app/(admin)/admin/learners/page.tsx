@@ -10,7 +10,6 @@ import { formatDate } from "@/lib/utils";
 import { DetailRow, SearchInput, StatusPill } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -57,7 +56,6 @@ export default function AdminLearnersPage() {
   return (
     <div>
       <PageHeader title="Learners" sub="Buyers and students across all creators. Views request only the fields each list needs.">
-        <DemoChip />
       </PageHeader>
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">
@@ -138,7 +136,7 @@ export default function AdminLearnersPage() {
                       <p className="shrink-0 text-[11px] font-bold text-moss tabular-nums">{enrolment.progressPct}% watched</p>
                     </div>
                     <p className="text-[11px] text-smoke">
-                      by {enrolment.creatorName} · enrolled {formatDate(enrolment.enrolledAt)} (demo progress)
+                      by {enrolment.creatorName} · enrolled {formatDate(enrolment.enrolledAt)}
                     </p>
                   </li>
                 ))}

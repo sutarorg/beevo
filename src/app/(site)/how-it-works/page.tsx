@@ -106,7 +106,7 @@ export default function HowItWorksPage() {
                   </div>
                   <div className="flex items-center justify-between border-b-2 border-dashed border-ink/20 pb-3">
                     <dt className="text-sm font-semibold text-smoke">
-                      CourseKit commission ({PLATFORM_COMMISSION_LABEL})
+                      Beevo commission ({PLATFORM_COMMISSION_LABEL})
                     </dt>
                     <dd className="text-lg font-bold text-accent tabular-nums">
                       −{formatINR(example.platformFeeInPaise, { decimals: true })}

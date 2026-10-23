@@ -59,9 +59,6 @@ export function CreatorStorefront({ handle }: { handle: string }) {
             ))}
           </div>
         )}
-        <p className="mt-10 text-center text-xs font-semibold text-smoke">
-          Demo storefront — sample creator profile and courses, not a real public page yet.
-        </p>
       </section>
       <PoweredByBanner />
     </>

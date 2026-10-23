@@ -6,7 +6,6 @@ import { getLearnerService } from "@/lib/services/learner";
 import { formatDateTime } from "@/lib/utils";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -28,7 +27,6 @@ export default function LearnerCoursesPage() {
   return (
     <div>
       <PageHeader title="My learning" sub="Your purchased courses — pick up exactly where you left off.">
-        <DemoChip />
       </PageHeader>
 
       {state.status === "loading" || state.status === "idle" ? (
@@ -47,7 +45,7 @@ export default function LearnerCoursesPage() {
         >
           <Button href="/@meera-shoots" variant="accent" size="sm">
             <Search className="size-4" aria-hidden="true" />
-            Try the demo storefront
+            Browse courses
           </Button>
         </EmptyState>
       ) : (
@@ -62,19 +60,16 @@ export default function LearnerCoursesPage() {
               icon={<GraduationCap className="size-4.5" aria-hidden="true" />}
               label="Courses"
               value={String(state.data.length)}
-              demo
             />
             <StatCard
               icon={<Play className="size-4.5" aria-hidden="true" />}
               label="In progress"
               value={String(state.data.filter((course) => course.progressPct > 0 && !course.completedAll).length)}
-              demo
             />
             <StatCard
               icon={<GraduationCap className="size-4.5" aria-hidden="true" />}
               label="Completed"
               value={String(state.data.filter((course) => course.completedAll).length)}
-              demo
             />
           </div>
 

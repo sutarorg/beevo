@@ -9,7 +9,7 @@ import { Accordion, Reveal } from "@/components/ui/motion";
 export const metadata: Metadata = {
   title: "FAQ",
   description:
-    "Answers about CourseKit: the free plan, 8% commission, no marketplace, payouts, course features, and the refund policy.",
+    "Answers about Beevo: the free plan, 8% commission, no marketplace, payouts, course features, and the refund policy.",
 };
 
 export default function FaqPage() {

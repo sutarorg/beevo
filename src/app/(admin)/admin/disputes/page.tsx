@@ -10,7 +10,6 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { DetailRow, HistoryTimeline, StatusPill, type PillTone } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -63,7 +62,6 @@ export default function AdminDisputesPage() {
         title="Disputes & exceptions"
         sub="Chargebacks, reversals, and legally required exceptions. There is no standard refund flow — by design."
       >
-        <DemoChip />
       </PageHeader>
 
       <div className="mb-5 rounded-2xl border-2 border-ink bg-parchment/70 p-4 text-xs leading-relaxed text-smoke">

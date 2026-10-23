@@ -134,7 +134,7 @@ export const FAQS: FaqGroup[] = [
     group: "The product",
     items: [
       {
-        q: "What exactly is CourseKit?",
+        q: "What exactly is Beevo?",
         a: "A tool for creators who already have an audience — on YouTube, Instagram, a newsletter, anywhere — to package what they know into paid courses. You get a personal profile, a course storefront, and secure checkout, all under your own link.",
       },
       {
@@ -151,7 +151,7 @@ export const FAQS: FaqGroup[] = [
     group: "Money",
     items: [
       {
-        q: "How much does CourseKit cost?",
+        q: "How much does Beevo cost?",
         a: "The creator plan is free — ₹0/month. We charge a flat 8% platform commission per successful eligible course sale. There is no Pro plan, no setup fee, and no paid tiers.",
       },
       {

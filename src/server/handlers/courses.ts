@@ -15,7 +15,16 @@ import {
 import { route } from "@/server/router";
 import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/http";
 import { newId } from "@/server/auth";
-import { buildStorageKey, presignUrl, UPLOAD_LIMITS, verifyObjectExists } from "@/server/storage";
+import {
+  buildStorageKey,
+  LOCAL_UPLOADS_ENABLED,
+  presignUrl,
+  readLocalObject,
+  statLocalObject,
+  UPLOAD_LIMITS,
+  verifyObjectExists,
+  writeLocalObject,
+} from "@/server/storage";
 import { R2 } from "@/server/env";
 import type { CourseEditor, CourseListItem, CourseSection, Lesson, MediaRef } from "@/lib/creator-types";
 import { readinessChecklist } from "@/lib/services/courses";
@@ -47,7 +56,10 @@ function toMediaRef(asset: typeof mediaAssets.$inferSelect): MediaRef {
     kind: asset.kind as MediaRef["kind"],
     fileName: asset.fileName,
     sizeBytes: Number(asset.verifiedSizeBytes ?? asset.declaredSizeBytes),
-    previewUrl: asset.kind === "cover" ? `/api/v1/media/access?assetId=${asset.id}` : undefined,
+    previewUrl:
+      asset.kind === "cover" || asset.kind === "avatar"
+        ? `/api/v1/media/access?assetId=${asset.id}`
+        : undefined,
     durationLabel: asset.durationLabel ?? undefined,
     uploadedAt: asset.createdAt.toISOString(),
     simulated: false,
@@ -594,8 +606,9 @@ route("PUT", "courses/:id/sections/:sectionId/lessons/reorder", async (req, ctx,
 // ---- Upload sessions (R2) -----------------------------------------------------
 
 const uploadSessionSchema = z.object({
-  courseId: z.string().min(1),
-  kind: z.enum(["cover", "video", "resource"]),
+  /** Optional for account-level media (profile photos); required for course media. */
+  courseId: z.string().min(1).optional(),
+  kind: z.enum(["cover", "video", "resource", "avatar"]),
   fileName: z.string().min(1).max(200),
   sizeBytes: z.number().int().positive(),
   mimeType: z.string().min(1).max(100),
@@ -618,11 +631,20 @@ route("POST", "uploads/session", async (req, ctx) => {
       media: [`Keep it under ${Math.round(limits.maxBytes / (1024 * 1024))} MB.`],
     });
   }
+  if (input.kind === "avatar") {
+    if (input.courseId) {
+      return fail("validation_failed", "Profile photos aren't attached to a course.", 422);
+    }
+  } else if (!input.courseId) {
+    return fail("validation_failed", "A course is required for this upload.", 422, {
+      media: ["Choose a course first."],
+    });
+  }
   // Ownership is verified BEFORE a key is minted.
-  if (!(await ownCourse(input.courseId, user.id))) {
+  if (input.courseId && !(await ownCourse(input.courseId, user.id))) {
     return fail("not_found", "Course not found.", 404);
   }
-  if (!R2.configured) {
+  if (!R2.configured && !LOCAL_UPLOADS_ENABLED) {
     return fail(
       "provider_not_configured",
       "Media storage isn't configured yet (R2 credentials missing). Uploads are disabled until it is.",
@@ -631,7 +653,8 @@ route("POST", "uploads/session", async (req, ctx) => {
   }
   const assetId = newId("media");
   const storageKey = buildStorageKey({
-    courseId: input.courseId,
+    courseId: input.courseId ?? null,
+    ownerId: user.id,
     kind: input.kind,
     assetId,
     fileName: input.fileName,
@@ -639,30 +662,73 @@ route("POST", "uploads/session", async (req, ctx) => {
   await db.insert(mediaAssets).values({
     id: assetId,
     uploaderId: user.id,
-    courseId: input.courseId,
+    courseId: input.courseId ?? null,
     kind: input.kind,
     fileName: input.fileName,
     mimeType: input.mimeType,
     declaredSizeBytes: input.sizeBytes,
     storageKey,
   });
-  const signed = presignUrl({
-    method: "PUT",
-    key: storageKey,
-    expiresSeconds: 900,
-    contentType: input.mimeType,
-  });
+  if (R2.configured) {
+    const signed = presignUrl({
+      method: "PUT",
+      key: storageKey,
+      expiresSeconds: 900,
+      contentType: input.mimeType,
+    });
+    return ok(
+      {
+        uploadId: assetId,
+        kind: input.kind,
+        fileName: input.fileName,
+        sizeBytes: input.sizeBytes,
+        signedUrl: signed.url,
+        expiresAt: signed.expiresAt,
+      },
+      { status: 201 },
+    );
+  }
+  // Local development fallback: the browser PUTs straight back to this app.
   return ok(
     {
       uploadId: assetId,
       kind: input.kind,
       fileName: input.fileName,
       sizeBytes: input.sizeBytes,
-      signedUrl: signed.url,
-      expiresAt: signed.expiresAt,
+      signedUrl: `/api/v1/uploads/put/${assetId}`,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     },
     { status: 201 },
   );
+});
+
+/** Local-development upload target (used only when R2 isn't configured). */
+route("PUT", "uploads/put/:assetId", async (req, ctx, params) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  if (!LOCAL_UPLOADS_ENABLED) {
+    return fail("provider_not_configured", "Direct uploads are handled by storage.", 503);
+  }
+  const asset = await db.query.mediaAssets.findFirst({
+    where: and(eq(mediaAssets.id, params.assetId), eq(mediaAssets.uploaderId, user.id)),
+  });
+  if (!asset) return fail("not_found", "Upload session not found.", 404);
+  if (asset.status !== "pending") {
+    return fail("invalid_state", "This upload was already completed.", 409);
+  }
+  const declared = Number(asset.declaredSizeBytes);
+  const limits = UPLOAD_LIMITS[asset.kind as keyof typeof UPLOAD_LIMITS];
+  if (!limits) return fail("validation_failed", "Unsupported upload type.", 422);
+  const body = Buffer.from(await req.arrayBuffer());
+  if (body.byteLength === 0) return fail("validation_failed", "The uploaded file was empty.", 422);
+  if (body.byteLength > limits.maxBytes) {
+    return fail("validation_failed", "File is too large for this upload type.", 422);
+  }
+  if (Math.abs(body.byteLength - declared) > Math.max(1024, declared * 0.02)) {
+    return fail("upload_size_mismatch", "The uploaded file doesn't match the declared size.", 409);
+  }
+  await writeLocalObject(asset.storageKey, body);
+  return ok({ uploaded: true });
 });
 
 route("POST", "uploads/complete", async (req, ctx) => {
@@ -682,7 +748,11 @@ route("POST", "uploads/complete", async (req, ctx) => {
   if (!asset) return fail("not_found", "Upload session not found.", 404);
   if (asset.status === "verified") return ok(toMediaRef(asset)); // idempotent
   // Independent server-side verification — the client's claim is never trusted.
-  const head = await verifyObjectExists(asset.storageKey);
+  const head = R2.configured
+    ? await verifyObjectExists(asset.storageKey)
+    : await statLocalObject(asset.storageKey).then((info) =>
+        info ? { sizeBytes: info.sizeBytes, contentType: asset.mimeType } : null,
+      );
   if (!head) {
     return fail(
       "upload_not_verified",
@@ -722,7 +792,7 @@ route("GET", "media/access", async (req, ctx) => {
   if (!asset) return fail("not_found", "Media not found.", 404);
 
   let allowed = false;
-  if (asset.kind === "cover") allowed = true; // covers are public sales-page assets
+  if (asset.kind === "cover" || asset.kind === "avatar") allowed = true; // public profile assets
   if (!allowed && ctx.user) {
     if (asset.uploaderId === ctx.user.id || ctx.isAdmin) allowed = true;
   }
@@ -762,7 +832,31 @@ route("GET", "media/access", async (req, ctx) => {
       ctx.user ? 403 : 401,
     );
   }
-  if (!R2.configured) return fail("provider_not_configured", "Media storage isn't configured.", 503);
+  if (!R2.configured) {
+    if (!LOCAL_UPLOADS_ENABLED) {
+      return fail("provider_not_configured", "Media storage isn't configured.", 503);
+    }
+    const downloadLocal = urlObj.searchParams.get("download") === "1";
+    if (downloadLocal) {
+      const signedLocal = `/api/v1/media/access?assetId=${asset.id}&download=1`;
+      return ok({
+        url: signedLocal,
+        expiresAt: new Date(Date.now() + 600 * 1000).toISOString(),
+        fileName: asset.fileName,
+        sizeBytes: Number(asset.verifiedSizeBytes ?? asset.declaredSizeBytes),
+      });
+    }
+    const bytes = await readLocalObject(asset.storageKey);
+    if (!bytes) return fail("not_found", "Media not found.", 404);
+    return new NextResponse(new Uint8Array(bytes), {
+      status: 200,
+      headers: {
+        "Content-Type": asset.mimeType || "application/octet-stream",
+        "Content-Length": String(bytes.byteLength),
+        "Cache-Control": "private, max-age=300",
+      },
+    });
+  }
 
   const download = urlObj.searchParams.get("download") === "1";
   const wantsJson =

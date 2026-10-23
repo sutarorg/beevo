@@ -8,7 +8,7 @@
 
 export type CourseStatus = "draft" | "published" | "unpublished" | "archived";
 export type LessonType = "video" | "resources";
-export type UploadKind = "cover" | "video" | "resource";
+export type UploadKind = "cover" | "video" | "resource" | "avatar";
 
 /**
  * A media object reference returned by the media service. In mock mode
@@ -191,6 +191,22 @@ export interface CreatorProfile {
   publicUrl: string;
 }
 
+/** Payout destination a creator supplies so admins can transfer earnings. */
+export interface PayoutDetails {
+  accountNumber: string;
+  ifsc: string;
+  /** ISO 8601 timestamp of the last save, or null when never provided. */
+  updatedAt: string | null;
+}
+
+/** Account + email-notification preferences (real, persisted per creator). */
+export interface CreatorSettings {
+  email: string;
+  notifySaleEmails: boolean;
+  notifyWeeklySummary: boolean;
+  notifyProductTips: boolean;
+}
+
 export interface SupportTicket {
   id: string;
   category: string;
@@ -215,4 +231,4 @@ export interface UploadSession {
 }
 
 export const SIMULATED_UPLOAD_NOTE =
-  "Simulated upload — no file left your device and nothing was stored.";
+  "Demo uploads stay on this device — connect storage to send real files.";

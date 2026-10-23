@@ -147,7 +147,7 @@ export function isReadyToPublish(course: CourseEditor): boolean {
 // Mock adapter — in-memory, session-persisted, deterministic failure triggers
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = "coursekit_mock_courses_v1";
+const STORAGE_KEY = "beevo_mock_courses_v1";
 
 function loadCourses(): CourseEditor[] {
   const seeded = seedCourses();

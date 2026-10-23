@@ -8,6 +8,20 @@
       "when": 1792737528908,
       "tag": "0000_volatile_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792742774932,
+      "tag": "0001_creator_payout_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792743175616,
+      "tag": "0002_learner_notification_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -733,7 +733,7 @@ route("POST", "admin/payouts/:id/record", async (req, ctx, params) => {
     await queueEmail({
       userId: creator.id,
       to: creator.email,
-      subject: "Your CourseKit payout was recorded",
+      subject: "Your Beevo payout was recorded",
       template: "payout_status_email",
       dedupeKey: `payout_email:${result.payout.id}`,
       html: emailShell(

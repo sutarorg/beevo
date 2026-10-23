@@ -5,7 +5,7 @@ import { LegalPage } from "@/components/legal/legal-page";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "What data CourseKit collects, why, how it is used, which providers we rely on, and the rights you have over your information.",
+    "What data Beevo collects, why, how it is used, which providers we rely on, and the rights you have over your information.",
 };
 
 export default function PrivacyPage() {

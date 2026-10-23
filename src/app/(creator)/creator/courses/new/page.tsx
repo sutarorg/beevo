@@ -35,8 +35,8 @@ export default function NewCoursePage() {
   if (!service) {
     return (
       <UnavailablePanel
-        title="Course services aren't connected yet"
-        message="Draft creation needs the backend, which connects in Prompt 5."
+        title="Course editor unavailable"
+        message="The course service didn't respond. Refresh the page to try again."
       />
     );
   }

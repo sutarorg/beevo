@@ -58,15 +58,15 @@ async function upsertUser(input: {
 
 async function main() {
   const creator = await upsertUser({
-    email: "meera@coursekit.dev",
+    email: "meera@beevo.dev",
     name: "Meera Kapoor",
     handle: "meera-shoots",
     tagline: "Teaching 86k subscribers to shoot on film, not filters.",
     niche: "Photography",
     verified: true,
   });
-  await upsertUser({ email: "kavya@coursekit.dev", name: "Kavya Raghavan", verified: true });
-  const adminEmail = cleanEnv(process.env.ADMIN_EMAIL).toLowerCase() || "admin@coursekit.dev";
+  await upsertUser({ email: "kavya@beevo.dev", name: "Kavya Raghavan", verified: true });
+  const adminEmail = cleanEnv(process.env.ADMIN_EMAIL).toLowerCase() || "admin@beevo.dev";
   const admin = await upsertUser({
     email: adminEmail,
     name: "Platform Admin",

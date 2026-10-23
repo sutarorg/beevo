@@ -233,7 +233,7 @@ export function LoginForm({
           </Button>
         </form>
         <p className="mt-5 text-center text-sm text-smoke">
-          New to CourseKit?{" "}
+          New to Beevo?{" "}
           <Link href="/signup" className="font-semibold text-accent underline underline-offset-4">
             Create a free account
           </Link>

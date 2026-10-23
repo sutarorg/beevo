@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Beevo / CourseKit — Idempotent Supabase & PostgreSQL Schema Initialization
+-- Beevo / Beevo — Idempotent Supabase & PostgreSQL Schema Initialization
 -- Paste into Supabase Dashboard → SQL Editor → New query → Run (safe to re-run).
 -- ===========================================================================
 
@@ -256,6 +256,14 @@ CREATE TABLE IF NOT EXISTS "users" (
 	"avatar_url" text,
 	"niche" text DEFAULT '' NOT NULL,
 	"links" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"payout_account_number" text,
+	"payout_ifsc" text,
+	"payout_details_updated_at" timestamp with time zone,
+	"notify_sale_emails" boolean DEFAULT true NOT NULL,
+	"notify_weekly_summary" boolean DEFAULT true NOT NULL,
+	"notify_product_tips" boolean DEFAULT false NOT NULL,
+	"notify_lesson_emails" boolean DEFAULT true NOT NULL,
+	"notify_receipt_emails" boolean DEFAULT true NOT NULL,
 	"suspended_at" timestamp with time zone,
 	"suspended_reason" text,
 	"email_verified_at" timestamp with time zone,
@@ -380,6 +388,16 @@ CREATE INDEX IF NOT EXISTS "payouts_creator_idx" ON "payouts" USING btree ("crea
 CREATE INDEX IF NOT EXISTS "payouts_status_idx" ON "payouts" USING btree ("status");
 CREATE INDEX IF NOT EXISTS "sections_course_idx" ON "sections" USING btree ("course_id","position");
 CREATE INDEX IF NOT EXISTS "sessions_user_idx" ON "sessions" USING btree ("user_id");
+-- Creator payout details & notification preferences (added after the initial release)
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "payout_account_number" text;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "payout_ifsc" text;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "payout_details_updated_at" timestamp with time zone;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_sale_emails" boolean DEFAULT true NOT NULL;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_weekly_summary" boolean DEFAULT true NOT NULL;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_product_tips" boolean DEFAULT false NOT NULL;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_lesson_emails" boolean DEFAULT true NOT NULL;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_receipt_emails" boolean DEFAULT true NOT NULL;
+
 CREATE INDEX IF NOT EXISTS "users_handle_idx" ON "users" USING btree ("handle");
 
 -- Lock down Supabase PostgREST (anon / authenticated) while keeping server Pool (postgres) unrestricted:

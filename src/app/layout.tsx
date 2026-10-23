@@ -1,33 +1,52 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import { APP_NAME, APP_TAGLINE, APP_URL } from "@/lib/config";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
+/**
+ * Self-hosted brand fonts (Space Grotesk + Instrument Serif).
+ * Files live in src/app/fonts so builds and previews never depend on a
+ * runtime request to Google Fonts.
+ */
+const spaceGrotesk = localFont({
+  src: [
+    { path: "./fonts/space-grotesk-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/space-grotesk-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/space-grotesk-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/space-grotesk-700.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-space-grotesk",
-  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
+const instrumentSerif = localFont({
+  src: [
+    { path: "./fonts/instrument-serif-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/instrument-serif-400-italic.woff2", weight: "400", style: "italic" },
+  ],
   variable: "--font-instrument-serif",
-  weight: "400",
-  style: ["normal", "italic"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
+  icons: {
+    icon: "/images/brand/beevo-logo.png",
+    shortcut: "/images/brand/beevo-logo.png",
+    apple: "/images/brand/beevo-logo.png",
+  },
+  openGraph: {
+    siteName: APP_NAME,
+    images: ["/images/brand/beevo-logo.png"],
+  },
   title: {
     default: `${APP_NAME} — ${APP_TAGLINE}`,
     template: `%s · ${APP_NAME}`,
   },
   description:
-    "CourseKit gives creators a personal storefront to sell courses directly to their own audience. Free plan, ₹0/month, 8% commission only on successful eligible sales. No marketplace.",
+    "Beevo gives creators a personal storefront to sell courses directly to their own audience. Free plan, ₹0/month, 8% commission only on successful eligible sales. No marketplace.",
   keywords: [
     "sell courses online",
     "creator storefront",

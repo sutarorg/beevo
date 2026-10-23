@@ -1,10 +1,12 @@
 "use client";
 
-import { Globe, Link2, Plus, Trash2 } from "lucide-react";
+import { Camera, Globe, Link2, Loader2, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { APP_URL } from "@/lib/config";
 import { useAsyncData } from "@/lib/hooks";
 import { getCreatorDataService } from "@/lib/services/creator-data";
+import { getMediaService, UPLOAD_RULES, validateUploadFile } from "@/lib/services/media";
 import { cn } from "@/lib/utils";
 import {
   CardListSkeleton,
@@ -34,6 +36,10 @@ export default function CreatorProfilePage() {
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [handleError, setHandleError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarProgress, setAvatarProgress] = useState(0);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (state.status === "success") {
@@ -42,6 +48,7 @@ export default function CreatorProfilePage() {
       setTagline(state.data.tagline);
       setNiche(state.data.niche);
       setLinks(state.data.links);
+      setAvatarUrl(state.data.avatarUrl);
     }
   }, [state]);
 
@@ -64,7 +71,52 @@ export default function CreatorProfilePage() {
   }
 
   const profile = state.data;
-  const publicUrl = `https://coursekit.app/@${handle || profile.handle}`;
+  const publicHost = APP_URL.replace(/^https?:\/\//, "");
+  const publicUrl = `${APP_URL}/@${handle || profile.handle}`;
+
+  const changeAvatar = async (file: File | undefined) => {
+    if (!file || !service) return;
+    const media = getMediaService();
+    if (!media) {
+      toast.push({ variant: "error", title: "Photo upload isn't available in this environment." });
+      return;
+    }
+    const validationError = validateUploadFile("avatar", file);
+    if (validationError) {
+      toast.push({ variant: "error", title: "That photo can't be used", description: validationError });
+      return;
+    }
+    setAvatarBusy(true);
+    setAvatarProgress(0);
+    const session = await media.beginUpload({
+      courseId: "",
+      kind: "avatar",
+      fileName: file.name,
+      sizeBytes: file.size,
+      mimeType: file.type,
+    });
+    if (!session.ok) {
+      setAvatarBusy(false);
+      toast.push({ variant: "error", title: "Couldn't start the upload", description: session.error.message });
+      return;
+    }
+    const uploaded = await media.performUpload({ ...session.data, file }, {
+      onProgress: setAvatarProgress,
+    });
+    if (!uploaded.ok) {
+      setAvatarBusy(false);
+      toast.push({ variant: "error", title: "Photo not uploaded", description: uploaded.error.message });
+      return;
+    }
+    const saved = await service.updateProfile({ avatarAssetId: uploaded.data.id });
+    setAvatarBusy(false);
+    if (!saved.ok) {
+      toast.push({ variant: "error", title: "Photo not saved", description: saved.error.message });
+      return;
+    }
+    setAvatarUrl(saved.data.avatarUrl);
+    toast.push({ variant: "success", title: "Profile photo updated", description: "Your storefront now shows this photo." });
+  };
 
   const save = async () => {
     if (!service) return;
@@ -90,15 +142,50 @@ export default function CreatorProfilePage() {
         <div className="space-y-4">
           <div className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs sm:p-6">
             <div className="flex items-center gap-4">
-              <div className="relative size-16 shrink-0 overflow-hidden rounded-full border-2 border-ink">
-                <Image src={profile.avatarUrl} alt="Your profile photo" fill sizes="64px" className="object-cover" />
-              </div>
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarBusy}
+                aria-label="Change profile photo"
+                title="Change profile photo"
+                className="group relative size-16 shrink-0 overflow-hidden rounded-full border-2 border-ink disabled:cursor-wait"
+              >
+                {avatarUrl ? (
+                  <Image src={avatarUrl} alt="Your profile photo" fill sizes="64px" className="object-cover" />
+                ) : (
+                  <span className="grid h-full w-full place-items-center bg-parchment text-lg font-bold text-smoke">
+                    {(displayName || "B").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="absolute inset-0 grid place-items-center bg-ink/55 text-cream opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  {avatarBusy ? (
+                    <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Camera className="size-5" aria-hidden="true" />
+                  )}
+                </span>
+                {avatarBusy ? (
+                  <span className="absolute inset-x-0 bottom-0 bg-ink/80 py-0.5 text-center text-[9px] font-bold text-cream">
+                    {avatarProgress}%
+                  </span>
+                ) : null}
+              </button>
               <div>
                 <p className="text-sm font-bold text-ink">Profile photo</p>
                 <p className="mt-0.5 text-xs text-smoke">
-                  Managed with your account media once storage connects in Prompt 5.
+                  Click your photo to upload a new one. {UPLOAD_RULES.avatar.label}.
                 </p>
               </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept={UPLOAD_RULES.avatar.accept}
+                className="hidden"
+                onChange={(event) => {
+                  void changeAvatar(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
             </div>
 
             <div className="mt-5 space-y-4">
@@ -108,12 +195,12 @@ export default function CreatorProfilePage() {
               <Field
                 id="profile-handle"
                 label="Handle"
-                hint="Lowercase letters, numbers, hyphens. Try “support” to see the taken-state (demo)."
+                hint="Lowercase letters, numbers, hyphens."
                 error={handleError ?? undefined}
               >
                 <div className="flex items-center gap-2">
                   <span className="rounded-xl border-2 border-ink bg-parchment px-3 py-3 text-sm font-bold text-smoke">
-                    coursekit.app/@
+                    {publicHost}/@
                   </span>
                   <Input
                     id="profile-handle"
@@ -221,18 +308,24 @@ export default function CreatorProfilePage() {
               <CopyButton text={publicUrl} variant="lime" />
             </div>
             <p className="mt-3 text-[11px] text-cream/50">
-              The storefront route itself ships with the backend phase — today this is the exact URL
-              it will live at.
+              Share this link anywhere your audience already follows you — it opens your public
+              storefront with every published course.
             </p>
           </div>
 
           <div aria-hidden="true" className="pointer-events-none rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
             <p className="mb-4 text-xs font-bold tracking-[0.18em] text-smoke uppercase">
-              Preview (mock)
+              Live preview
             </p>
             <div className="flex items-center gap-3">
               <div className="relative size-12 overflow-hidden rounded-full border-2 border-ink">
-                <Image src={profile.avatarUrl} alt="" fill sizes="48px" className="object-cover" />
+                {avatarUrl ? (
+                  <Image src={avatarUrl} alt="" fill sizes="48px" className="object-cover" />
+                ) : (
+                  <span className="grid h-full w-full place-items-center bg-parchment text-sm font-bold text-smoke">
+                    {(displayName || "B").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
               </div>
               <div>
                 <p className="text-sm font-bold text-ink">{displayName || "Your name"}</p>
@@ -256,7 +349,7 @@ export default function CreatorProfilePage() {
                 ))}
             </div>
             <div className={cn("mt-4 rounded-xl border-2 border-dashed border-ink/30 px-3 py-2 text-center text-[10px] text-smoke")}>
-              Your published courses appear below on the real storefront.
+              Your published courses appear below on your storefront.
             </div>
           </div>
         </div>

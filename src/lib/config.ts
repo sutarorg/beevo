@@ -5,12 +5,12 @@
  * (or documented in DECISIONS.md). Never read `process.env` ad-hoc in pages.
  */
 
-export const APP_NAME = "CourseKit";
+export const APP_NAME = "Beevo";
 export const APP_TAGLINE = "Sell courses to the audience you already have.";
 
 function resolvePublicAppUrl(): string {
   const raw = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim().replace(/^["']|["']$/g, "");
-  if (!raw) return "https://coursekit.app";
+  if (!raw) return "https://beevo.in";
   const withScheme = /^https?:\/\//i.test(raw)
     ? raw
     : /^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(raw)
@@ -19,14 +19,14 @@ function resolvePublicAppUrl(): string {
   try {
     return new URL(withScheme).origin;
   } catch {
-    return "https://coursekit.app";
+    return "https://beevo.in";
   }
 }
 
 /** Public marketing URL used in metadata and email copy. */
 export const APP_URL = resolvePublicAppUrl();
 
-export const SUPPORT_EMAIL = "support@coursekit.app";
+export const SUPPORT_EMAIL = "support@beevo.in";
 
 /**
  * Service mode for the pre-backend phases (Prompts 1–4).

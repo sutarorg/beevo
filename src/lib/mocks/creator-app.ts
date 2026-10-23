@@ -33,7 +33,7 @@ export const MOCK_CURRENT_CREATOR: CreatorProfile = {
     { label: "YouTube", url: "https://youtube.com" },
     { label: "Instagram", url: "https://instagram.com" },
   ],
-  publicUrl: "https://coursekit.app/@meera-shoots",
+  publicUrl: "https://beevo.in/@meera-shoots",
 };
 
 const now = Date.now();

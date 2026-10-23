@@ -10,7 +10,6 @@ import { formatDate } from "@/lib/utils";
 import { DetailRow, HistoryTimeline, SearchInput, StatusPill } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -99,7 +98,6 @@ export default function AdminCreatorsPage() {
   return (
     <div>
       <PageHeader title="Creators" sub="Every creator on the platform — search, inspect, and manage account status.">
-        <DemoChip />
       </PageHeader>
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">

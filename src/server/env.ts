@@ -118,7 +118,7 @@ function sanitizeFromEmail(raw: string | undefined): string {
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
     .replace(/&amp;/gi, "&");
-  return cleanEnv(decoded) || "CourseKit <hello@example.com>";
+  return cleanEnv(decoded) || "Beevo <hello@example.com>";
 }
 
 export const RESEND_API_KEY = cleanEnv(process.env.RESEND_API_KEY);

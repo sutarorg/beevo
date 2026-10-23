@@ -104,6 +104,14 @@ export interface PaymentReceipt {
   note: string;
 }
 
+/** Email notification preferences for a learner account. */
+export interface LearnerSettings {
+  name: string;
+  email: string;
+  notifyLessonEmails: boolean;
+  notifyReceiptEmails: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Enrolment, library, progress
 // ---------------------------------------------------------------------------

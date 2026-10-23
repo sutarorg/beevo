@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/admin/app-shell";
 export const metadata: Metadata = {
   title: {
     default: "Admin",
-    template: "%s · CourseKit Admin",
+    template: "%s · Beevo Admin",
   },
   robots: { index: false, follow: false },
 };
