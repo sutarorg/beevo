@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #f6f0e2;
+  --color-parchment: #ede4cf;
+  --color-sand: #e2d6ba;
+  --color-ink: #171307;
+  --color-smoke: #5c543f;
+  --color-accent: #e8490f;
+  --color-accent-deep: #c23a0a;
+  --color-lime: #d5f34e;
+  --color-moss: #20301c;
+
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-editorial: var(--font-instrument-serif), ui-serif, Georgia, serif;
+
+  --breakpoint-xs: 26rem;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-cream);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ---------- Hard offset shadows (sticker style) ---------- */
+.shadow-hard {
+  box-shadow: 6px 6px 0 0 var(--color-ink);
+}
+.shadow-hard-sm {
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+}
+.shadow-hard-xs {
+  box-shadow: 2px 2px 0 0 var(--color-ink);
+}
+.shadow-hard-lime {
+  box-shadow: 6px 6px 0 0 var(--color-lime);
+}
+.shadow-hard-accent {
+  box-shadow: 6px 6px 0 0 var(--color-accent);
+}
+
+/* ---------- Marquee ---------- */
+@keyframes marquee-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee-x 30s linear infinite;
+  will-change: transform;
+}
+.marquee-pause:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
+/* ---------- Slow spin for decorative stars ---------- */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slow {
+  animation: spin-slow 14s linear infinite;
+}
+
+/* ---------- Gentle float for hero ornaments ---------- */
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float {
+  animation: float-y 5s ease-in-out infinite;
+}
+
+/* ---------- Outlined display text ---------- */
+.text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px currentColor;
+}
+.text-outline-cream {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--color-cream);
+}
+
+/* ---------- Animated underline link ---------- */
+.link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 20% 1.5px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: 2px;
+}
+.link-underline:hover,
+.link-underline:focus-visible {
+  background-size: 100% 1.5px;
+}
+
+/* ---------- Paper grain overlay ---------- */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* ---------- Dashed ticket divider ---------- */
+.ticket-divider {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-ink) 0 10px,
+    transparent 10px 20px
+  );
+  background-size: 100% 1.5px;
+  background-repeat: no-repeat;
+  background-position: center;
+  height: 1.5px;
+}
+
+/* Range slider (commission calculator) */
+.slider-accent {
+  accent-color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-marquee,
+  .animate-spin-slow,
+  .animate-float {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
