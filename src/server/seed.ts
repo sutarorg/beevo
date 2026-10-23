@@ -24,7 +24,7 @@ if (!connectionString) {
 const pool = new Pool({ connectionString });
 const db = drizzle(pool, { schema });
 
-const PASSWORD = cleanEnv(process.env.SEED_PASSWORD) || "Demo1234";
+const PASSWORD = cleanEnv(process.env.SEED_PASSWORD) || "Beevo1234";
 
 async function upsertUser(input: {
   email: string;
