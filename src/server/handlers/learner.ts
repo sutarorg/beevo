@@ -44,13 +44,17 @@ async function progressMap(userId: string, courseId: string) {
 }
 
 route("GET", "learn/library", async (_req, ctx) => {
-  const auth = requireUser(ctx);
-  if ("code" in (auth as object)) return auth as never;
-  const user = auth as NonNullable<typeof ctx.user>;
-  const enrollRows = await db.query.enrollments.findMany({ where: eq(enrollments.userId, user.id) });
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
+  const enrollRows = await db.query.enrollments.findMany({
+    where: eq(enrollments.userId, user.id),
+  });
   if (enrollRows.length === 0) return ok([] as LearnerCourseCard[]);
   const courseRows = await db.query.courses.findMany({
-    where: inArray(courses.id, enrollRows.map((row) => row.courseId)),
+    where: inArray(
+      courses.id,
+      enrollRows.map((row) => row.courseId),
+    ),
   });
   const cards: LearnerCourseCard[] = [];
   for (const course of courseRows) {
@@ -66,7 +70,9 @@ route("GET", "learn/library", async (_req, ctx) => {
       where: and(eq(lastAccessed.userId, user.id), eq(lastAccessed.courseId, course.id)),
     });
     const cover = course.coverAssetId
-      ? await db.query.mediaAssets.findFirst({ where: and(eq(mediaAssets.id, course.coverAssetId), eq(mediaAssets.status, "verified")) })
+      ? await db.query.mediaAssets.findFirst({
+          where: and(eq(mediaAssets.id, course.coverAssetId), eq(mediaAssets.status, "verified")),
+        })
       : null;
     const total = lessonRows.length;
     cards.push({
@@ -89,11 +95,16 @@ route("GET", "learn/library", async (_req, ctx) => {
 });
 
 route("GET", "learn/courses/:courseId", async (_req, ctx, params) => {
-  const auth = requireUser(ctx);
-  if ("code" in (auth as object)) return auth as never;
-  const user = auth as NonNullable<typeof ctx.user>;
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
   const course = await enrolledCourse(user.id, params.courseId);
-  if (!course) return fail("not_enrolled", "You haven't purchased this course. Enrol first to start learning.", 403);
+  if (!course) {
+    return fail(
+      "not_enrolled",
+      "You haven't purchased this course. Enrol first to start learning.",
+      403,
+    );
+  }
   const creator = await db.query.users.findFirst({ where: eq(users.id, course.creatorId) });
   const sectionRows = await db.query.sections.findMany({
     where: eq(sections.courseId, course.id),
@@ -101,7 +112,10 @@ route("GET", "learn/courses/:courseId", async (_req, ctx, params) => {
   });
   const lessonRows = sectionRows.length
     ? await db.query.lessons.findMany({
-        where: inArray(lessons.sectionId, sectionRows.map((row) => row.id)),
+        where: inArray(
+          lessons.sectionId,
+          sectionRows.map((row) => row.id),
+        ),
         orderBy: [asc(lessons.position)],
       })
     : [];
@@ -110,7 +124,15 @@ route("GET", "learn/courses/:courseId", async (_req, ctx, params) => {
         .select({ lessonId: lessonMedia.lessonId, asset: mediaAssets })
         .from(lessonMedia)
         .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
-        .where(and(inArray(lessonMedia.lessonId, lessonRows.map((row) => row.id)), eq(mediaAssets.status, "verified")))
+        .where(
+          and(
+            inArray(
+              lessonMedia.lessonId,
+              lessonRows.map((row) => row.id),
+            ),
+            eq(mediaAssets.status, "verified"),
+          ),
+        )
         .orderBy(asc(lessonMedia.position))
     : [];
   const progress = await progressMap(user.id, course.id);
@@ -128,7 +150,11 @@ route("GET", "learn/courses/:courseId", async (_req, ctx, params) => {
         lesson.type === "resources"
           ? mediaLinks
               .filter((link) => link.lessonId === lesson.id)
-              .map((link) => ({ id: link.asset.id, fileName: link.asset.fileName, sizeBytes: Number(link.asset.verifiedSizeBytes ?? link.asset.declaredSizeBytes) }))
+              .map((link) => ({
+                id: link.asset.id,
+                fileName: link.asset.fileName,
+                sizeBytes: Number(link.asset.verifiedSizeBytes ?? link.asset.declaredSizeBytes),
+              }))
           : [],
     };
   };
@@ -143,7 +169,9 @@ route("GET", "learn/courses/:courseId", async (_req, ctx, params) => {
     where: and(eq(lastAccessed.userId, user.id), eq(lastAccessed.courseId, course.id)),
   });
   const cover = course.coverAssetId
-    ? await db.query.mediaAssets.findFirst({ where: and(eq(mediaAssets.id, course.coverAssetId), eq(mediaAssets.status, "verified")) })
+    ? await db.query.mediaAssets.findFirst({
+        where: and(eq(mediaAssets.id, course.coverAssetId), eq(mediaAssets.status, "verified")),
+      })
     : null;
   const view: LearnerCourseView = {
     courseId: course.id,
@@ -162,10 +190,9 @@ route("GET", "learn/courses/:courseId", async (_req, ctx, params) => {
   return ok(view);
 });
 
-route("GET", "learn/courses/:courseId/lessons/:lessonId", async (req, ctx, params) => {
-  const auth = requireUser(ctx);
-  if ("code" in (auth as object)) return auth as never;
-  const user = auth as NonNullable<typeof ctx.user>;
+route("GET", "learn/courses/:courseId/lessons/:lessonId", async (_req, ctx, params) => {
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
   const course = await enrolledCourse(user.id, params.courseId);
   if (!course) return fail("not_enrolled", "You haven't purchased this course.", 403);
   const flat = await db
@@ -184,7 +211,10 @@ route("GET", "learn/courses/:courseId/lessons/:lessonId", async (req, ctx, param
   await db
     .insert(lastAccessed)
     .values({ userId: user.id, courseId: course.id, lessonId: current.lesson.id, at: new Date() })
-    .onConflictDoUpdate({ target: [lastAccessed.userId, lastAccessed.courseId], set: { lessonId: current.lesson.id, at: new Date() } });
+    .onConflictDoUpdate({
+      target: [lastAccessed.userId, lastAccessed.courseId],
+      set: { lessonId: current.lesson.id, at: new Date() },
+    });
   await db
     .insert(lessonProgress)
     .values({ userId: user.id, lessonId: current.lesson.id, courseId: course.id })
@@ -207,9 +237,17 @@ route("GET", "learn/courses/:courseId/lessons/:lessonId", async (req, ctx, param
   };
   if (isVideo && videoAsset) {
     if (R2.configured) {
-      const signed = presignUrl({ method: "GET", key: videoAsset.storageKey, expiresSeconds: 900 });
+      const signed = presignUrl({
+        method: "GET",
+        key: videoAsset.storageKey,
+        expiresSeconds: 900,
+      });
       const durationLabel = videoAsset.durationLabel ?? "8:00";
-      const durationSeconds = durationLabel.split(":").map(Number).reduce((acc, part) => acc * 60 + part, 0);
+      const parsedSeconds = durationLabel
+        .split(":")
+        .map(Number)
+        .reduce((acc, part) => (Number.isFinite(part) ? acc * 60 + part : acc), 0);
+      const durationSeconds = parsedSeconds > 0 ? parsedSeconds : 480;
       playback = {
         mode: "direct",
         deliveryUrl: `/api/v1/media/access?assetId=${videoAsset.id}`,
@@ -256,16 +294,25 @@ route("GET", "learn/courses/:courseId/lessons/:lessonId", async (req, ctx, param
     nextLessonId: index < flat.length - 1 ? flat[index + 1].lesson.id : null,
     playback,
   };
-  void req;
   return ok(view);
 });
 
 route("PUT", "learn/courses/:courseId/lessons/:lessonId/progress", async (req, ctx, params) => {
-  const auth = requireUser(ctx);
-  if ("code" in (auth as object)) return auth as never;
-  const user = auth as NonNullable<typeof ctx.user>;
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
   const course = await enrolledCourse(user.id, params.courseId);
   if (!course) return fail("not_enrolled", "You haven't purchased this course.", 403);
+
+  const belongs = await db
+    .select({ id: lessons.id })
+    .from(lessons)
+    .innerJoin(sections, eq(sections.id, lessons.sectionId))
+    .where(and(eq(sections.courseId, course.id), eq(lessons.id, params.lessonId)))
+    .limit(1);
+  if (belongs.length === 0) {
+    return fail("not_found", "That lesson isn't part of this course.", 404);
+  }
+
   const parsed = parseBody(
     z.object({
       completed: z.boolean().optional(),
@@ -275,7 +322,10 @@ route("PUT", "learn/courses/:courseId/lessons/:lessonId/progress", async (req, c
   );
   if ("response" in parsed) return parsed.response;
   const existing = await db.query.lessonProgress.findFirst({
-    where: and(eq(lessonProgress.userId, user.id), eq(lessonProgress.lessonId, params.lessonId)),
+    where: and(
+      eq(lessonProgress.userId, user.id),
+      eq(lessonProgress.lessonId, params.lessonId),
+    ),
   });
   const next = {
     completed: parsed.values.completed ?? existing?.completed ?? false,
@@ -283,7 +333,13 @@ route("PUT", "learn/courses/:courseId/lessons/:lessonId/progress", async (req, c
   };
   await db
     .insert(lessonProgress)
-    .values({ userId: user.id, lessonId: params.lessonId, courseId: course.id, ...next, updatedAt: new Date() })
+    .values({
+      userId: user.id,
+      lessonId: params.lessonId,
+      courseId: course.id,
+      ...next,
+      updatedAt: new Date(),
+    })
     .onConflictDoUpdate({
       target: [lessonProgress.userId, lessonProgress.lessonId],
       set: { ...next, updatedAt: new Date() },
@@ -292,11 +348,13 @@ route("PUT", "learn/courses/:courseId/lessons/:lessonId/progress", async (req, c
 });
 
 route("GET", "learn/purchases", async (_req, ctx) => {
-  const auth = requireUser(ctx);
-  if ("code" in (auth as object)) return auth as never;
-  const user = auth as NonNullable<typeof ctx.user>;
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
   const rows = await db.query.orders.findMany({
-    where: eq(orders.userId, user.id),
+    where: and(
+      eq(orders.userId, user.id),
+      inArray(orders.status, ["paid", "paid_reversed"]),
+    ),
     orderBy: [sql`${orders.placedAt} DESC`],
   });
   const records: PurchaseRecord[] = rows.map((row) => ({

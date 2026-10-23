@@ -1,6 +1,14 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { courses, lessonMedia, lessons, sections, users, mediaAssets } from "@/db/schema";
+import {
+  courses,
+  lessonMedia,
+  lessons,
+  mediaAssets,
+  platformSettings,
+  sections,
+  users,
+} from "@/db/schema";
 import { route } from "@/server/router";
 import { fail, ok } from "@/server/http";
 import type {
@@ -16,34 +24,58 @@ import type {
  * + published courses. No media refs, no enrolments, no private data.
  */
 
-async function publicCreator(handle: string): Promise<PublicCreatorInfo | null> {
-  const creator = await db.query.users.findFirst({
-    where: and(eq(users.handle, handle), isNull(users.suspendedAt)),
+async function isMaintenanceMode(): Promise<boolean> {
+  const row = await db.query.platformSettings.findFirst({
+    where: eq(platformSettings.key, "flags"),
   });
-  if (!creator) return null;
+  const flags = (row?.value ?? {}) as { maintenanceMode?: boolean };
+  return flags.maintenanceMode === true;
+}
+
+async function resolvePublicCreator(
+  handle: string,
+): Promise<{ row: typeof users.$inferSelect; info: PublicCreatorInfo } | null> {
+  const creator = await db.query.users.findFirst({
+    where: and(eq(users.handle, handle.toLowerCase()), isNull(users.suspendedAt)),
+  });
+  if (!creator || !creator.handle) return null;
   return {
-    handle: creator.handle!,
-    displayName: creator.name,
-    avatarUrl: creator.avatarUrl ?? "/images/avatars/meera.jpg",
-    tagline: creator.tagline,
-    niche: creator.niche || "Creator",
-    links: creator.links,
+    row: creator,
+    info: {
+      handle: creator.handle,
+      displayName: creator.name,
+      avatarUrl: creator.avatarUrl || "/images/avatars/meera.jpg",
+      tagline: creator.tagline,
+      niche: creator.niche || "Creator",
+      links: creator.links,
+    },
   };
 }
 
 route("GET", "storefront/:handle", async (_req, _ctx, params) => {
-  const creator = await publicCreator(params.handle);
-  if (!creator) return fail("not_found", "This creator page doesn't exist or isn't public anymore.", 404);
+  if (await isMaintenanceMode()) {
+    return fail(
+      "maintenance",
+      "Storefronts are temporarily undergoing scheduled maintenance. Please check back shortly.",
+      503,
+    );
+  }
+  const resolved = await resolvePublicCreator(params.handle);
+  if (!resolved) {
+    return fail("not_found", "This creator page doesn't exist or isn't public anymore.", 404);
+  }
   const rows = await db.query.courses.findMany({
-    where: and(eq(courses.creatorId, (await db.query.users.findFirst({ where: eq(users.handle, params.handle) }))!.id), eq(courses.status, "published")),
+    where: and(eq(courses.creatorId, resolved.row.id), eq(courses.status, "published")),
   });
   const cards: PublicCourseCard[] = [];
   for (const row of rows) {
     const cover = row.coverAssetId
-      ? await db.query.mediaAssets.findFirst({ where: and(eq(mediaAssets.id, row.coverAssetId), eq(mediaAssets.status, "verified")) })
+      ? await db.query.mediaAssets.findFirst({
+          where: and(eq(mediaAssets.id, row.coverAssetId), eq(mediaAssets.status, "verified")),
+        })
       : null;
     const [{ count }] = await db
-      .select({ count: (await import("drizzle-orm")).sql<number>`count(${lessons.id})::int` })
+      .select({ count: sql<number>`count(${lessons.id})::int` })
       .from(lessons)
       .innerJoin(sections, eq(sections.id, lessons.sectionId))
       .where(eq(sections.courseId, row.id));
@@ -57,39 +89,73 @@ route("GET", "storefront/:handle", async (_req, _ctx, params) => {
       lessonCount: count,
     });
   }
-  const page: PublicCreatorPage = { ...creator, courses: cards };
+  const page: PublicCreatorPage = { ...resolved.info, courses: cards };
   return ok(page);
 });
 
 route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
-  const creator = await publicCreator(params.handle);
-  if (!creator) return fail("not_found", "This creator page doesn't exist or isn't public anymore.", 404);
-  const creatorRow = await db.query.users.findFirst({ where: eq(users.handle, params.handle) });
+  if (await isMaintenanceMode()) {
+    return fail(
+      "maintenance",
+      "Storefronts are temporarily undergoing scheduled maintenance. Please check back shortly.",
+      503,
+    );
+  }
+  const resolved = await resolvePublicCreator(params.handle);
+  if (!resolved) {
+    return fail("not_found", "This creator page doesn't exist or isn't public anymore.", 404);
+  }
   const course = await db.query.courses.findFirst({
-    where: and(eq(courses.creatorId, creatorRow!.id), eq(courses.slug, params.slug), eq(courses.status, "published")),
+    where: and(
+      eq(courses.creatorId, resolved.row.id),
+      eq(courses.slug, params.slug),
+      eq(courses.status, "published"),
+    ),
   });
   if (!course) {
-    return fail("not_found", "This course isn't available. It may be unpublished, archived, or the link is wrong.", 404);
+    return fail(
+      "not_found",
+      "This course isn't available. It may be unpublished, archived, or the link is wrong.",
+      404,
+    );
   }
   const cover = course.coverAssetId
-    ? await db.query.mediaAssets.findFirst({ where: and(eq(mediaAssets.id, course.coverAssetId), eq(mediaAssets.status, "verified")) })
-      : null;
+    ? await db.query.mediaAssets.findFirst({
+        where: and(eq(mediaAssets.id, course.coverAssetId), eq(mediaAssets.status, "verified")),
+      })
+    : null;
   const sectionRows = await db.query.sections.findMany({
     where: eq(sections.courseId, course.id),
     orderBy: [asc(sections.position)],
   });
   const lessonRows = sectionRows.length
     ? await db.query.lessons.findMany({
-        where: inArray(lessons.sectionId, sectionRows.map((row) => row.id)),
+        where: inArray(
+          lessons.sectionId,
+          sectionRows.map((row) => row.id),
+        ),
         orderBy: [asc(lessons.position)],
       })
     : [];
   const mediaLinks = lessonRows.length
     ? await db
-        .select({ lessonId: lessonMedia.lessonId, assetId: lessonMedia.assetId, duration: mediaAssets.durationLabel })
+        .select({
+          lessonId: lessonMedia.lessonId,
+          assetId: lessonMedia.assetId,
+          duration: mediaAssets.durationLabel,
+        })
         .from(lessonMedia)
         .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
-        .where(and(inArray(lessonMedia.lessonId, lessonRows.map((row) => row.id)), eq(mediaAssets.status, "verified")))
+        .where(
+          and(
+            inArray(
+              lessonMedia.lessonId,
+              lessonRows.map((row) => row.id),
+            ),
+            eq(mediaAssets.status, "verified"),
+          ),
+        )
+        .orderBy(asc(lessonMedia.position))
     : [];
   let previewMarked = false;
   const publicSections: PublicSectionMeta[] = sectionRows.map((section) => ({
@@ -130,8 +196,9 @@ route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
     lessonCount: lessonRows.length,
     videoCount,
     resourceCount,
-    durationLabel: minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
-    creator,
+    durationLabel:
+      minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
+    creator: resolved.info,
   };
   return ok(page);
 });

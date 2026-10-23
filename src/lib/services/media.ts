@@ -185,15 +185,36 @@ interface LiveSessionResponse {
   expiresAt: string;
 }
 
+const EXTENSION_MIME_MAP: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  pdf: "application/pdf",
+  zip: "application/zip",
+  csv: "text/csv",
+};
+
+export function resolveUploadMimeType(fileName: string, browserType: string): string {
+  const trimmed = browserType.trim().toLowerCase();
+  if (trimmed) return trimmed;
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  return EXTENSION_MIME_MAP[ext] ?? "application/octet-stream";
+}
+
 function xhrPut(
   url: string,
   file: File,
+  contentType: string,
   callbacks: UploadCallbacks,
 ): Promise<ApiResult<void>> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url, true);
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) {
         callbacks.onProgress(Math.round((event.loaded / event.total) * 100));
@@ -229,7 +250,8 @@ class ApiMediaService implements MediaService {
     sizeBytes: number;
     mimeType: string;
   }): Promise<ApiResult<UploadSession>> {
-    const result = await apiPost<LiveSessionResponse>("uploads/session", input);
+    const mimeType = resolveUploadMimeType(input.fileName, input.mimeType);
+    const result = await apiPost<LiveSessionResponse>("uploads/session", { ...input, mimeType });
     if (!result.ok) return { ok: false, error: result.error };
     return {
       ok: true,
@@ -240,7 +262,7 @@ class ApiMediaService implements MediaService {
         sizeBytes: result.data.sizeBytes,
         expiresAt: result.data.expiresAt,
         signedUrl: result.data.signedUrl,
-        mimeType: input.mimeType,
+        mimeType,
       },
     };
   }
@@ -252,11 +274,15 @@ class ApiMediaService implements MediaService {
         error: { code: "upload_session_expired", message: "The upload session expired — start the upload again." },
       };
     }
-    const put = await xhrPut(session.signedUrl, session.file, callbacks);
+    const contentType = session.mimeType || resolveUploadMimeType(session.file.name, session.file.type);
+    const put = await xhrPut(session.signedUrl, session.file, contentType, callbacks);
     if (!put.ok) return { ok: false, error: put.error };
     callbacks.onProgress(100);
     // Server independently verifies the object before issuing the media ref.
-    return apiPost<MediaRef>("uploads/complete", { assetId: session.id });
+    return apiPost<MediaRef>("uploads/complete", {
+      assetId: session.id,
+      ...(callbacks.durationLabel ? { durationLabel: callbacks.durationLabel } : {}),
+    });
   }
 }
 

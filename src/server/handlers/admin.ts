@@ -9,6 +9,7 @@ import {
   disputeNotes,
   disputes,
   enrollments,
+  lessonProgress,
   lessons,
   orders,
   payoutEvents,
@@ -24,7 +25,7 @@ import { fail, ok, parseBody, requireAdmin, type Ctx } from "@/server/http";
 import { newId } from "@/server/auth";
 import { audit } from "@/server/audit";
 import { notifyInApp, queueEmail, emailShell } from "@/server/email";
-import { payoutRecordingAllowed } from "@/server/env";
+import { collectionsAllowed, payoutRecordingAllowed } from "@/server/env";
 import type {
   AdminEvent,
   AdminOrderRecord,
@@ -297,15 +298,29 @@ route("GET", "admin/learners/:id", async (_req, ctx, params) => {
     const course = await db.query.courses.findFirst({ where: eq(courses.id, enroll.courseId) });
     const creator = course ? await db.query.users.findFirst({ where: eq(users.id, course.creatorId) }) : null;
     const lessonRows = course
-      ? await db.select({ id: lessons.id }).from(lessons).innerJoin(sections, eq(sections.id, lessons.sectionId)).where(eq(sections.courseId, course.id))
+      ? await db
+          .select({ id: lessons.id })
+          .from(lessons)
+          .innerJoin(sections, eq(sections.id, lessons.sectionId))
+          .where(eq(sections.courseId, course.id))
       : [];
-    void lessonRows;
+    const completedRows = course
+      ? await db.query.lessonProgress.findMany({
+          where: and(
+            eq(lessonProgress.userId, learner.id),
+            eq(lessonProgress.courseId, course.id),
+            eq(lessonProgress.completed, true),
+          ),
+        })
+      : [];
+    const progressPct =
+      lessonRows.length > 0 ? Math.round((completedRows.length / lessonRows.length) * 100) : 0;
     enrollDetails.push({
       courseId: enroll.courseId,
       courseTitle: course?.title ?? "—",
       creatorName: creator?.name ?? "—",
       enrolledAt: enroll.createdAt.toISOString(),
-      progressPct: 0,
+      progressPct,
     });
   }
   const detail: LearnerDetail = {
@@ -559,9 +574,24 @@ route("GET", "admin/payouts", async (_req, ctx) => {
   return ok(out);
 });
 
+async function readPlatformFlags(): Promise<PaymentFeatureFlags> {
+  const row = await db.query.platformSettings.findFirst({ where: eq(platformSettings.key, "flags") });
+  const value = (row?.value ?? {}) as Partial<PaymentFeatureFlags>;
+  return {
+    razorpayConnection: collectionsAllowed ? "connected" : "pending_provider_approval",
+    manualPayoutRecording: value.manualPayoutRecording ?? true,
+    maintenanceMode: value.maintenanceMode ?? false,
+    learnerSignups: value.learnerSignups ?? true,
+  };
+}
+
 route("POST", "admin/payouts", async (req, ctx) => {
   const me = admin(ctx);
   if (!me) return fail("admin_required", "Administrator access required.", 403);
+  const flags = await readPlatformFlags();
+  if (!flags.manualPayoutRecording) {
+    return fail("feature_disabled", "Manual payout recording is currently disabled in Platform Settings.", 403);
+  }
   const parsed = parseBody(
     z.object({ creatorId: z.string().min(1), amountInPaise: z.number().int().positive() }),
     await req.json().catch(() => ({})),
@@ -609,6 +639,10 @@ route("POST", "admin/payouts", async (req, ctx) => {
 route("POST", "admin/payouts/:id/record", async (req, ctx, params) => {
   const me = admin(ctx);
   if (!me) return fail("admin_required", "Administrator access required.", 403);
+  const flags = await readPlatformFlags();
+  if (!flags.manualPayoutRecording) {
+    return fail("feature_disabled", "Manual payout recording is currently disabled in Platform Settings.", 403);
+  }
   if (!payoutRecordingAllowed) {
     return fail(
       "arrangement_not_approved",
@@ -866,14 +900,7 @@ route("POST", "admin/disputes/:id/notes", async (req, ctx, params) => {
 
 route("GET", "admin/settings", async (_req, ctx) => {
   if (!admin(ctx)) return fail("admin_required", "Administrator access required.", 403);
-  const row = await db.query.platformSettings.findFirst({ where: eq(platformSettings.key, "flags") });
-  const value = (row?.value ?? {}) as Partial<PaymentFeatureFlags>;
-  return ok({
-    razorpayConnection: "pending_provider_approval",
-    manualPayoutRecording: value.manualPayoutRecording ?? true,
-    maintenanceMode: value.maintenanceMode ?? false,
-    learnerSignups: value.learnerSignups ?? true,
-  } satisfies PaymentFeatureFlags);
+  return ok(await readPlatformFlags());
 });
 
 route("PATCH", "admin/settings", async (req, ctx) => {
@@ -901,7 +928,7 @@ route("PATCH", "admin/settings", async (req, ctx) => {
     action: "flags_updated",
     detail: `Flags updated: ${Object.keys(parsed.values).join(", ")}.`,
   });
-  return ok(merged);
+  return ok(await readPlatformFlags());
 });
 
 route("GET", "admin/audit-logs", async (_req, ctx) => {

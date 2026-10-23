@@ -6,9 +6,9 @@ import { eq } from "drizzle-orm";
 import { route } from "@/server/router";
 import { clientIp, fail, ok, parseBody, rateLimit } from "@/server/http";
 import {
-  clearSessionCookie,
   consumeAuthToken,
   createSession,
+  destroyCurrentSession,
   hashPassword,
   issueAuthToken,
   newId,
@@ -16,14 +16,13 @@ import {
   verifyPassword,
 } from "@/server/auth";
 import { emailShell, queueEmail } from "@/server/email";
-import { APP_BASE_URL } from "@/server/env";
+import { resolveRequestBaseUrl } from "@/server/env";
 import { audit } from "@/server/audit";
 import {
   emailSchema,
   forgotPasswordSchema,
   fullNameSchema,
   passwordSchema,
-  resetPasswordSchema,
 } from "@/lib/validation";
 
 const signupSchema = z.object({
@@ -32,7 +31,10 @@ const signupSchema = z.object({
   password: passwordSchema,
 });
 
-const loginSchema = z.object({ email: emailSchema, password: z.string().min(1, "Password is required") });
+const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, "Password is required"),
+});
 
 function sessionPayload(user: typeof users.$inferSelect) {
   return {
@@ -44,9 +46,9 @@ function sessionPayload(user: typeof users.$inferSelect) {
   };
 }
 
-async function sendVerificationEmail(user: typeof users.$inferSelect) {
+async function sendVerificationEmail(user: typeof users.$inferSelect, baseUrl: string) {
   const token = await issueAuthToken(user.id, "verify", 24 * 60 * 60 * 1000);
-  const url = `${APP_BASE_URL}/api/v1/auth/verify?token=${token}`;
+  const url = `${baseUrl}/api/v1/auth/verify?token=${token}`;
   await queueEmail({
     userId: user.id,
     to: user.email,
@@ -72,14 +74,41 @@ route("POST", "auth/signup", async (req) => {
 
   const existing = await db.query.users.findFirst({ where: eq(users.email, emailNorm) });
   if (existing) {
-    return fail("email_already_in_use", "An account already exists for this email. Try logging in instead.", 409, {
-      email: ["An account already exists for this email."],
-    });
+    return fail(
+      "email_already_in_use",
+      "An account already exists for this email. Try logging in instead.",
+      409,
+      { email: ["An account already exists for this email."] },
+    );
   }
-  const [user] = await db
-    .insert(users)
-    .values({ id: newId("usr"), email: emailNorm, name: fullName.trim(), passwordHash: hashPassword(password) })
-    .returning();
+
+  let user: typeof users.$inferSelect;
+  try {
+    const [created] = await db
+      .insert(users)
+      .values({
+        id: newId("usr"),
+        email: emailNorm,
+        name: fullName.trim(),
+        passwordHash: hashPassword(password),
+      })
+      .returning();
+    user = created;
+  } catch (error) {
+    const code =
+      (error as { cause?: { code?: string }; code?: string })?.cause?.code ??
+      (error as { code?: string })?.code;
+    if (code === "23505") {
+      return fail(
+        "email_already_in_use",
+        "An account already exists for this email. Try logging in instead.",
+        409,
+        { email: ["An account already exists for this email."] },
+      );
+    }
+    throw error;
+  }
+
   await audit({
     actorId: user.id,
     actorLabel: user.name,
@@ -88,7 +117,7 @@ route("POST", "auth/signup", async (req) => {
     detail: `New account registered (${emailNorm}).`,
     kind: "event",
   });
-  await sendVerificationEmail(user);
+  await sendVerificationEmail(user, resolveRequestBaseUrl(req));
   return ok({ email: user.email, verificationRequired: true as const }, { status: 201 });
 });
 
@@ -96,8 +125,12 @@ route("POST", "auth/resend-verification", async (req) => {
   const parsed = parseBody(z.object({ email: emailSchema }), await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
   // Anti-enumeration: same response either way.
-  const user = await db.query.users.findFirst({ where: eq(users.email, parsed.values.email.trim().toLowerCase()) });
-  if (user && !user.emailVerifiedAt) await sendVerificationEmail(user);
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, parsed.values.email.trim().toLowerCase()),
+  });
+  if (user && !user.emailVerifiedAt) {
+    await sendVerificationEmail(user, resolveRequestBaseUrl(req));
+  }
   return ok({ email: parsed.values.email });
 });
 
@@ -112,20 +145,22 @@ route("POST", "auth/login", async (req) => {
   });
   const passwordOk = user ? verifyPassword(parsed.values.password, user.passwordHash) : false;
   if (!user || !passwordOk) {
-    return fail("invalid_credentials", "Incorrect email or password. Check your details and try again.", 401);
+    return fail(
+      "invalid_credentials",
+      "Incorrect email or password. Check your details and try again.",
+      401,
+    );
+  }
+  if (user.suspendedAt) {
+    return fail("account_suspended", "This account is suspended. Contact support.", 403);
   }
   const token = await createSession(user.id);
   await setSessionCookie(token);
   return ok(sessionPayload(user));
 });
 
-route("POST", "auth/logout", async (_req, ctx) => {
-  if (ctx.user) {
-    // Remove all tokens for this session's cookie value implicitly via expiry cleanup.
-    await clearSessionCookie();
-    return ok({ success: true as const });
-  }
-  await clearSessionCookie();
+route("POST", "auth/logout", async () => {
+  await destroyCurrentSession();
   return ok({ success: true as const });
 });
 
@@ -144,7 +179,8 @@ route("POST", "auth/forgot", async (req) => {
   const user = await db.query.users.findFirst({ where: eq(users.email, emailNorm) });
   if (user) {
     const token = await issueAuthToken(user.id, "reset", 60 * 60 * 1000);
-    const url = `${APP_BASE_URL}/forgot-password/reset?token=${token}`;
+    const baseUrl = resolveRequestBaseUrl(req);
+    const url = `${baseUrl}/forgot-password/reset?token=${token}`;
     await queueEmail({
       userId: user.id,
       to: user.email,
@@ -170,9 +206,16 @@ route("POST", "auth/reset", async (req) => {
   if ("response" in parsed) return parsed.response;
   const userId = await consumeAuthToken(parsed.values.token, "reset");
   if (!userId) {
-    return fail("invalid_reset_token", "This reset link is invalid or has expired. Request a fresh one.", 400);
+    return fail(
+      "invalid_reset_token",
+      "This reset link is invalid or has expired. Request a fresh one.",
+      400,
+    );
   }
-  await db.update(users).set({ passwordHash: hashPassword(parsed.values.password), updatedAt: new Date() }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ passwordHash: hashPassword(parsed.values.password), updatedAt: new Date() })
+    .where(eq(users.id, userId));
   // Invalidate all existing sessions after a password change.
   await db.delete(sessions).where(eq(sessions.userId, userId));
   return ok({ success: true as const });
@@ -180,12 +223,16 @@ route("POST", "auth/reset", async (req) => {
 
 /** Email verification landing: consumes the token, then redirects with UX state. */
 route("GET", "auth/verify", async (req) => {
+  const baseUrl = resolveRequestBaseUrl(req);
   const token = new URL(req.url).searchParams.get("token") ?? "";
   const userId = token ? await consumeAuthToken(token, "verify") : null;
   if (!userId) {
-    return NextResponse.redirect(`${APP_BASE_URL}/login?error=verification_failed`, 302);
+    return NextResponse.redirect(`${baseUrl}/login?error=verification_failed`, 302);
   }
-  await db.update(users).set({ emailVerifiedAt: new Date(), updatedAt: new Date() }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
+    .where(eq(users.id, userId));
   await audit({
     actorId: userId,
     actorLabel: "user",
@@ -194,5 +241,5 @@ route("GET", "auth/verify", async (req) => {
     detail: "Email address verified by link.",
     kind: "event",
   });
-  return NextResponse.redirect(`${APP_BASE_URL}/login?notice=verified`, 302);
+  return NextResponse.redirect(`${baseUrl}/login?notice=verified`, 302);
 });

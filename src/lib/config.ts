@@ -8,9 +8,23 @@
 export const APP_NAME = "CourseKit";
 export const APP_TAGLINE = "Sell courses to the audience you already have.";
 
+function resolvePublicAppUrl(): string {
+  const raw = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim().replace(/^["']|["']$/g, "");
+  if (!raw) return "https://coursekit.app";
+  const withScheme = /^https?:\/\//i.test(raw)
+    ? raw
+    : /^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(raw)
+      ? `http://${raw}`
+      : `https://${raw}`;
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return "https://coursekit.app";
+  }
+}
+
 /** Public marketing URL used in metadata and email copy. */
-export const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://coursekit.app";
+export const APP_URL = resolvePublicAppUrl();
 
 export const SUPPORT_EMAIL = "support@coursekit.app";
 
@@ -31,9 +45,11 @@ export const SUPPORT_EMAIL = "support@coursekit.app";
 type ServiceMode = "mock" | "live";
 const REPO_SERVICE_MODE: ServiceMode = "live";
 
+const rawUseMocks = process.env.NEXT_PUBLIC_USE_MOCKS?.trim();
+
 export const USE_MOCK_SERVICES =
-  process.env.NEXT_PUBLIC_USE_MOCKS !== undefined
-    ? process.env.NEXT_PUBLIC_USE_MOCKS === "true"
+  rawUseMocks !== undefined && rawUseMocks !== ""
+    ? rawUseMocks === "true"
     : (REPO_SERVICE_MODE as ServiceMode) === "mock";
 
 /**

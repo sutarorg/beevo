@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -5,7 +6,6 @@ import {
   commissionLedger,
   courses,
   enrollments,
-  notifications,
   orders,
   payments,
   users,
@@ -17,14 +17,21 @@ import { newId } from "@/server/auth";
 import { audit } from "@/server/audit";
 import { emailShell, notifyInApp, queueEmail } from "@/server/email";
 import {
+  APP_BASE_URL,
   collectionsAllowed,
+  PAYMENTS_LIVE_ENABLED,
   PLATFORM_COMMISSION_BPS,
   payoutRecordingAllowed,
-  razorpayConfigured,
   RAZORPAY_KEY_ID,
-  APP_BASE_URL,
+  razorpayConfigured,
+  razorpaySecretMatchesKeyId,
 } from "@/server/env";
-import { createRazorpayOrder, verifyCheckoutSignature, verifyWebhookSignature, type RazorpayWebhookPayload } from "@/server/razorpay";
+import {
+  createRazorpayOrder,
+  verifyCheckoutSignature,
+  verifyWebhookSignature,
+  type RazorpayWebhookPayload,
+} from "@/server/razorpay";
 
 /**
  * Checkout + webhook. Access is granted ONLY after a server-verified
@@ -42,17 +49,30 @@ function feeOf(grossInPaise: number): number {
 }
 
 route("POST", "checkout", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
-  if ("code" in (user as object)) return user as never;
-  const me = user as NonNullable<typeof ctx.user>;
+  const me = requireVerifiedUser(ctx);
+  if (me instanceof Response) return me;
   if (!rateLimit(`checkout:${me.id}:${clientIp(req)}`, 10, 60_000)) {
     return fail("rate_limited", "Slow down — too many checkout attempts.", 429);
   }
-  const parsed = parseBody(z.object({ courseId: z.string().min(1) }), await req.json().catch(() => ({})));
+  const parsed = parseBody(
+    z.object({ courseId: z.string().min(1) }),
+    await req.json().catch(() => ({})),
+  );
   if ("response" in parsed) return parsed.response;
 
+  if (razorpaySecretMatchesKeyId) {
+    return fail(
+      "provider_misconfigured",
+      "Payment credentials are misconfigured (RAZORPAY_KEY_SECRET must be your secret key, not the Key ID).",
+      503,
+    );
+  }
   if (!razorpayConfigured) {
-    return fail("provider_not_configured", "Payments aren't configured yet (Razorpay keys missing). Sandbox testing resumes once test keys are added.", 503);
+    return fail(
+      "provider_not_configured",
+      "Payments aren't configured yet (Razorpay keys missing). Sandbox testing resumes once test keys are added.",
+      503,
+    );
   }
   if (!collectionsAllowed) {
     return fail(
@@ -63,8 +83,19 @@ route("POST", "checkout", async (req, ctx) => {
   }
 
   // Authoritative price: ALWAYS the current database value.
-  const course = await db.query.courses.findFirst({ where: eq(courses.id, parsed.values.courseId) });
-  if (!course || course.status !== "published" || course.priceInPaise === null || course.priceInPaise <= 0) {
+  const course = await db.query.courses.findFirst({
+    where: eq(courses.id, parsed.values.courseId),
+  });
+  if (
+    !course ||
+    course.status !== "published" ||
+    course.priceInPaise === null ||
+    course.priceInPaise <= 0
+  ) {
+    return fail("not_purchasable", "This course isn't available for purchase right now.", 404);
+  }
+  const creator = await db.query.users.findFirst({ where: eq(users.id, course.creatorId) });
+  if (!creator || creator.suspendedAt) {
     return fail("not_purchasable", "This course isn't available for purchase right now.", 404);
   }
   if (course.creatorId === me.id) {
@@ -86,7 +117,7 @@ route("POST", "checkout", async (req, ctx) => {
       receipt: `ck_${Date.now().toString(36)}`,
       notes: { courseId: course.id, buyerUserId: me.id },
     });
-  } catch (error) {
+  } catch {
     await audit({
       actorId: me.id,
       actorLabel: me.name,
@@ -95,7 +126,11 @@ route("POST", "checkout", async (req, ctx) => {
       detail: "Razorpay order creation failed (provider error, no order persisted).",
       kind: "event",
     });
-    return fail("provider_error", "The payment provider rejected order creation. Nothing was charged — try again.", 502);
+    return fail(
+      "provider_error",
+      "The payment provider rejected order creation. Nothing was charged — try again.",
+      502,
+    );
   }
 
   const [order] = await db
@@ -134,7 +169,11 @@ route("POST", "checkout", async (req, ctx) => {
  * Fulfilment, transactional + idempotent. Returns true when this call did
  * the fulfilling (false = already fulfilled — safe to treat as success).
  */
-async function fulfilPaidOrder(orderId: string, providerPaymentId: string, method: string | null): Promise<boolean> {
+async function fulfilPaidOrder(
+  orderId: string,
+  providerPaymentId: string,
+  method: string | null,
+): Promise<boolean> {
   return db.transaction(async (tx) => {
     const [order] = await tx
       .update(orders)
@@ -144,13 +183,16 @@ async function fulfilPaidOrder(orderId: string, providerPaymentId: string, metho
     if (!order) return false; // already processed
 
     const paymentId = newId("pay");
-    await tx.insert(payments).values({
-      id: paymentId,
-      orderId: order.id,
-      providerPaymentId,
-      method: method?.slice(0, 40) ?? null,
-      status: "captured",
-    }).onConflictDoNothing({ target: payments.providerPaymentId });
+    await tx
+      .insert(payments)
+      .values({
+        id: paymentId,
+        orderId: order.id,
+        providerPaymentId,
+        method: method?.slice(0, 40) ?? null,
+        status: "captured",
+      })
+      .onConflictDoNothing({ target: payments.providerPaymentId });
 
     // Enrolment: unique (user, course) prevents duplicates.
     await tx
@@ -184,11 +226,14 @@ async function afterFulfilment(orderId: string) {
   if (!order) return;
   const buyer = await db.query.users.findFirst({ where: eq(users.id, order.userId) });
   const course = await db.query.courses.findFirst({ where: eq(courses.id, order.courseId) });
-  const creator = course ? await db.query.users.findFirst({ where: eq(users.id, course.creatorId) }) : null;
+  const creator = course
+    ? await db.query.users.findFirst({ where: eq(users.id, course.creatorId) })
+    : null;
+  if (!buyer) return;
   const learnUrl = `${APP_BASE_URL}/learn/courses`;
   await queueEmail({
     userId: order.userId,
-    to: buyer!.email,
+    to: buyer.email,
     subject: `You're enrolled: ${order.courseTitle}`,
     template: "purchase_confirmation",
     dedupeKey: `purchase_email:${order.id}`,
@@ -203,16 +248,15 @@ async function afterFulfilment(orderId: string) {
       userId: creator.id,
       template: "sale_made",
       title: "New enrolment",
-      body: `${buyer!.name} enrolled in “${order.courseTitle}” (${(order.grossInPaise / 100).toLocaleString("en-IN")} ₹ gross).`,
+      body: `${buyer.name} enrolled in “${order.courseTitle}” (₹${(order.grossInPaise / 100).toLocaleString("en-IN")} gross).`,
       dedupeKey: `sale_notice:${order.id}`,
     });
   }
 }
 
 route("POST", "checkout/verify", async (req, ctx) => {
-  const user = requireUser(ctx);
-  if ("code" in (user as object)) return user as never;
-  const me = user as NonNullable<typeof ctx.user>;
+  const me = requireUser(ctx);
+  if (me instanceof Response) return me;
   const parsed = parseBody(
     z.object({
       orderId: z.string().min(1),
@@ -225,14 +269,22 @@ route("POST", "checkout/verify", async (req, ctx) => {
   if ("response" in parsed) return parsed.response;
 
   const order = await db.query.orders.findFirst({ where: eq(orders.id, parsed.values.orderId) });
-  if (!order || order.userId !== me.id) return fail("order_not_found", "This order doesn't exist.", 404);
+  if (!order || order.userId !== me.id) {
+    return fail("order_not_found", "This order doesn't exist.", 404);
+  }
   if (order.providerRef !== parsed.values.razorpayOrderId) {
     return fail("order_mismatch", "Order reference mismatch.", 400);
   }
   if (order.status === "paid") {
     // Idempotent: previously fulfilled — safe to report success again.
     const payment = await db.query.payments.findFirst({ where: eq(payments.orderId, order.id) });
-    return ok({ paymentId: payment?.providerPaymentId ?? parsed.values.razorpayPaymentId, orderId: order.id, amountInPaise: order.grossInPaise, note: "Already enrolled.", enrolled: true });
+    return ok({
+      paymentId: payment?.providerPaymentId ?? parsed.values.razorpayPaymentId,
+      orderId: order.id,
+      amountInPaise: order.grossInPaise,
+      note: "Already enrolled.",
+      enrolled: true,
+    });
   }
 
   const signatureOk = verifyCheckoutSignature({
@@ -241,13 +293,16 @@ route("POST", "checkout/verify", async (req, ctx) => {
     signature: parsed.values.razorpaySignature,
   });
   if (!signatureOk) {
-    await db.insert(payments).values({
-      id: newId("pay"),
-      orderId: order.id,
-      providerPaymentId: parsed.values.razorpayPaymentId,
-      status: "failed",
-      failureReason: "signature_verification_failed",
-    }).onConflictDoNothing({ target: payments.providerPaymentId });
+    await db
+      .insert(payments)
+      .values({
+        id: newId("pay"),
+        orderId: order.id,
+        providerPaymentId: parsed.values.razorpayPaymentId,
+        status: "failed",
+        failureReason: "signature_verification_failed",
+      })
+      .onConflictDoNothing({ target: payments.providerPaymentId });
     await audit({
       actorId: me.id,
       actorLabel: me.name,
@@ -256,7 +311,11 @@ route("POST", "checkout/verify", async (req, ctx) => {
       detail: `Checkout signature verification failed for ${order.id}. Access NOT granted.`,
       kind: "event",
     });
-    return fail("signature_invalid", "We couldn't verify this payment's signature. No access was granted.", 400);
+    return fail(
+      "signature_invalid",
+      "We couldn't verify this payment's signature. No access was granted.",
+      400,
+    );
   }
 
   await fulfilPaidOrder(order.id, parsed.values.razorpayPaymentId, null);
@@ -283,7 +342,9 @@ route("POST", "webhooks/razorpay", async (req) => {
   } catch {
     return fail("invalid_payload", "Webhook payload isn't valid JSON.", 400);
   }
-  const eventId = payload.id ?? `unknown_${Date.now()}`;
+  const headerEventId = req.headers.get("x-razorpay-event-id")?.trim();
+  const bodyDigest = `rzp_${createHash("sha256").update(rawBody).digest("hex").slice(0, 40)}`;
+  const eventId = headerEventId || payload.id || bodyDigest;
   const event = payload.event ?? "unknown";
 
   // Idempotency: insert-first; a conflict means we've already handled it.
@@ -302,7 +363,9 @@ route("POST", "webhooks/razorpay", async (req) => {
       const providerOrderId = entity?.order_id ?? payload.payload?.order?.entity?.id;
       const providerPaymentId = entity?.id;
       if (providerOrderId && providerPaymentId) {
-        const order = await db.query.orders.findFirst({ where: eq(orders.providerRef, providerOrderId) });
+        const order = await db.query.orders.findFirst({
+          where: eq(orders.providerRef, providerOrderId),
+        });
         if (order) {
           const didFulfil = await fulfilPaidOrder(order.id, providerPaymentId, entity.method ?? null);
           if (didFulfil) await afterFulfilment(order.id);
@@ -312,17 +375,25 @@ route("POST", "webhooks/razorpay", async (req) => {
       const entity = payload.payload?.payment?.entity;
       const providerOrderId = entity?.order_id;
       if (providerOrderId) {
-        const order = await db.query.orders.findFirst({ where: eq(orders.providerRef, providerOrderId) });
+        const order = await db.query.orders.findFirst({
+          where: eq(orders.providerRef, providerOrderId),
+        });
         if (order && order.status === "created") {
           await db.transaction(async (tx) => {
-            await tx.update(orders).set({ status: "failed" }).where(and(eq(orders.id, order.id), eq(orders.status, "created")));
-            await tx.insert(payments).values({
-              id: newId("pay"),
-              orderId: order.id,
-              providerPaymentId: entity?.id ?? null,
-              status: "failed",
-              failureReason: entity?.error_description?.slice(0, 200) ?? "payment_failed",
-            }).onConflictDoNothing();
+            await tx
+              .update(orders)
+              .set({ status: "failed" })
+              .where(and(eq(orders.id, order.id), eq(orders.status, "created")));
+            await tx
+              .insert(payments)
+              .values({
+                id: newId("pay"),
+                orderId: order.id,
+                providerPaymentId: entity?.id ?? null,
+                status: "failed",
+                failureReason: entity?.error_description?.slice(0, 200) ?? "payment_failed",
+              })
+              .onConflictDoNothing();
           });
         }
       }
@@ -345,7 +416,7 @@ route("GET", "payments/arrangement-status", async () => {
   return ok({
     collectionsAllowed,
     payoutsAllowedHere: payoutRecordingAllowed,
-    paymentsLiveEnabled: process.env.PAYMENTS_LIVE_ENABLED === "true",
+    paymentsLiveEnabled: PAYMENTS_LIVE_ENABLED,
     note: "Centralized collection + manual payouts require explicit Razorpay approval; live mode stays disabled until confirmed.",
   });
 });
