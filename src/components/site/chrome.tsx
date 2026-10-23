@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Menu, Sparkles, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -12,23 +13,43 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sticker } from "@/components/ui/primitives";
 
+/** Brand mark — the Beevo logo, framed in the site's sticker/marker style. */
+export function LogoMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl border-2 border-ink bg-ink shadow-hard-xs transition-transform duration-200 group-hover:-rotate-6",
+        className,
+      )}
+    >
+      <Image
+        src="/images/brand/beevo-logo.png"
+        alt=""
+        width={72}
+        height={72}
+        sizes="36px"
+        className="size-full object-cover"
+        priority
+      />
+    </span>
+  );
+}
+
 export function Logo({ dark = false }: { dark?: boolean }) {
   return (
     <Link
       href="/"
-      aria-label="CourseKit home"
+      aria-label="Beevo home"
       className="group inline-flex items-center gap-2.5"
     >
-      <span className="grid size-9 place-items-center rounded-xl border-2 border-ink bg-accent shadow-hard-xs transition-transform duration-200 group-hover:-rotate-6">
-        <Sparkles className="size-5 text-cream" aria-hidden="true" />
-      </span>
+      <LogoMark />
       <span
         className={cn(
           "text-xl font-bold tracking-tight",
           dark ? "text-cream" : "text-ink",
         )}
       >
-        Course<span className="text-accent">Kit</span>
+        Beevo
       </span>
     </Link>
   );
@@ -235,7 +256,7 @@ export function Footer() {
           ))}
         </div>
         <div className="mt-12 flex flex-col gap-3 border-t border-cream/15 pt-6 text-xs text-cream/50 sm:flex-row sm:items-center sm:justify-between">
-          <p>© 2026 CourseKit. Made for creators, not algorithms.</p>
+          <p>© 2026 Beevo. Made for creators, not algorithms.</p>
           <p>Course purchases are non-refundable except where required by law.</p>
         </div>
       </div>

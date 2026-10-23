@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import type { ApiResult } from "@/lib/domain";
 import type { MediaRef, UploadKind } from "@/lib/creator-types";
-import { SIMULATED_UPLOAD_NOTE } from "@/lib/creator-types";
 import {
   getMediaService,
   UPLOAD_RULES,
@@ -23,7 +22,7 @@ export type UploadPhase =
   | { phase: "cancelled"; fileName: string };
 
 /**
- * Full upload lifecycle against the (mock) media service: begin session →
+ * Full upload lifecycle against the media service: begin session →
  * stream with progress → media ref. Supports cancel (AbortSignal) and retry
  * (the selected File is retained for the retry path).
  */
@@ -139,7 +138,7 @@ export function UploadProgressRow({
         />
       </div>
       <p className="mt-1 text-[10px] font-bold text-smoke tabular-nums">
-        Uploading… {progress}% (simulated)
+        Uploading… {progress}%
       </p>
     </div>
   );
@@ -167,7 +166,7 @@ export function CoverUpload({
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
     setSaveError(null);
-    // Read a local preview so the mock can show the actual chosen image.
+    // Read a local preview so the chosen image shows instantly.
     let dataUrl: string | undefined;
     if (file.type.startsWith("image/")) {
       dataUrl = await new Promise<string | undefined>((resolve) => {
@@ -298,7 +297,6 @@ export function CoverUpload({
         </p>
       ) : null}
 
-      <p className="mt-2 text-[11px] text-smoke italic">{SIMULATED_UPLOAD_NOTE}</p>
       <input
         ref={inputRef}
         type="file"

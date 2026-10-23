@@ -5,7 +5,7 @@ import { CreatorAppShell } from "@/components/creator/app-shell";
 export const metadata: Metadata = {
   title: {
     default: "Creator Studio",
-    template: "%s · CourseKit Studio",
+    template: "%s · Beevo Studio",
   },
 };
 

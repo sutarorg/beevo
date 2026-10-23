@@ -7,7 +7,6 @@ import { getCreatorDataService } from "@/lib/services/creator-data";
 import { MiniBars, TrendLine } from "@/components/creator/charts";
 import {
   CardListSkeleton,
-  DemoChip,
   FailedState,
   PageHeader,
   StatCard,
@@ -28,10 +27,8 @@ export default function CreatorAnalyticsPage() {
     <div>
       <PageHeader
         title="Analytics"
-        sub="Sales and enrolment trends across your courses. Every figure here is demo data."
-      >
-        <DemoChip />
-      </PageHeader>
+        sub="Sales and enrolment trends across your courses."
+      />
 
       {state.status === "loading" || state.status === "idle" ? (
         <div className="space-y-5">
@@ -46,19 +43,16 @@ export default function CreatorAnalyticsPage() {
               icon={<IndianRupee className="size-4.5" aria-hidden="true" />}
               label="Gross · 30 days"
               value={formatINR(state.data.overview.grossLast30dInPaise)}
-              demo
             />
             <StatCard
               icon={<ReceiptText className="size-4.5" aria-hidden="true" />}
               label="Orders · 30 days"
               value={String(state.data.overview.ordersLast30d)}
-              demo
             />
             <StatCard
               icon={<UserRoundPlus className="size-4.5" aria-hidden="true" />}
               label="Enrolments · 30 days"
               value={String(state.data.overview.enrollmentsLast30d)}
-              demo
             />
             <StatCard
               icon={<TrendingUp className="size-4.5" aria-hidden="true" />}
@@ -68,7 +62,6 @@ export default function CreatorAnalyticsPage() {
                   ? formatINR(Math.round(state.data.overview.grossLast30dInPaise / state.data.overview.ordersLast30d))
                   : "—"
               }
-              demo
             />
           </div>
 
@@ -82,7 +75,7 @@ export default function CreatorAnalyticsPage() {
               points={state.data.salesSeries.map((point) => ({ label: point.label, value: point.grossInPaise }))}
             />
             <p className="mt-3 text-[11px] text-smoke">
-              Demo series derived from the seeded sample orders. Hover bars for exact values.
+              Hover or focus a bar for the exact weekly gross.
             </p>
           </section>
 
@@ -97,6 +90,11 @@ export default function CreatorAnalyticsPage() {
           <section aria-labelledby="perf-table" className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs sm:p-6">
             <h2 id="perf-table" className="mb-4 text-base font-bold text-ink">Course performance</h2>
             <ul className="space-y-2.5">
+              {state.data.performance.length === 0 ? (
+                <li className="rounded-xl border-2 border-dashed border-ink/25 bg-cream px-4 py-6 text-center text-sm text-smoke">
+                  No course performance yet — publish a course to start collecting sales.
+                </li>
+              ) : null}
               {state.data.performance.map((row, index) => {
                 const max = state.data.performance[0]?.grossInPaise || 1;
                 return (
@@ -126,7 +124,7 @@ export default function CreatorAnalyticsPage() {
             </ul>
             <p className="mt-4 text-[11px] leading-relaxed text-smoke">
               “Yours” is the 92% creator share after the 8% platform commission, computed from the
-              shared commission utility. All rows are demo data.
+              same commission rule used at checkout.
             </p>
           </section>
         </div>

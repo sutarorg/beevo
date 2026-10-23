@@ -22,12 +22,18 @@ if (r2PublicBase) {
 }
 
 const nextConfig: NextConfig = {
+  // Dev-only: allow the proxied preview host to load dev assets/HMR.
+  allowedDevOrigins: ["*.e2b.app", "localhost:3000"],
   images: {
     localPatterns: [
       { pathname: "/images/**" },
       { pathname: "/api/v1/media/access" },
     ],
     remotePatterns,
+  },
+  // Legacy clients still request /favicon.ico directly — serve the brand mark.
+  async rewrites() {
+    return [{ source: "/favicon.ico", destination: "/images/brand/beevo-logo.png" }];
   },
 };
 

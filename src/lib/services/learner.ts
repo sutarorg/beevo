@@ -9,6 +9,7 @@ import type {
   LearnerLessonView,
   LearnerProfile,
   LearnerSectionView,
+  LearnerSettings,
   ProgressPatch,
   PurchaseRecord,
 } from "@/lib/learner-types";
@@ -40,17 +41,21 @@ export interface LearnerService {
   getLesson(courseId: string, lessonId: string): Promise<ApiResult<LearnerLessonView>>;
   updateProgress(courseId: string, lessonId: string, patch: ProgressPatch): Promise<ApiResult<void>>;
   listPurchases(): Promise<ApiResult<PurchaseRecord[]>>;
+  getSettings(): Promise<ApiResult<LearnerSettings>>;
+  updateSettings(patch: Partial<Omit<LearnerSettings, "email">>): Promise<ApiResult<LearnerSettings>>;
   /** Called by the checkout success state — simulates enrolment creation. */
   recordDemoPurchase(order: CheckoutOrder): Promise<ApiResult<PurchaseRecord>>;
 }
 
-const STORAGE_KEY = "coursekit_mock_learner_v1";
+const STORAGE_KEY = "beevo_mock_learner_v1";
 
 interface LearnerDb {
   session: { name: string; email: string } | null;
   purchases: PurchaseRecord[];
   progress: Record<string, Record<string, { completed: boolean; positionSeconds: number; updatedAt: string }>>;
   lastAccessed: Record<string, { lessonId: string; at: string }>;
+  notifyLessonEmails?: boolean;
+  notifyReceiptEmails?: boolean;
 }
 
 function seedDb(): LearnerDb {
@@ -316,6 +321,26 @@ class MockLearnerService implements LearnerService {
     return ok([...this.db.purchases].sort((a, b) => b.placedAt.localeCompare(a.placedAt)));
   }
 
+  async getSettings(): Promise<ApiResult<LearnerSettings>> {
+    const session = this.db.session;
+    return ok<LearnerSettings>({
+      name: session?.name ?? "Learner",
+      email: session?.email ?? "learner@beevo.in",
+      notifyLessonEmails: this.db.notifyLessonEmails ?? true,
+      notifyReceiptEmails: this.db.notifyReceiptEmails ?? true,
+    });
+  }
+
+  async updateSettings(
+    patch: Partial<Omit<LearnerSettings, "email">>,
+  ): Promise<ApiResult<LearnerSettings>> {
+    await mockLatency(200, 150);
+    this.db.notifyLessonEmails = patch.notifyLessonEmails ?? this.db.notifyLessonEmails ?? true;
+    this.db.notifyReceiptEmails = patch.notifyReceiptEmails ?? this.db.notifyReceiptEmails ?? true;
+    this.save();
+    return this.getSettings();
+  }
+
   async recordDemoPurchase(order: CheckoutOrder): Promise<ApiResult<PurchaseRecord>> {
     await mockLatency(300, 200);
     const forced = consumeForcedFailure<PurchaseRecord>();
@@ -352,7 +377,7 @@ function getMock(): MockLearnerService {
 // ---------------------------------------------------------------------------
 
 import { fetchSession } from "@/lib/services/auth";
-import { get as apiGet, put as apiPut } from "@/lib/services/api";
+import { get as apiGet, patch as apiPatch, put as apiPut } from "@/lib/services/api";
 
 class ApiLearnerService implements LearnerService {
   private sessionCache: { signedIn: boolean; profile: LearnerProfile | null } | null = null;
@@ -392,6 +417,12 @@ class ApiLearnerService implements LearnerService {
   }
   listPurchases() {
     return apiGet<PurchaseRecord[]>("learn/purchases");
+  }
+  getSettings() {
+    return apiGet<LearnerSettings>("learn/settings");
+  }
+  updateSettings(patch: Partial<Omit<LearnerSettings, "email">>) {
+    return apiPatch<LearnerSettings>("learn/settings", patch);
   }
 
   /**

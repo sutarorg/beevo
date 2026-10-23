@@ -33,7 +33,7 @@ export const MOCK_CURRENT_CREATOR: CreatorProfile = {
     { label: "YouTube", url: "https://youtube.com" },
     { label: "Instagram", url: "https://instagram.com" },
   ],
-  publicUrl: "https://coursekit.app/@meera-shoots",
+  publicUrl: "https://beevo.in/@meera-shoots",
 };
 
 const now = Date.now();
@@ -290,7 +290,7 @@ export function seedOrders(): OrderRecord[] {
     const gross = courseId === "course_film" ? 149900 : 99900;
     const fee = feeOf(gross);
     return {
-      id: `ck_demo_${String(2400 + i)}`,
+      id: `ck_mk_${String(2400 + i)}`,
       courseId,
       courseTitle:
         courseId === "course_film"
@@ -325,7 +325,7 @@ export function seedStudents(): StudentRecord[] {
 export function seedPayouts(): PayoutRecord[] {
   return [
     {
-      id: "pay_demo_1",
+      id: "pay_mk_1",
       amountInPaise: 128_000,
       reference: "manual-ref-2025-12",
       status: "recorded",
@@ -333,7 +333,7 @@ export function seedPayouts(): PayoutRecord[] {
       note: "Recorded by platform admin under the payment arrangement.",
     },
     {
-      id: "pay_demo_2",
+      id: "pay_mk_2",
       amountInPaise: 96_500,
       reference: "manual-ref-2026-01",
       status: "recorded",
@@ -346,7 +346,7 @@ export function seedPayouts(): PayoutRecord[] {
 export function seedNotifications(): CreatorNotification[] {
   return [
     {
-      id: "ntf_demo_1",
+      id: "ntf_mk_1",
       kind: "enrollment",
       title: "New enrolment",
       body: "Ananya Iyer enrolled in Film Photography Foundations.",
@@ -354,7 +354,7 @@ export function seedNotifications(): CreatorNotification[] {
       read: false,
     },
     {
-      id: "ntf_demo_2",
+      id: "ntf_mk_2",
       kind: "enrollment",
       title: "New enrolment",
       body: "Rohit Malhotra enrolled in Film Photography Foundations.",
@@ -362,7 +362,7 @@ export function seedNotifications(): CreatorNotification[] {
       read: false,
     },
     {
-      id: "ntf_demo_3",
+      id: "ntf_mk_3",
       kind: "payout",
       title: "Payout recorded",
       body: "A payout of ₹965.00 was recorded by the platform (manual-ref-2026-01).",
@@ -370,7 +370,7 @@ export function seedNotifications(): CreatorNotification[] {
       read: true,
     },
     {
-      id: "ntf_demo_4",
+      id: "ntf_mk_4",
       kind: "system",
       title: "Profile tip",
       body: "Creators with 3+ learning outcomes convert better. Add yours in any draft.",

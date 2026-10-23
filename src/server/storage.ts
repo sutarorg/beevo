@@ -1,5 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
-import { R2 } from "@/server/env";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { IS_PROD, R2 } from "@/server/env";
 
 /**
  * Cloudflare R2 (S3 API) — hand-rolled SigV4 presigning, no SDK needed.
@@ -144,8 +146,50 @@ export async function deleteObject(key: string): Promise<void> {
   }
 }
 
+/**
+ * Local development fallback.
+ *
+ * Production media always lives in R2. When R2 credentials are absent (local
+ * dev / preview environments) uploads are written to a git-ignored folder so
+ * the studio and profile-photo flows stay fully functional. Disabled in
+ * production, where a missing storage configuration is reported honestly.
+ */
+export const LOCAL_UPLOADS_ENABLED = !R2.configured && !IS_PROD;
+
+const LOCAL_ROOT = path.join(process.cwd(), ".uploads");
+
+function localPath(key: string): string {
+  // Keys are server-generated; still normalize to keep writes inside LOCAL_ROOT.
+  const safe = key.replace(/\\/g, "/").split("/").filter((part) => part && part !== "..").join("/");
+  return path.join(LOCAL_ROOT, safe);
+}
+
+export async function writeLocalObject(key: string, data: Buffer): Promise<void> {
+  const target = localPath(key);
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, data);
+}
+
+export async function statLocalObject(key: string): Promise<{ sizeBytes: number } | null> {
+  try {
+    const info = await stat(localPath(key));
+    return info.isFile() ? { sizeBytes: info.size } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function readLocalObject(key: string): Promise<Buffer | null> {
+  try {
+    return await readFile(localPath(key));
+  } catch {
+    return null;
+  }
+}
+
 export const UPLOAD_LIMITS = {
   cover: { maxBytes: 5 * 1024 * 1024, mimeTypes: ["image/jpeg", "image/png", "image/webp"] },
+  avatar: { maxBytes: 5 * 1024 * 1024, mimeTypes: ["image/jpeg", "image/png", "image/webp"] },
   video: { maxBytes: 500 * 1024 * 1024, mimeTypes: ["video/mp4", "video/quicktime", "video/webm"] },
   resource: {
     maxBytes: 50 * 1024 * 1024,
@@ -161,11 +205,15 @@ export const UPLOAD_LIMITS = {
 } as const;
 
 export function buildStorageKey(input: {
-  courseId: string;
+  courseId?: string | null;
+  ownerId: string;
   kind: string;
   assetId: string;
   fileName: string;
 }): string {
   const safe = input.fileName.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 80);
-  return `courses/${input.courseId}/${input.kind}/${input.assetId}/${safe}`;
+  if (input.courseId) {
+    return `courses/${input.courseId}/${input.kind}/${input.assetId}/${safe}`;
+  }
+  return `${input.kind === "avatar" ? "avatars" : "media"}/${input.ownerId}/${input.assetId}/${safe}`;
 }

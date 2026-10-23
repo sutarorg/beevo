@@ -4,14 +4,14 @@ Chronological, opinionated record. New phases append — never rewrite history.
 
 ## D1 — 2026-01 · Brand and product framing
 
-- **Name:** CourseKit. **Positioning:** "Your audience is the marketplace." The differentiator is the *absence* of a marketplace, so the marketing site says it constantly (hero, dedicated dark section, footer, FAQ, /features "absent by design" band).
+- **Name:** Beevo. **Positioning:** "Your audience is the marketplace." The differentiator is the *absence* of a marketplace, so the marketing site says it constantly (hero, dedicated dark section, footer, FAQ, /features "absent by design" band).
 - **Design language:** editorial sticker/brutalist hybrid — cream paper background, ink borders, hard offset shadows, vermilion accent, lime highlights, Space Grotesk display type with Instrument Serif italic accents, grain overlay, marquee tickers. Motivation: creator-economy energy, print-poster confidence, and a layout that reads beautifully on phones first.
 - No invented social proof: no fake testimonial quotes or platform-wide stats anywhere. Storefront examples are fictional, labelled "Demo" in UI and isolated in `src/lib/mocks/`.
 
 ## D2 — Mock-first service architecture
 
 - The UI talks to contracts, not vendors: `AuthService` in `src/lib/services/auth.ts` is the single auth surface. A `MockAuthService` implements it with deterministic, documented behaviour (`taken@demo.test`, `@fail.demo` triggers).
-- Mock mode is explicit and visible: resolved from `NEXT_PUBLIC_USE_MOCKS` when set, else from the in-source `REPO_SERVICE_MODE` in `src/lib/config.ts` ("mock" during Prompts 1–4, so demo sandboxes that reset `.env` can't silently flip behavior); every auth/creator screen displays a "Demo mode · mock services" badge. With mocks off, every screen renders an honest "not connected yet" unavailable panel.
+- Live services are the default: `REPO_SERVICE_MODE` in `src/lib/config.ts` is `"live"` and every service factory returns the real `/api/v1` adapter. `NEXT_PUBLIC_USE_MOCKS=true` remains available for isolated frontend work; no production screen advertises demo data.
 - Prompt 5 will add a Supabase adapter and switch by configuration only — zero page rewrites.
 
 ## D3 — Business rules are constants, not copy
@@ -56,7 +56,7 @@ Chronological, opinionated record. New phases append — never rewrite history.
 
 ## D9 — 2026-01 · Storefront, checkout & learner app (Prompt 3)
 
-- **Public routes** `/@username` and `/@username/course-slug` are implemented with a `[handle]` dynamic segment that requires the literal `@` prefix (anything else → `notFound()`), placed inside the marketing `(site)` group so the pages inherit public chrome plus a "Powered by CourseKit" footer strip. No marketplace/catalogue/discovery feed exists — period.
+- **Public routes** `/@username` and `/@username/course-slug` are implemented with a `[handle]` dynamic segment that requires the literal `@` prefix (anything else → `notFound()`), placed inside the marketing `(site)` group so the pages inherit public chrome plus a "Powered by Beevo" footer strip. No marketplace/catalogue/discovery feed exists — period.
 - **Single demo source of truth:** the storefront reads the same mock course DB the studio writes to, so publishing/unpublishing in Prompt 2's editor immediately changes what's public. Only `published` courses are ever returned; unknown handles and non-published courses get neutral not-found states that leak nothing.
 - **Public payloads are delivery-safe** by construction: `PublicLessonMeta` carries titles/descriptions/counts/durations + one `isPreview` flag — never media refs, storage keys, signed URLs, or payment internals.
 - **Checkout is an explicit state machine** (`ready → creating_order → checkout_open → processing → success | failed | cancelled | pending`) whose simulated gateway panel offers labeled outcome choices, so every state is testable — while every receipt states "no money was charged". Sign-in happens inline mid-checkout and the course card stays in context (the handoff requirement). Order/enrolment recording is idempotent by orderId.

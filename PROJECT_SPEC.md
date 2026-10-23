@@ -1,4 +1,4 @@
-# CourseKit — Project Specification
+# Beevo — Project Specification
 
 **One line:** A mobile-first SaaS where creators and influencers sell courses directly to the audience they already have — through their own links, from their own storefront.
 
@@ -29,11 +29,11 @@
 | Concern | Choice |
 | --- | --- |
 | App | Next.js (App Router) + TypeScript |
-| Auth | Supabase Auth *(wired in Prompt 5)* |
+| Auth | First-party email + password on PostgreSQL sessions (`src/server/auth.ts`) |
 | Database | PostgreSQL *(Supabase in production; local dev scaffold uses the same `DATABASE_URL` name)* |
-| Payments | Razorpay Payment Gateway *(Prompt 5)* |
-| Transactional email | Resend *(Prompt 5)* |
-| Storage / media delivery | Cloudflare R2 *(Prompt 5)* |
+| Payments | Razorpay Payment Gateway (server-verified orders + signed webhooks) |
+| Transactional email | Resend (`src/server/email.ts`) |
+| Storage / media delivery | Cloudflare R2 (local `.uploads/` fallback in development) |
 | Version control | GitHub |
 | Deployment | Vercel-compatible |
 
@@ -43,41 +43,43 @@
 
 `/`, `/features`, `/how-it-works`, `/pricing`, `/faq`, `/terms`, `/privacy`, `/refund-policy`
 
-### Public storefront (implemented in Prompt 3, mock services)
+### Public storefront (live data)
 
-`/@username` (creator storefront), `/@username/course-slug` (course sales page + simulated checkout)
+`/@username` (creator storefront), `/@username/course-slug` (course sales page + Razorpay checkout)
 
-### Auth interfaces (implemented in Prompt 1, mock service adapters)
+### Auth
 
 `/login`, `/signup`, `/forgot-password`, `/forgot-password/reset` (completion, token via query param)
 
 Auth screens also render: email-verification pending, successful-auth redirect, auth error, and service-unavailable states.
 
-### Creator app (implemented in Prompt 2, frontend-only, mock service adapters)
+### Creator app (live data)
 
 `/creator/dashboard`, `/creator/courses`, `/creator/courses/new`, `/creator/courses/[courseId]/edit` (stages: details, curriculum, pricing, review), `/creator/students`, `/creator/orders`, `/creator/analytics`, `/creator/profile`, `/creator/earnings`, `/creator/settings`, `/creator/support`
 
-### Learner app (implemented in Prompt 3, mock services)
+### Learner app (live data)
 
-`/learn/courses` (library + continue learning), `/learn/courses/[courseId]` (course + curriculum), `/learn/courses/[courseId]/lessons/[lessonId]` (simulated player + progress), `/learn/purchases`, `/learn/settings`, `/learn/support` (`/learn` redirects)
+`/learn/courses` (library + continue learning), `/learn/courses/[courseId]` (course + curriculum), `/learn/courses/[courseId]/lessons/[lessonId]` (player + progress), `/learn/purchases`, `/learn/settings`, `/learn/support` (`/learn` redirects)
 
-### Admin console (implemented in Prompt 4, mock services, simulated admin session)
+### Admin console (role-gated, live data)
 
 `/admin/dashboard`, `/admin/creators`, `/admin/learners`, `/admin/courses`, `/admin/orders`, `/admin/payments`, `/admin/commission-ledger`, `/admin/earnings`, `/admin/payouts`, `/admin/disputes`, `/admin/settings`, `/admin/audit-logs`
 
-### Reserved for later phases
+### API
 
-`/api/*` business routes, payment webhooks.
+Business routes live under `/api/v1/*` (single catch-all router in `src/server/router.ts`
+with handlers in `src/server/handlers/`): auth, courses, uploads, media, creator,
+learner, storefront, checkout, admin, and the Razorpay webhook.
 
 ## 5. Phases
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| Prompt 1 | Public website + auth page interfaces (frontend only, mock adapters) | Complete |
-| Prompt 2 | Creator dashboard + course builder (frontend only, mock adapters) | Complete |
-| Prompt 3 | Public storefront + course sales pages + checkout & learner app (frontend only) | Complete |
-| Prompt 4 | Admin console (frontend only, mock services) | Complete |
-| Prompt 5 | Real backend: Supabase, Razorpay, Resend, R2, authorization | Planned |
+| Prompt 1 | Public website + auth screens | Complete |
+| Prompt 2 | Creator dashboard + course builder | Complete |
+| Prompt 3 | Public storefront + course sales pages + checkout & learner app | Complete |
+| Prompt 4 | Admin console | Complete |
+| Prompt 5 | Backend: PostgreSQL schema/RLS, first-party auth, Razorpay, Resend, R2/local storage, server authorization | Complete |
 | Prompt 6 | End-to-end tests + DEPLOYMENT.md | Planned |
 
 Phases reuse the same routes, domain types (`src/lib/domain.ts`), validation schemas (`src/lib/validation.ts`), legal copy (`src/lib/legal.ts`), business rules, and environment definitions (`.env.example`).

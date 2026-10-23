@@ -7,7 +7,7 @@ import { Accordion, Reveal } from "@/components/ui/motion";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "CourseKit has one free plan at ₹0/month. We charge a flat 8% commission per successful eligible course sale — no Pro plan, no subscriptions.",
+    "Beevo has one free plan at ₹0/month. We charge a flat 8% commission per successful eligible course sale — no Pro plan, no subscriptions.",
 };
 
 export default function PricingPage() {

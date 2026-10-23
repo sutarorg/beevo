@@ -47,8 +47,8 @@ export default function CreatorSupportPage() {
     setBody("");
     toast.push({
       variant: "success",
-      title: "Request received (demo)",
-      description: "A human would reply within 2 working days. This ticket lives in the mock adapter.",
+      title: "Request received",
+      description: "Our support team replies within 2 working days at the email on your account.",
     });
   };
 
@@ -147,7 +147,7 @@ export default function CreatorSupportPage() {
 
           {tickets.length > 0 ? (
             <div className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
-              <h2 className="text-base font-bold text-ink">Your requests (this session)</h2>
+              <h2 className="text-base font-bold text-ink">Submitted requests</h2>
               <ul className="mt-3 space-y-2.5">
                 {tickets.map((ticket) => (
                   <li key={ticket.id} className="rounded-xl border-2 border-ink/10 bg-cream p-3.5">

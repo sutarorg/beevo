@@ -10,7 +10,6 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { DetailRow, HistoryTimeline, SearchInput, StatusPill, type PillTone } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -71,7 +70,6 @@ export default function AdminPayoutsPage() {
         title="Payouts"
         sub="Manual payout records: create → transfer at the bank → record the reference. Nothing moves money here."
       >
-        <DemoChip />
         <Button variant="accent" size="sm" onClick={() => setCreating(true)}>
           <Plus className="size-4" aria-hidden="true" />
           New payout record
@@ -371,7 +369,7 @@ function PayoutDetail({
             made to <span className="font-semibold text-ink">{payout.beneficiaryMasked}</span> with
             reference <span className="font-mono text-xs">{transferRef.trim()}</span> dated{" "}
             <span className="font-semibold text-ink">{transferDate}</span>. This writes to the audit
-            log and moves the amount from “outstanding” to “paid out” in the demo ledger.
+            log and moves the amount from “outstanding” to “paid out” in the ledger.
           </>
         }
         confirmLabel="Confirm — transfer was made"

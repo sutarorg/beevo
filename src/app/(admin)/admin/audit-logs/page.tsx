@@ -9,7 +9,6 @@ import { formatDateTime } from "@/lib/utils";
 import { EventIcon, SearchInput, StatusPill } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -54,8 +53,7 @@ export default function AdminAuditLogsPage() {
 
   return (
     <div>
-      <PageHeader title="Audit logs" sub="Every admin action and system event, newest first. The demo appends entries for everything you do.">
-        <DemoChip />
+      <PageHeader title="Audit logs" sub="Every admin action and system event, newest first. Writes append an entry automatically.">
       </PageHeader>
 
       <div className="mb-5 flex flex-col gap-3">

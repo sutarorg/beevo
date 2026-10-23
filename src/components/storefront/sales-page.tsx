@@ -287,7 +287,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 </p>
                 <p className="mt-3 flex items-center gap-2 text-[11px] text-cream/50">
                   <Clock3 className="size-3.5" aria-hidden="true" />
-                  Preview access becomes available in your account after checkout (demo note).
+                  Preview access unlocks in your account right after checkout.
                 </p>
               </div>
             ) : null}
@@ -312,9 +312,6 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           </aside>
         </div>
 
-        <p className={cn("mt-10 text-center text-xs font-semibold text-smoke")}>
-          Demo sales page — checkout below is fully simulated, no real payment can occur.
-        </p>
       </section>
 
       <PoweredByBanner />

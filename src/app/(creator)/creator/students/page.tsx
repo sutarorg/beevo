@@ -9,7 +9,6 @@ import { formatDate } from "@/lib/utils";
 import { Modal } from "@/components/creator/dialogs";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -58,9 +57,7 @@ export default function CreatorStudentsPage() {
       <PageHeader
         title="Students"
         sub="The people learning from you — manage enrolments and reach them directly."
-      >
-        <DemoChip />
-      </PageHeader>
+      />
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
@@ -118,7 +115,7 @@ export default function CreatorStudentsPage() {
       ) : (
         <>
           <p className="mb-3 text-xs font-semibold text-smoke">
-            {filtered.length} enrolment{filtered.length === 1 ? "" : "s"} (demo records)
+            {filtered.length} enrolment{filtered.length === 1 ? "" : "s"}
           </p>
           <ul className="space-y-2.5">
             {filtered.map((student) => (
@@ -163,7 +160,6 @@ export default function CreatorStudentsPage() {
                 <p className="text-base font-bold text-ink">{selected.fullName}</p>
                 <p className="text-sm text-smoke">{selected.email}</p>
               </div>
-              <DemoChip />
             </div>
             <div>
               <p className="text-xs font-bold tracking-[0.18em] text-smoke uppercase">
@@ -185,7 +181,7 @@ export default function CreatorStudentsPage() {
               Email {selected.fullName.split(" ")[0]}
             </Button>
             <p className="text-[11px] text-smoke italic">
-              Demo record — not a real learner. Messaging and progress tracking arrive with the backend.
+              Enrolment details come from this learner&apos;s completed purchase.
             </p>
           </div>
         ) : null}

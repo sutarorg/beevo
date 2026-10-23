@@ -128,8 +128,8 @@ export function buildSeedOrders(): AdminOrderRecord[] {
     const status = spec.status;
     const commission = status === "paid" || status === "refunded" ? fee(gross) : 0;
     return {
-      id: `ord_demo_${String(3100 + index)}`,
-      providerRef: `rzp_pay_demo_${(872100 + index * 37).toString(16)}`,
+      id: `ord_mk_${String(3100 + index)}`,
+      providerRef: `rzp_pay_mk_${(872100 + index * 37).toString(16)}`,
       courseId: spec.course,
       courseTitle: course.title,
       creatorId: course.creator,
@@ -152,7 +152,7 @@ export function buildSeedOrders(): AdminOrderRecord[] {
 export function buildSeedPaymentEvents(orders: AdminOrderRecord[]): PaymentEvent[] {
   const events: PaymentEvent[] = [];
   for (const order of orders) {
-    const method = orderSpecs.find((s) => `ord_demo_${String(3100 + orderSpecs.indexOf(s))}` === order.id)?.method ?? "upi";
+    const method = orderSpecs.find((s) => `ord_mk_${String(3100 + orderSpecs.indexOf(s))}` === order.id)?.method ?? "upi";
     events.push({
       id: `pev_${order.id}`,
       orderId: order.id,
@@ -181,7 +181,7 @@ export function buildSeedPaymentEvents(orders: AdminOrderRecord[]): PaymentEvent
       method,
       status: "failed",
       failureReason: reason,
-      providerRef: `rzp_pay_demo_fail_${i}`,
+      providerRef: `rzp_pay_mk_fail_${i}`,
       at: ago(days),
     });
   });
@@ -190,7 +190,7 @@ export function buildSeedPaymentEvents(orders: AdminOrderRecord[]): PaymentEvent
 
 export const seedPayouts: PayoutRecordAdmin[] = [
   {
-    id: "pay_demo_1",
+    id: "pay_mk_1",
     creatorId: "cr_meera",
     creatorName: "Meera Kapoor",
     handle: "meera-shoots",
@@ -199,17 +199,17 @@ export const seedPayouts: PayoutRecordAdmin[] = [
     beneficiaryMasked: "HDFC Bank ••••4821",
     transferRef: "UTR N312459871",
     transferDate: ago(38).slice(0, 10),
-    recordedBy: "Platform Admin (demo)",
+    recordedBy: "Platform Admin ",
     createdAt: ago(40),
     recordedAt: ago(38),
     note: "Recorded under the manual payment arrangement.",
     history: [
-      { id: "peh_1a", at: ago(40), actor: "Platform Admin (demo)", area: "payouts", action: "payout_created", detail: "Payout record created for Meera Kapoor (₹1,280.00).", kind: "action" },
-      { id: "peh_1b", at: ago(38), actor: "Platform Admin (demo)", area: "payouts", action: "payout_recorded", detail: "Marked recorded with UTR N312459871.", kind: "action" },
+      { id: "peh_1a", at: ago(40), actor: "Platform Admin ", area: "payouts", action: "payout_created", detail: "Payout record created for Meera Kapoor (₹1,280.00).", kind: "action" },
+      { id: "peh_1b", at: ago(38), actor: "Platform Admin ", area: "payouts", action: "payout_recorded", detail: "Marked recorded with UTR N312459871.", kind: "action" },
     ],
   },
   {
-    id: "pay_demo_2",
+    id: "pay_mk_2",
     creatorId: "cr_meera",
     creatorName: "Meera Kapoor",
     handle: "meera-shoots",
@@ -218,17 +218,17 @@ export const seedPayouts: PayoutRecordAdmin[] = [
     beneficiaryMasked: "HDFC Bank ••••4821",
     transferRef: "UTR N402117655",
     transferDate: ago(10).slice(0, 10),
-    recordedBy: "Platform Admin (demo)",
+    recordedBy: "Platform Admin ",
     createdAt: ago(11),
     recordedAt: ago(10),
     note: "Recorded under the manual payment arrangement.",
     history: [
-      { id: "peh_2a", at: ago(11), actor: "Platform Admin (demo)", area: "payouts", action: "payout_created", detail: "Payout record created for Meera Kapoor (₹965.00).", kind: "action" },
-      { id: "peh_2b", at: ago(10), actor: "Platform Admin (demo)", area: "payouts", action: "payout_recorded", detail: "Marked recorded with UTR N402117655.", kind: "action" },
+      { id: "peh_2a", at: ago(11), actor: "Platform Admin ", area: "payouts", action: "payout_created", detail: "Payout record created for Meera Kapoor (₹965.00).", kind: "action" },
+      { id: "peh_2b", at: ago(10), actor: "Platform Admin ", area: "payouts", action: "payout_recorded", detail: "Marked recorded with UTR N402117655.", kind: "action" },
     ],
   },
   {
-    id: "pay_demo_3",
+    id: "pay_mk_3",
     creatorId: "cr_ayaan",
     creatorName: "Ayaan Verma",
     handle: "trainwithayaan",
@@ -242,11 +242,11 @@ export const seedPayouts: PayoutRecordAdmin[] = [
     recordedAt: null,
     note: "Awaiting transfer + UTR entry.",
     history: [
-      { id: "peh_3a", at: ago(2), actor: "Platform Admin (demo)", area: "payouts", action: "payout_created", detail: "Payout record created for Ayaan Verma (₹413.00).", kind: "action" },
+      { id: "peh_3a", at: ago(2), actor: "Platform Admin ", area: "payouts", action: "payout_created", detail: "Payout record created for Ayaan Verma (₹413.00).", kind: "action" },
     ],
   },
   {
-    id: "pay_demo_4",
+    id: "pay_mk_4",
     creatorId: "cr_farid",
     creatorName: "Farid Khan",
     handle: "fkbeats",
@@ -255,23 +255,23 @@ export const seedPayouts: PayoutRecordAdmin[] = [
     beneficiaryMasked: "SBI ••••2290",
     transferRef: "UTR N509122344",
     transferDate: ago(6).slice(0, 10),
-    recordedBy: "Platform Admin (demo)",
+    recordedBy: "Platform Admin ",
     createdAt: ago(8),
     recordedAt: ago(6),
     note: "Bank returned the transfer (beneficiary IFSC mismatch).",
     history: [
-      { id: "peh_4a", at: ago(8), actor: "Platform Admin (demo)", area: "payouts", action: "payout_created", detail: "Payout record created for Farid Khan (₹881.00).", kind: "action" },
-      { id: "peh_4b", at: ago(6), actor: "Platform Admin (demo)", area: "payouts", action: "payout_failed", detail: "Transfer returned by bank — IFSC mismatch.", kind: "event" },
+      { id: "peh_4a", at: ago(8), actor: "Platform Admin ", area: "payouts", action: "payout_created", detail: "Payout record created for Farid Khan (₹881.00).", kind: "action" },
+      { id: "peh_4b", at: ago(6), actor: "Platform Admin ", area: "payouts", action: "payout_failed", detail: "Transfer returned by bank — IFSC mismatch.", kind: "event" },
     ],
   },
 ];
 
 export const seedDisputes: DisputeRecord[] = [
   {
-    id: "disp_demo_1",
+    id: "disp_mk_1",
     type: "chargeback",
     status: "open",
-    orderId: "ord_demo_3112",
+    orderId: "ord_mk_3112",
     courseTitle: "Bedroom Beats in 30 Days",
     learnerName: "Arjun Menon",
     creatorName: "Farid Khan",
@@ -283,10 +283,10 @@ export const seedDisputes: DisputeRecord[] = [
     ],
   },
   {
-    id: "disp_demo_2",
+    id: "disp_mk_2",
     type: "legal_exception",
     status: "under_review",
-    orderId: "ord_demo_3105",
+    orderId: "ord_mk_3105",
     courseTitle: "Film Photography Foundations",
     learnerName: "Kabir Anand",
     creatorName: "Meera Kapoor",
@@ -294,15 +294,15 @@ export const seedDisputes: DisputeRecord[] = [
     openedAt: ago(4),
     summary: "Buyer reports access could not be granted after payment. A remedy may be required under applicable law.",
     notes: [
-      { id: "dn_2", at: ago(4), actor: "Platform Admin (demo)", note: "Confirmed payment captured; enrolment record missing. Investigating provisionally — this may qualify as a legally required exception." },
-      { id: "dn_3", at: ago(3), actor: "Platform Admin (demo)", note: "Restored access manually as the first remedy; buyer informed by email." },
+      { id: "dn_2", at: ago(4), actor: "Platform Admin ", note: "Confirmed payment captured; enrolment record missing. Investigating provisionally — this may qualify as a legally required exception." },
+      { id: "dn_3", at: ago(3), actor: "Platform Admin ", note: "Restored access manually as the first remedy; buyer informed by email." },
     ],
   },
   {
-    id: "disp_demo_3",
+    id: "disp_mk_3",
     type: "reversal",
     status: "resolved",
-    orderId: "ord_demo_3106",
+    orderId: "ord_mk_3106",
     courseTitle: "Film Photography Foundations",
     learnerName: "Kabir Anand",
     creatorName: "Meera Kapoor",
@@ -310,18 +310,18 @@ export const seedDisputes: DisputeRecord[] = [
     openedAt: ago(9),
     summary: "Duplicate payment for the same course was reversed; the corresponding sale was reversed in the ledger.",
     notes: [
-      { id: "dn_4", at: ago(8), actor: "Platform Admin (demo)", note: "Duplicate charge verified with provider refs; reversal completed." },
+      { id: "dn_4", at: ago(8), actor: "Platform Admin ", note: "Duplicate charge verified with provider refs; reversal completed." },
     ],
   },
 ];
 
 export const seedAuditEvents: AdminEvent[] = [
-  { id: "aud_1", at: ago(14), actor: "Platform Admin (demo)", area: "creators", action: "creator_suspended", detail: "Lena D’Souza (@lenawrites) suspended: repeated copyright complaints pending review.", kind: "action" },
-  { id: "aud_2", at: ago(13), actor: "system", area: "payments", action: "settlement_exception", detail: "Settlement mismatch flagged on ord_demo_3108 — needs review.", kind: "system" },
-  { id: "aud_3", at: ago(11), actor: "Platform Admin (demo)", area: "payouts", action: "payout_created", detail: "Payout record created for Meera Kapoor (₹965.00).", kind: "action" },
-  { id: "aud_4", at: ago(10), actor: "Platform Admin (demo)", area: "payouts", action: "payout_recorded", detail: "Payout pay_demo_2 recorded with UTR N402117655.", kind: "action" },
-  { id: "aud_5", at: ago(9), actor: "system", area: "disputes", action: "dispute_opened", detail: "Reversal case opened for ord_demo_3106 (duplicate payment).", kind: "system" },
-  { id: "aud_6", at: ago(5), actor: "Platform Admin (demo)", area: "courses", action: "course_flagged", detail: "Bedroom Beats in 30 Days flagged for content review.", kind: "action" },
+  { id: "aud_1", at: ago(14), actor: "Platform Admin ", area: "creators", action: "creator_suspended", detail: "Lena D’Souza (@lenawrites) suspended: repeated copyright complaints pending review.", kind: "action" },
+  { id: "aud_2", at: ago(13), actor: "system", area: "payments", action: "settlement_exception", detail: "Settlement mismatch flagged on ord_mk_3108 — needs review.", kind: "system" },
+  { id: "aud_3", at: ago(11), actor: "Platform Admin ", area: "payouts", action: "payout_created", detail: "Payout record created for Meera Kapoor (₹965.00).", kind: "action" },
+  { id: "aud_4", at: ago(10), actor: "Platform Admin ", area: "payouts", action: "payout_recorded", detail: "Payout pay_mk_2 recorded with UTR N402117655.", kind: "action" },
+  { id: "aud_5", at: ago(9), actor: "system", area: "disputes", action: "dispute_opened", detail: "Reversal case opened for ord_mk_3106 (duplicate payment).", kind: "system" },
+  { id: "aud_6", at: ago(5), actor: "Platform Admin ", area: "courses", action: "course_flagged", detail: "Bedroom Beats in 30 Days flagged for content review.", kind: "action" },
   { id: "aud_7", at: ago(4), actor: "system", area: "payments", action: "webhook_retry", detail: "Provider webhook delivery retried (3 attempts) — recovered.", kind: "system" },
-  { id: "aud_8", at: ago(2), actor: "Platform Admin (demo)", area: "disputes", action: "dispute_note", detail: "Investigation note added to legal_exception case disp_demo_2.", kind: "action" },
+  { id: "aud_8", at: ago(2), actor: "Platform Admin ", area: "disputes", action: "dispute_note", detail: "Investigation note added to legal_exception case disp_mk_2.", kind: "action" },
 ];

@@ -13,11 +13,11 @@ import type { CreatorPublicProfile } from "@/lib/domain";
  */
 
 export const MOCK_DATA_NOTICE =
-  "Fictional demo profiles — shown to preview the product. No real creators or sales.";
+  "Sample profiles shown to preview the product. No real creators or sales.";
 
 export const MOCK_CREATORS: CreatorPublicProfile[] = [
   {
-    id: "demo_creator_meera",
+    id: "mk_creator_meera",
     handle: "meera-shoots",
     displayName: "Meera Kapoor",
     tagline: "Teaching 86k subscribers to shoot on film, not filters.",
@@ -30,7 +30,7 @@ export const MOCK_CREATORS: CreatorPublicProfile[] = [
     ],
     courses: [
       {
-        id: "demo_course_film",
+        id: "mk_course_film",
         slug: "film-photography-foundations",
         title: "Film Photography Foundations",
         blurb: "Metering, film stocks, and scanning — your first 10 rolls done right.",
@@ -41,7 +41,7 @@ export const MOCK_CREATORS: CreatorPublicProfile[] = [
         level: "Beginner",
       },
       {
-        id: "demo_course_street",
+        id: "mk_course_street",
         slug: "street-portraits-natural-light",
         title: "Street Portraits in Natural Light",
         blurb: "Approach strangers, find light, and leave with frames worth printing.",
@@ -54,7 +54,7 @@ export const MOCK_CREATORS: CreatorPublicProfile[] = [
     ],
   },
   {
-    id: "demo_creator_ayaan",
+    id: "mk_creator_ayaan",
     handle: "trainwithayaan",
     displayName: "Ayaan Verma",
     tagline: "Strength coach. Zero-equipment programs for real schedules.",
@@ -67,7 +67,7 @@ export const MOCK_CREATORS: CreatorPublicProfile[] = [
     ],
     courses: [
       {
-        id: "demo_course_strength",
+        id: "mk_course_strength",
         slug: "home-strength-basics",
         title: "Home Strength Basics",
         blurb: "A 6-week progressive program using nothing but your floor and your focus.",
@@ -80,7 +80,7 @@ export const MOCK_CREATORS: CreatorPublicProfile[] = [
     ],
   },
   {
-    id: "demo_creator_diya",
+    id: "mk_creator_diya",
     handle: "diyacooks",
     displayName: "Diya Rao",
     tagline: "Weeknight Indian cooking from my tiny Mumbai kitchen.",
@@ -93,7 +93,7 @@ export const MOCK_CREATORS: CreatorPublicProfile[] = [
     ],
     courses: [
       {
-        id: "demo_course_cooking",
+        id: "mk_course_cooking",
         slug: "everyday-indian-cooking",
         title: "Everyday Indian Cooking",
         blurb: "30 recipes, 5 base gravies, and the spice box system that makes it fast.",

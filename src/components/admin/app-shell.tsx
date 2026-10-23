@@ -32,6 +32,7 @@ import { isMockAuth } from "@/lib/services/auth";
 import { getAdminService, resetAdminMockData } from "@/lib/services/admin";
 import { cn } from "@/lib/utils";
 import { RequireSession } from "@/components/auth/gates";
+import { LogoMark } from "@/components/site/chrome";
 import { UnavailablePanel } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/primitives";
@@ -86,14 +87,14 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Simulated admin protection — labeled, never mistaken for real security. */
+/** Admin gate — the server verifies the role on every request. */
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const service = getAdminService();
   const toast = useToast();
   const [nonce, setNonce] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [email, setEmail] = useState("admin@coursekit.app");
+  const [email, setEmail] = useState("admin@beevo.in");
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
 
@@ -103,8 +104,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main id="main" className="grid min-h-dvh place-items-center bg-cream px-4">
         <UnavailablePanel
-          title="The admin console isn’t connected yet"
-          message="Real admin authorization (roles, RLS, audit logging) ships in Prompt 5."
+          title="The admin console isn’t available"
+          message="We couldn't reach the admin services. Check your connection and reload."
         />
       </main>
     );
@@ -141,9 +142,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </span>
             <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink">Admin console</h1>
             <p className="mt-2 text-sm leading-relaxed text-smoke">
-              Internal platform management. This demo simulates an authenticated admin session — it
-              is <span className="font-bold text-ink">not</span> real security; server authorization
-              arrives in Prompt 5.
+              Internal platform management. Access is limited to accounts an administrator has
+              granted the platform-admin role.
             </p>
             <div className="mt-5">
               <Field id="admin-email" label="Admin email" error={error ?? undefined}>
@@ -201,7 +201,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r-2 border-ink bg-ink text-cream lg:flex">
         <div className="flex h-16 items-center border-b-2 border-cream/15 px-5">
           <Link href="/admin/dashboard" className="text-lg font-bold tracking-tight">
-            Course<span className="text-accent">Kit</span>{" "}
+            <LogoMark className="mr-2 inline-grid size-8 align-middle" />
+            Beevo{" "}
             <span className="font-editorial text-sm font-normal text-cream/50 italic">admin</span>
           </Link>
         </div>
@@ -265,7 +266,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <div className={cn("fixed inset-x-0 z-40 border-b-2 border-ink bg-cream/95 backdrop-blur-sm lg:hidden", demo ? "top-9" : "top-0")}>
         <div className="flex h-13 items-center justify-between px-4">
           <Link href="/admin/dashboard" className="text-lg font-bold tracking-tight text-ink">
-            Course<span className="text-accent">Kit</span>{" "}
+            <LogoMark className="mr-2 inline-grid size-7 align-middle" />
+            Beevo{" "}
             <span className="font-editorial text-xs font-normal text-smoke italic">admin</span>
           </Link>
           <button

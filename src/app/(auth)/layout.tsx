@@ -2,7 +2,6 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/site/chrome";
-import { DemoBadge } from "@/components/states";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -22,7 +21,6 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6">
         <div className="flex w-full max-w-md flex-col items-stretch">{children}</div>
         <div className="mt-6 flex flex-col items-center gap-3">
-          <DemoBadge />
           <p className="max-w-md text-center text-xs text-smoke">
             By continuing you agree to our{" "}
             <Link href="/terms" className="font-semibold underline underline-offset-2">

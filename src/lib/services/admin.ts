@@ -71,8 +71,8 @@ export interface AdminService {
   listAuditLogs(): Promise<ApiResult<AuditLogEntry[]>>;
 }
 
-const STORAGE_KEY = "coursekit_mock_admin_v2";
-const SESSION_KEY = "coursekit_mock_admin_session_v2";
+const STORAGE_KEY = "beevo_mock_admin_v2";
+const SESSION_KEY = "beevo_mock_admin_session_v2";
 const ADMIN_NAME = "Platform Admin (demo)";
 
 interface AdminDb {

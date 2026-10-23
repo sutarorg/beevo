@@ -10,7 +10,6 @@ import { formatDateTime } from "@/lib/utils";
 import { DetailRow, SearchInput, StatusPill, type PillTone } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -83,7 +82,6 @@ export default function AdminOrdersPage() {
   return (
     <div>
       <PageHeader title="Orders" sub="Every checkout record — status, commission, and reconciliation in one place.">
-        <DemoChip />
       </PageHeader>
 
       <div className="mb-5 flex flex-col gap-3">
@@ -190,8 +188,7 @@ export default function AdminOrdersPage() {
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-smoke">
                   Marking it reviewed records that a human looked at it — it does not alter the
-                  reconciliation state or any financial record (that flow ships with the provider
-                  integration in Prompt 5).
+                  reconciliation state or any financial record.
                 </p>
                 <Button variant="accent" size="sm" className="mt-3" onClick={() => setConfirmReview(true)}>
                   <CircleCheck className="size-4" aria-hidden="true" />
@@ -200,7 +197,7 @@ export default function AdminOrdersPage() {
               </div>
             ) : (
               <p className="rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
-                Order records are read-only in this demo. Refunds only ever happen per the purchase
+                Order records are read-only here. Refunds only ever happen per the purchase
                 policy through disputes/legal exceptions — never as a self-serve flow.
               </p>
             )}

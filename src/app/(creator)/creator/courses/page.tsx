@@ -20,7 +20,6 @@ import { formatDate } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/creator/dialogs";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -119,7 +118,7 @@ export default function CreatorCoursesPage() {
       variant: "success",
       title:
         kind === "publish"
-          ? "Course published (demo)"
+          ? "Course published"
           : kind === "unpublish"
             ? "Course unpublished"
             : kind === "archive"
@@ -127,7 +126,7 @@ export default function CreatorCoursesPage() {
               : "Course restored to drafts",
       description:
         kind === "publish"
-          ? "Simulated publish — no real storefront went live."
+          ? "It's live on your storefront and ready to share."
           : undefined,
     });
     reload();
@@ -137,7 +136,7 @@ export default function CreatorCoursesPage() {
     <div>
       <PageHeader
         title="My courses"
-        sub="Draft, publish, and maintain everything you sell. Demo sales figures included."
+        sub="Draft, publish, and maintain everything you sell."
       >
         <Button href="/creator/courses/new" variant="accent" size="sm">
           <Plus className="size-4" aria-hidden="true" />
@@ -252,7 +251,7 @@ export default function CreatorCoursesPage() {
               publish: (
                 <>
                   <span className="font-semibold text-ink">“{confirm.course.title}”</span> will go live on
-                  your storefront (simulated in this demo) and become purchasable through your link.
+                  your storefront and become purchasable through your link.
                 </>
               ),
               unpublish: (
@@ -327,7 +326,6 @@ function CourseRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <StatusChip status={course.status} />
-            <DemoChip />
           </div>
           <h2 className="mt-1.5 truncate text-base font-bold text-ink sm:text-lg">{course.title}</h2>
           <p className="mt-0.5 text-xs text-smoke">
@@ -339,7 +337,7 @@ function CourseRow({
           <p className="mt-1 text-xs font-semibold text-smoke">
             {course.salesCount} sale{course.salesCount === 1 ? "" : "s"} · {course.enrollmentCount}{" "}
             enrolment{course.enrollmentCount === 1 ? "" : "s"} ·{" "}
-            <span className="text-ink">{formatINR(course.grossInPaise)} gross (demo)</span>
+            <span className="text-ink">{formatINR(course.grossInPaise)} gross</span>
           </p>
         </div>
       </div>

@@ -43,8 +43,8 @@ export default function LearnerSupportPage() {
     setBody("");
     toast.push({
       variant: "success",
-      title: "Request received (demo)",
-      description: "A human would reply within 2 working days.",
+      title: "Request received",
+      description: "Our team replies within 2 working days.",
     });
   };
 

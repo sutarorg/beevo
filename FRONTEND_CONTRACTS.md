@@ -92,7 +92,7 @@ Zod schemas in `src/lib/validation.ts` — `loginSchema`, `signupSchema`, `forgo
 
 ## 8. Creator app contracts (Prompt 2)
 
-Routes `/creator/*` (Studio shell: sidebar on desktop, bottom-nav + "More" sheet on mobile, demo workspace strip with visible demo controls). Mock adapters persist course drafts to `sessionStorage` (`coursekit_mock_courses_v1`), so leaving and resuming the editor works within the session; the "Reset demo data" control re-seeds.
+Routes `/creator/*` (Studio shell: sidebar on desktop, bottom-nav + "More" sheet on mobile, demo workspace strip with visible demo controls). Mock adapters persist course drafts to `sessionStorage` (`beevo_mock_courses_v1`), so leaving and resuming the editor works within the session; the "Reset demo data" control re-seeds.
 
 ### CourseService (src/lib/services/courses.ts)
 
@@ -115,7 +115,7 @@ Keystroke → validate immediately → debounce 800ms → "Saving…" → `saveD
 - Any save text containing `[fail]` → `save_failed` (retry path).
 - Upload filename containing `fail` → mid-upload `upload_failed`.
 - "Fail next request" demo control → next call returns `service_unavailable`.
-- Profile handle validation: reserved handles `admin, support, coursekit, help, pricing` → `handle_taken`.
+- Profile handle validation: reserved handles `admin, support, beevo, help, pricing` → `handle_taken`.
 
 ## 9. Storefront, checkout & learner contracts (Prompt 3)
 

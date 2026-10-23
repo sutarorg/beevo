@@ -6,7 +6,7 @@ import type { PaymentFeatureFlags } from "@/lib/admin-types";
 import { useAsyncData } from "@/lib/hooks";
 import { getAdminService } from "@/lib/services/admin";
 import { StatusPill } from "@/components/admin/ui";
-import { CardListSkeleton, DemoChip, FailedState, PageHeader } from "@/components/creator/ui";
+import { CardListSkeleton, FailedState, PageHeader } from "@/components/creator/ui";
 import { useToast } from "@/components/ui/toast";
 
 export default function AdminSettingsPage() {
@@ -31,14 +31,13 @@ export default function AdminSettingsPage() {
       toast.push({ variant: "error", title: "Couldn't update flags", description: result.error.message });
       return;
     }
-    toast.push({ variant: "success", title: `${label} updated (demo)`, description: "Written to the audit log." });
+    toast.push({ variant: "success", title: `${label} updated`, description: "Written to the audit log." });
     reload();
   };
 
   return (
     <div>
       <PageHeader title="Platform settings" sub="Configuration and feature flags. Payment integration status is provider-gated, not a button we can press.">
-        <DemoChip />
       </PageHeader>
 
       {state.status === "loading" || state.status === "idle" ? (
@@ -57,7 +56,7 @@ export default function AdminSettingsPage() {
                 <p className="text-sm font-bold text-ink">Razorpay connection</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-smoke">
                   The intended manual payout arrangement runs subject to payment-provider approval.
-                  Keys, webhooks, and settlement wiring land in Prompt 5.
+                  Connection status reflects the keys and webhook secret configured on the server.
                 </p>
               </div>
               <StatusPill

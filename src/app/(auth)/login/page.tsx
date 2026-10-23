@@ -3,7 +3,7 @@ import { LoginForm } from "@/components/auth/forms";
 
 export const metadata: Metadata = {
   title: "Log in",
-  description: "Log in to your CourseKit creator account.",
+  description: "Log in to your Beevo creator account.",
 };
 
 /** Maps auth-callback error codes to UI-safe banners. */

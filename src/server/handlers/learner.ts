@@ -21,6 +21,7 @@ import type {
   LearnerLessonMeta,
   LearnerLessonView,
   LearnerSectionView,
+  LearnerSettings,
   PurchaseRecord,
 } from "@/lib/learner-types";
 import { presignUrl } from "@/server/storage";
@@ -368,4 +369,38 @@ route("GET", "learn/purchases", async (_req, ctx) => {
     demo: false,
   }));
   return ok(records);
+});
+
+function settingsOf(user: typeof users.$inferSelect): LearnerSettings {
+  return {
+    name: user.name,
+    email: user.email,
+    notifyLessonEmails: user.notifyLessonEmails,
+    notifyReceiptEmails: user.notifyReceiptEmails,
+  };
+}
+
+route("GET", "learn/settings", async (_req, ctx) => {
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
+  return ok(settingsOf(user));
+});
+
+route("PATCH", "learn/settings", async (req, ctx) => {
+  const me = requireUser(ctx);
+  if (me instanceof Response) return me;
+  const parsed = parseBody(
+    z.object({
+      notifyLessonEmails: z.boolean().optional(),
+      notifyReceiptEmails: z.boolean().optional(),
+    }),
+    await req.json().catch(() => ({})),
+  );
+  if ("response" in parsed) return parsed.response;
+  await db
+    .update(users)
+    .set({ ...parsed.values, updatedAt: new Date() })
+    .where(eq(users.id, me.id));
+  const fresh = await db.query.users.findFirst({ where: eq(users.id, me.id) });
+  return ok(settingsOf(fresh!));
 });

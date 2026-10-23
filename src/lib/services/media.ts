@@ -25,6 +25,7 @@ export interface UploadCallbacks {
 
 export interface MediaService {
   beginUpload(input: {
+    /** Empty for uploads that aren't attached to a course (avatars). */
     courseId: string;
     kind: UploadKind;
     fileName: string;
@@ -50,6 +51,12 @@ export const UPLOAD_RULES: Record<
     mimeTypes: ["video/mp4", "video/quicktime", "video/webm"],
     maxBytes: 500 * 1024 * 1024,
     label: "MP4, MOV or WebM up to 500 MB",
+  },
+  avatar: {
+    accept: "image/jpeg,image/png,image/webp",
+    mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+    maxBytes: 5 * 1024 * 1024,
+    label: "JPG, PNG or WebP up to 5 MB",
   },
   resource: {
     accept: ".pdf,.zip,.jpg,.jpeg,.png,.csv",
@@ -251,7 +258,11 @@ class ApiMediaService implements MediaService {
     mimeType: string;
   }): Promise<ApiResult<UploadSession>> {
     const mimeType = resolveUploadMimeType(input.fileName, input.mimeType);
-    const result = await apiPost<LiveSessionResponse>("uploads/session", { ...input, mimeType });
+    const result = await apiPost<LiveSessionResponse>("uploads/session", {
+    ...input,
+    courseId: input.courseId,
+    mimeType,
+  });
     if (!result.ok) return { ok: false, error: result.error };
     return {
       ok: true,

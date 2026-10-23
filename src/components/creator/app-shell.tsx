@@ -4,16 +4,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChartColumn,
   Clapperboard,
-  FlaskConical,
   LayoutDashboard,
   LifeBuoy,
   Menu,
   Plus,
   ReceiptText,
-  RotateCcw,
   Settings,
   Sparkles,
-  TriangleAlert,
   UserRound,
   UsersRound,
   Wallet,
@@ -22,13 +19,11 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { DEMO_WORKSPACE_NOTE } from "@/lib/mocks/creator-app";
-import { isMockAuth } from "@/lib/services/auth";
-import { getCourseService, resetCourseMockData } from "@/lib/services/courses";
-import { isFailNextCallArmed, simulateNextCallFailure } from "@/lib/services/mock-utils";
+import { getCourseService } from "@/lib/services/courses";
 import { cn } from "@/lib/utils";
 import { RequireSession } from "@/components/auth/gates";
 import { NotificationBell } from "@/components/creator/notifications";
+import { LogoMark } from "@/components/site/chrome";
 import { UnavailablePanel } from "@/components/states";
 import { Button } from "@/components/ui/button";
 
@@ -77,37 +72,6 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function DemoControls() {
-  const [armed, setArmed] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          simulateNextCallFailure();
-          setArmed(true);
-          window.setTimeout(() => setArmed(isFailNextCallArmed()), 1500);
-        }}
-        className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-cream px-2.5 py-1 text-[11px] font-bold text-ink transition-colors hover:bg-lime"
-      >
-        <TriangleAlert className="size-3" aria-hidden="true" />
-        {armed ? "Next call will fail" : "Fail next request"}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          resetCourseMockData();
-          window.location.reload();
-        }}
-        className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-cream px-2.5 py-1 text-[11px] font-bold text-ink transition-colors hover:bg-lime"
-      >
-        <RotateCcw className="size-3" aria-hidden="true" />
-        Reset demo data
-      </button>
-    </>
-  );
-}
-
 export function CreatorAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const available = getCourseService() !== null;
@@ -121,41 +85,25 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
     return (
       <main id="main" className="grid min-h-dvh place-items-center bg-cream px-4">
         <UnavailablePanel
-          title="The creator workspace isn’t connected yet"
-          message="Creator services (auth, database, storage) connect in Prompt 5. This environment has no configured backend, so no workspace is shown instead of a fake one."
+          title="The creator workspace isn’t available"
+          message="We couldn't reach the creator services. Check your connection and reload the page."
         />
       </main>
     );
   }
 
-  const demo = isMockAuth();
-
   return (
     <RequireSession>
     <div className="min-h-dvh bg-cream lg:pl-66">
-      {/* Demo-strip (mock mode only) */}
-      {demo ? (
-      <div className="fixed inset-x-0 top-0 z-40 border-b-2 border-ink bg-lime lg:left-66">
-        <div className="flex h-9 items-center gap-2 overflow-x-auto px-3 sm:px-4">
-          <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-bold tracking-wide text-ink uppercase">
-            <FlaskConical className="size-3.5" aria-hidden="true" />
-            Demo workspace
-          </span>
-          <span className="hidden min-w-0 flex-1 truncate text-[11px] font-medium text-ink/70 sm:block">
-            {DEMO_WORKSPACE_NOTE}
-          </span>
-          <span className="ml-auto flex shrink-0 items-center gap-2">
-            <DemoControls />
-          </span>
-        </div>
-      </div>
-      ) : null}
-
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-66 flex-col border-r-2 border-ink bg-cream lg:flex">
         <div className="flex h-16 items-center border-b-2 border-ink px-5">
-          <Link href="/creator/dashboard" className="text-lg font-bold tracking-tight text-ink">
-            Course<span className="text-accent">Kit</span>{" "}
+          <Link
+            href="/creator/dashboard"
+            className="group flex items-center gap-2 text-lg font-bold tracking-tight text-ink"
+          >
+            <LogoMark className="size-8" />
+            Beevo{" "}
             <span className="font-editorial text-sm font-normal text-smoke italic">studio</span>
           </Link>
         </div>
@@ -205,10 +153,14 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className={cn("fixed inset-x-0 z-40 border-b-2 border-ink bg-cream/95 backdrop-blur-sm lg:hidden", demo ? "top-9" : "top-0")}>
+      <div className="fixed inset-x-0 top-0 z-40 border-b-2 border-ink bg-cream/95 backdrop-blur-sm lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/creator/dashboard" className="text-lg font-bold tracking-tight text-ink">
-            Course<span className="text-accent">Kit</span>{" "}
+          <Link
+            href="/creator/dashboard"
+            className="group flex items-center gap-2 text-lg font-bold tracking-tight text-ink"
+          >
+            <LogoMark className="size-7" />
+            Beevo{" "}
             <span className="font-editorial text-xs font-normal text-smoke italic">studio</span>
           </Link>
           <NotificationBell />
@@ -216,11 +168,11 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Desktop top row (bell only) */}
-      <div className={cn("fixed right-0 left-66 z-30 hidden h-14 items-center justify-end border-b border-ink/10 bg-cream/80 px-6 backdrop-blur-sm lg:flex", demo ? "top-9" : "top-0")}>
+      <div className="fixed right-0 left-66 top-0 z-30 hidden h-14 items-center justify-end border-b border-ink/10 bg-cream/80 px-6 backdrop-blur-sm lg:flex">
         <NotificationBell />
       </div>
 
-      <div className={cn("px-4 pb-28 sm:px-6 lg:px-8 lg:pb-12", demo ? "pt-33 lg:pt-30" : "pt-16 lg:pt-20")}>
+      <div className="px-4 pt-16 pb-28 sm:px-6 lg:px-8 lg:pt-20 lg:pb-12">
         <div className="mx-auto max-w-5xl">{children}</div>
       </div>
 

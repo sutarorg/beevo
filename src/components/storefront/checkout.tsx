@@ -180,7 +180,7 @@ export function CheckoutSheet({
       key: order.keyId,
       amount: order.amountInPaise,
       currency: "INR",
-      name: "CourseKit",
+      name: "Beevo",
       description: order.courseTitle,
       order_id: order.razorpayOrderId,
       prefill: order.buyer ? { name: order.buyer.name, email: order.buyer.email } : undefined,
@@ -297,9 +297,11 @@ export function CheckoutSheet({
           <p className="flex items-center gap-2 text-sm font-bold text-ink">
             <Lock className="size-4 text-moss" aria-hidden="true" />
             {state.stage === "sign_in" ? "Sign in to enrol" : "Secure checkout"}
-            <span className="rounded-full border border-dashed border-accent/60 px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-accent-deep uppercase">
-              Simulated
-            </span>
+            {isMockAuth() ? (
+              <span className="rounded-full border border-dashed border-accent/60 px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-accent-deep uppercase">
+                Test mode
+              </span>
+            ) : null}
           </p>
           <button
             type="button"
@@ -413,7 +415,7 @@ export function CheckoutSheet({
               <div className="rounded-2xl border-2 border-ink bg-ink p-4 text-cream">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
-                    Razorpay (simulated)
+                    Razorpay (test mode)
                   </p>
                   <ShieldCheck className="size-4.5 text-lime" aria-hidden="true" />
                 </div>
@@ -422,7 +424,7 @@ export function CheckoutSheet({
                   {state.order.orderId} · key {state.order.keyId}
                 </p>
                 <p className="mt-2 text-[11px] text-cream/60">
-                  Simulated gateway — choose an outcome to test each payment state. No card is
+                  Test gateway — choose an outcome to walk through each payment state. No card is
                   charged.
                 </p>
               </div>
@@ -547,8 +549,9 @@ export function CheckoutSheet({
 
         <div className="border-t-2 border-ink bg-white px-5 py-3">
           <p className="text-center text-[10px] leading-relaxed text-smoke">
-            Simulated checkout for the frontend phase — no Razorpay order exists. Course purchases
-            are non-refundable except where required by applicable law.
+            {isMockAuth()
+              ? "Test-mode checkout — no real payment is taken. Course purchases are non-refundable except where required by applicable law."
+              : "Payments are processed securely by Razorpay. Course purchases are non-refundable except where required by applicable law."}
           </p>
         </div>
       </div>

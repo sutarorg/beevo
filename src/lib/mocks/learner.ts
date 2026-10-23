@@ -22,7 +22,7 @@ export const DEMO_LEARNER = {
 /** One small text file used when the learner downloads a simulated resource. */
 export function simulatedDownloadText(fileName: string): string {
   return [
-    "CourseKit — simulated download",
+    "Beevo — simulated download",
     "================================",
     "",
     `You requested: ${fileName}`,
@@ -38,8 +38,8 @@ export function simulatedDownloadText(fileName: string): string {
 export function seedLearnerPurchases(): PurchaseRecord[] {
   return [
     {
-      id: "lpur_demo_1",
-      orderId: "ord_demo_8821",
+      id: "lpur_mk_1",
+      orderId: "ord_mk_8821",
       courseId: "course_film",
       courseTitle: "Film Photography Foundations",
       amountInPaise: 149900,

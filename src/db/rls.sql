@@ -1,4 +1,4 @@
--- CourseKit RLS hardening (applied once via psql; idempotent).
+-- Beevo RLS hardening (applied once via psql; idempotent).
 -- The API uses the privileged driver user (superuser: bypasses RLS), and
 -- every request verifies authorization in server code. These policies make
 -- direct access by least-privilege roles safe as well. The `app_user` role

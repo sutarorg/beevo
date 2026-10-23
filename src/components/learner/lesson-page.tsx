@@ -59,8 +59,8 @@ export function LearnerLessonPage({ courseId, lessonId }: { courseId: string; le
     if (next) {
       toast.push({
         variant: "success",
-        title: "Lesson complete (demo)",
-        description: "Progress is stored only in this demo session.",
+        title: "Lesson complete",
+        description: "Progress saved to your account.",
       });
     }
   };
@@ -155,7 +155,7 @@ export function LearnerLessonPage({ courseId, lessonId }: { courseId: string; le
             <ResourceDownloads view={lessonView} />
           </div>
           <p className="mt-4 text-[11px] text-smoke italic">
-            Simulated files — secure delivery from object storage arrives in Prompt 5.
+            Downloads are served through short-lived, access-checked links tied to your enrolment.
           </p>
         </div>
       )}
@@ -204,8 +204,8 @@ export function LearnerLessonPage({ courseId, lessonId }: { courseId: string; le
       <CurriculumPanel course={courseView} currentLessonId={lessonId} />
 
       <p className="mt-5 text-xs text-smoke">
-        Progress and playback position are saved to this demo session only — persistent accounts
-        ship in Prompt 5. <Link href="/learn/support" className="font-semibold text-accent underline underline-offset-2">Something broken?</Link>
+        Progress and playback position are saved to your account.{" "}
+        <Link href="/learn/support" className="font-semibold text-accent underline underline-offset-2">Something broken?</Link>
       </p>
     </div>
   );

@@ -5,6 +5,7 @@ import {
   commissionLedger,
   courses,
   enrollments,
+  mediaAssets,
   notifications,
   orders,
   payouts,
@@ -14,12 +15,14 @@ import {
 import { route } from "@/server/router";
 import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/http";
 import { newId } from "@/server/auth";
-import type { CreatorProfile } from "@/lib/creator-types";
+import type { CreatorProfile, CreatorSettings, PayoutDetails } from "@/lib/creator-types";
 import type { AnalyticsData, DashboardData } from "@/lib/services/creator-data";
 import type { CourseStatus, CreatorNotification, SupportTicket } from "@/lib/creator-types";
 import { APP_BASE_URL } from "@/server/env";
 
 /** Creator profile + business data views (self-scoped, server-verified). */
+
+const DEFAULT_AVATAR_URL = "/images/avatars/meera.jpg";
 
 function profileOf(user: {
   id: string;
@@ -35,7 +38,7 @@ function profileOf(user: {
     handle: user.handle ?? "",
     displayName: user.name,
     tagline: user.tagline,
-    avatarUrl: user.avatarUrl || "/images/avatars/meera.jpg",
+    avatarUrl: user.avatarUrl || DEFAULT_AVATAR_URL,
     niche: user.niche,
     links: user.links,
     publicUrl: user.handle ? `${APP_BASE_URL}/@${user.handle}` : "",
@@ -49,6 +52,7 @@ route("GET", "creator/profile", async (_req, ctx) => {
 });
 
 const profilePatchSchema = z.object({
+  avatarAssetId: z.string().min(1).nullable().optional(),
   handle: z
     .string()
     .regex(/^[a-z0-9-]{3,30}$/, "3–30 characters, lowercase letters, numbers, hyphens.")
@@ -67,12 +71,33 @@ route("PATCH", "creator/profile", async (req, ctx) => {
   if (me instanceof Response) return me;
   const parsed = parseBody(profilePatchSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
+
+  let nextAvatarUrl: string | null | undefined;
+  if (parsed.values.avatarAssetId === null) {
+    nextAvatarUrl = null;
+  } else if (parsed.values.avatarAssetId !== undefined) {
+    const asset = await db.query.mediaAssets.findFirst({
+      where: and(
+        eq(mediaAssets.id, parsed.values.avatarAssetId),
+        eq(mediaAssets.uploaderId, me.id),
+        eq(mediaAssets.status, "verified"),
+        eq(mediaAssets.kind, "avatar"),
+      ),
+    });
+    if (!asset) {
+      return fail("validation_failed", "That photo isn't a verified upload yet.", 422, {
+        avatar: ["Upload the photo again."],
+      });
+    }
+    nextAvatarUrl = `/api/v1/media/access?assetId=${asset.id}`;
+  }
+
   if (parsed.values.handle) {
     const handle = parsed.values.handle.toLowerCase();
     const reserved = [
       "admin",
       "support",
-      "coursekit",
+      "beevo",
       "help",
       "pricing",
       "api",
@@ -101,11 +126,104 @@ route("PATCH", "creator/profile", async (req, ctx) => {
       ...(parsed.values.tagline !== undefined ? { tagline: parsed.values.tagline } : {}),
       ...(parsed.values.niche !== undefined ? { niche: parsed.values.niche } : {}),
       ...(parsed.values.links !== undefined ? { links: parsed.values.links } : {}),
+      ...(nextAvatarUrl !== undefined ? { avatarUrl: nextAvatarUrl } : {}),
       updatedAt: new Date(),
     })
     .where(eq(users.id, me.id));
   const fresh = await db.query.users.findFirst({ where: eq(users.id, me.id) });
   return ok(profileOf(fresh!));
+});
+
+const payoutDetailsSchema = z.object({
+  accountNumber: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/\s+/g, ""))
+    .refine((value) => /^\d{9,18}$/.test(value), "Enter a valid bank account number (9–18 digits)."),
+  ifsc: z
+    .string()
+    .trim()
+    .transform((value) => value.toUpperCase())
+    .refine(
+      (value) => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(value),
+      "Enter a valid IFSC code, e.g. HDFC0001234.",
+    ),
+});
+
+function payoutDetailsOf(user: {
+  payoutAccountNumber: string | null;
+  payoutIfsc: string | null;
+  payoutDetailsUpdatedAt: Date | null;
+}): PayoutDetails {
+  return {
+    accountNumber: user.payoutAccountNumber ?? "",
+    ifsc: user.payoutIfsc ?? "",
+    updatedAt: user.payoutDetailsUpdatedAt?.toISOString() ?? null,
+  };
+}
+
+route("GET", "creator/payout-details", async (_req, ctx) => {
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
+  return ok(payoutDetailsOf(user));
+});
+
+route("PUT", "creator/payout-details", async (req, ctx) => {
+  const me = requireVerifiedUser(ctx);
+  if (me instanceof Response) return me;
+  const parsed = parseBody(payoutDetailsSchema, await req.json().catch(() => ({})));
+  if ("response" in parsed) return parsed.response;
+  await db
+    .update(users)
+    .set({
+      payoutAccountNumber: parsed.values.accountNumber,
+      payoutIfsc: parsed.values.ifsc,
+      payoutDetailsUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, me.id));
+  const fresh = await db.query.users.findFirst({ where: eq(users.id, me.id) });
+  return ok(payoutDetailsOf(fresh!));
+});
+
+function settingsOf(user: {
+  email: string;
+  notifySaleEmails: boolean;
+  notifyWeeklySummary: boolean;
+  notifyProductTips: boolean;
+}): CreatorSettings {
+  return {
+    email: user.email,
+    notifySaleEmails: user.notifySaleEmails,
+    notifyWeeklySummary: user.notifyWeeklySummary,
+    notifyProductTips: user.notifyProductTips,
+  };
+}
+
+route("GET", "creator/settings", async (_req, ctx) => {
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
+  return ok(settingsOf(user));
+});
+
+route("PATCH", "creator/settings", async (req, ctx) => {
+  const me = requireUser(ctx);
+  if (me instanceof Response) return me;
+  const parsed = parseBody(
+    z.object({
+      notifySaleEmails: z.boolean().optional(),
+      notifyWeeklySummary: z.boolean().optional(),
+      notifyProductTips: z.boolean().optional(),
+    }),
+    await req.json().catch(() => ({})),
+  );
+  if ("response" in parsed) return parsed.response;
+  await db
+    .update(users)
+    .set({ ...parsed.values, updatedAt: new Date() })
+    .where(eq(users.id, me.id));
+  const fresh = await db.query.users.findFirst({ where: eq(users.id, me.id) });
+  return ok(settingsOf(fresh!));
 });
 
 route("GET", "creator/username-check", async (req, ctx) => {
@@ -116,7 +234,7 @@ route("GET", "creator/username-check", async (req, ctx) => {
   const reserved = [
     "admin",
     "support",
-    "coursekit",
+    "beevo",
     "help",
     "pricing",
     "api",
@@ -136,15 +254,17 @@ async function myCourses(userId: string) {
 
 async function creatorFinance(courseIds: string[]) {
   if (courseIds.length === 0) {
-    return { paidOrders: [], gross: 0, fees: 0 };
+    return { orders: [], paidOrders: [], gross: 0, fees: 0 };
   }
-  const paidOrders = await db
+  const allOrders = await db
     .select({ order: orders, learner: users })
     .from(orders)
     .leftJoin(users, eq(users.id, orders.userId))
-    .where(and(inArray(orders.courseId, courseIds), eq(orders.status, "paid")))
+    .where(and(inArray(orders.courseId, courseIds), inArray(orders.status, ["paid", "paid_reversed"])))
     .orderBy(sql`${orders.placedAt} DESC`);
+  const paidOrders = allOrders.filter((row) => row.order.status === "paid");
   return {
+    orders: allOrders,
     paidOrders,
     gross: paidOrders.reduce((sum, row) => sum + row.order.grossInPaise, 0),
     fees: paidOrders.reduce((sum, row) => sum + row.order.platformFeeInPaise, 0),
@@ -183,7 +303,7 @@ route("GET", "creator/dashboard", async (_req, ctx) => {
       availableInPaise: Math.max(0, share - payoutsTotal),
       paidOutInPaise: payoutsTotal,
     },
-    recentOrders: finance.paidOrders.slice(0, 5).map(({ order, learner }) => ({
+    recentOrders: finance.orders.slice(0, 5).map(({ order, learner }) => ({
       id: order.id,
       courseId: order.courseId,
       courseTitle: order.courseTitle,
@@ -192,7 +312,7 @@ route("GET", "creator/dashboard", async (_req, ctx) => {
       grossInPaise: order.grossInPaise,
       platformFeeInPaise: order.platformFeeInPaise,
       creatorShareInPaise: order.creatorShareInPaise,
-      status: "paid" as const,
+      status: order.status === "paid" ? ("paid" as const) : ("refunded" as const),
       placedAt: order.placedAt.toISOString(),
       demo: false,
     })),
@@ -312,7 +432,7 @@ route("GET", "creator/orders", async (_req, ctx) => {
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
     .innerJoin(courses, eq(courses.id, orders.courseId))
-    .where(and(inArray(orders.courseId, courseIds), eq(orders.status, "paid")))
+    .where(and(inArray(orders.courseId, courseIds), inArray(orders.status, ["paid", "paid_reversed"])))
     .orderBy(sql`${orders.placedAt} DESC`);
   return ok(
     rows.map((row) => ({
@@ -324,7 +444,7 @@ route("GET", "creator/orders", async (_req, ctx) => {
       grossInPaise: row.order.grossInPaise,
       platformFeeInPaise: row.order.platformFeeInPaise,
       creatorShareInPaise: row.order.creatorShareInPaise,
-      status: "paid" as const,
+      status: row.order.status === "paid" ? ("paid" as const) : ("refunded" as const),
       placedAt: row.order.placedAt.toISOString(),
       demo: false,
     })),

@@ -10,7 +10,6 @@ import { getLearnerService } from "@/lib/services/learner";
 import { formatDateTime } from "@/lib/utils";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -32,7 +31,6 @@ export default function LearnerPurchasesPage() {
   return (
     <div>
       <PageHeader title="Purchase history" sub="Every order tied to your account, with receipts.">
-        <DemoChip />
       </PageHeader>
 
       {state.status === "loading" || state.status === "idle" ? (
@@ -50,7 +48,7 @@ export default function LearnerPurchasesPage() {
           body="When you enrol in a course through a creator's link, the receipt appears here instantly."
         >
           <Button href="/@meera-shoots" variant="accent" size="sm">
-            Visit the demo storefront
+            Browse courses
           </Button>
         </EmptyState>
       ) : (
@@ -77,7 +75,7 @@ export default function LearnerPurchasesPage() {
                       {formatINR(purchase.amountInPaise)}
                     </span>
                     <span className="inline-block rounded-full border-2 border-ink bg-lime/60 px-1.5 text-[9px] font-bold tracking-wide uppercase">
-                      {purchase.status} (demo)
+                      {purchase.status}
                     </span>
                   </span>
                 </button>
@@ -94,7 +92,7 @@ export default function LearnerPurchasesPage() {
             <Link href="/learn/support" className="font-semibold text-accent underline underline-offset-2">
               contact support
             </Link>{" "}
-            if you hit a problem. These are demo records, not real transactions.
+            if you hit a problem.
           </p>
         </>
       )}
@@ -123,9 +121,8 @@ export default function LearnerPurchasesPage() {
               </div>
             </dl>
             <p className="text-[11px] leading-relaxed text-smoke">
-              Demo receipt — no real payment exists. In production this is the record emailed to you
-              after a successful Razorpay payment, and real refunds are only ever actioned per the
-              purchase policy.
+              This is the record emailed to you after a successful payment. Refunds are only ever
+              actioned per the purchase policy.
             </p>
           </div>
         ) : null}

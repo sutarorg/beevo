@@ -10,7 +10,6 @@ import { formatDateTime } from "@/lib/utils";
 import { DetailRow, SearchInput, StatusPill, type PillTone } from "@/components/admin/ui";
 import {
   CardListSkeleton,
-  DemoChip,
   EmptyState,
   FailedState,
   PageHeader,
@@ -62,15 +61,14 @@ export default function AdminCommissionLedgerPage() {
   return (
     <div>
       <PageHeader title="Commission ledger" sub="One ledger row per settled sale — the platform's 8%, gateway costs, and creator shares.">
-        <DemoChip />
       </PageHeader>
 
       {state.status === "success" ? (
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Gross (accrued)" value={formatINR(totals.gross)} demo />
-          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Platform commission" value={formatINR(totals.commission)} demo />
-          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Gateway costs (est.)" value={formatINR(totals.gateway)} hint="Estimated 2% until provider reports" demo />
-          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Creator shares" value={formatINR(totals.share)} demo />
+          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Gross (accrued)" value={formatINR(totals.gross)} />
+          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Platform commission" value={formatINR(totals.commission)} />
+          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Gateway costs (est.)" value={formatINR(totals.gateway)} hint="Estimated 2% until provider reports" />
+          <StatCard icon={<BadgePercent className="size-4.5" aria-hidden="true" />} label="Creator shares" value={formatINR(totals.share)} />
         </div>
       ) : null}
 

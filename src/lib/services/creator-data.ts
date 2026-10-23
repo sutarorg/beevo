@@ -5,9 +5,11 @@ import type {
   CoursePerformanceRow,
   CreatorNotification,
   CreatorProfile,
+  CreatorSettings,
   EarningsSummary,
   EnrollmentPoint,
   OrderRecord,
+  PayoutDetails,
   PayoutRecord,
   SalesPoint,
   StudentRecord,
@@ -50,14 +52,26 @@ export interface AnalyticsData {
   performance: CoursePerformanceRow[];
 }
 
+/** Profile patch; `avatarAssetId` swaps the photo via a verified media upload. */
+export interface ProfilePatch
+  extends Partial<Pick<CreatorProfile, "handle" | "displayName" | "tagline" | "niche" | "links">> {
+  avatarAssetId?: string | null;
+}
+
 export interface CreatorDataService {
   getDashboard(): Promise<ApiResult<DashboardData>>;
   getAnalytics(): Promise<ApiResult<AnalyticsData>>;
   listStudents(): Promise<ApiResult<StudentRecord[]>>;
   listOrders(): Promise<ApiResult<OrderRecord[]>>;
   getEarnings(): Promise<ApiResult<{ summary: EarningsSummary; payouts: PayoutRecord[] }>>;
+  getPayoutDetails(): Promise<ApiResult<PayoutDetails>>;
+  updatePayoutDetails(input: { accountNumber: string; ifsc: string }): Promise<ApiResult<PayoutDetails>>;
+  getSettings(): Promise<ApiResult<CreatorSettings>>;
+  updateSettings(
+    patch: Partial<Pick<CreatorSettings, "notifySaleEmails" | "notifyWeeklySummary" | "notifyProductTips">>,
+  ): Promise<ApiResult<CreatorSettings>>;
   getProfile(): Promise<ApiResult<CreatorProfile>>;
-  updateProfile(patch: Partial<Pick<CreatorProfile, "handle" | "displayName" | "tagline" | "niche" | "links">>): Promise<ApiResult<CreatorProfile>>;
+  updateProfile(patch: ProfilePatch): Promise<ApiResult<CreatorProfile>>;
   listNotifications(): Promise<ApiResult<CreatorNotification[]>>;
   markAllNotificationsRead(): Promise<ApiResult<void>>;
   submitSupportTicket(input: { category: string; subject: string; body: string }): Promise<ApiResult<SupportTicket>>;
@@ -155,7 +169,7 @@ function computeOverview(orders: OrderRecord[]): AnalyticsOverview {
   };
 }
 
-const RESERVED_HANDLES = ["admin", "support", "coursekit", "help", "pricing"];
+const RESERVED_HANDLES = ["admin", "support", "beevo", "help", "pricing"];
 
 class MockCreatorDataService implements CreatorDataService {
   private orders = seedOrders();
@@ -164,6 +178,13 @@ class MockCreatorDataService implements CreatorDataService {
   private notifications = seedNotifications();
   private tickets: SupportTicket[] = [];
   private profile: CreatorProfile = { ...MOCK_CURRENT_CREATOR };
+  private payoutDetails: PayoutDetails = { accountNumber: "", ifsc: "", updatedAt: null };
+  private settings: CreatorSettings = {
+    email: "creator@example.com",
+    notifySaleEmails: true,
+    notifyWeeklySummary: true,
+    notifyProductTips: false,
+  };
 
   async getDashboard(): Promise<ApiResult<DashboardData>> {
     await mockLatency(300, 250);
@@ -226,6 +247,60 @@ class MockCreatorDataService implements CreatorDataService {
     };
   }
 
+  async getPayoutDetails(): Promise<ApiResult<PayoutDetails>> {
+    await mockLatency(150, 100);
+    const forced = consumeForcedFailure<PayoutDetails>();
+    if (forced) return forced;
+    return { ok: true, data: { ...this.payoutDetails } };
+  }
+
+  async updatePayoutDetails(input: { accountNumber: string; ifsc: string }): Promise<ApiResult<PayoutDetails>> {
+    await mockLatency(250, 150);
+    const forced = consumeForcedFailure<PayoutDetails>();
+    if (forced) return forced;
+    const accountNumber = input.accountNumber.replace(/\s+/g, "");
+    const ifsc = input.ifsc.trim().toUpperCase();
+    if (!/^\d{9,18}$/.test(accountNumber)) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message: "Enter a valid bank account number (9–18 digits).",
+          fieldErrors: { accountNumber: ["9–18 digits."] },
+        },
+      };
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      return {
+        ok: false,
+        error: {
+          code: "validation_failed",
+          message: "Enter a valid IFSC code, e.g. HDFC0001234.",
+          fieldErrors: { ifsc: ["Format: 4 letters, 0, then 6 alphanumerics."] },
+        },
+      };
+    }
+    this.payoutDetails = { accountNumber, ifsc, updatedAt: new Date().toISOString() };
+    return { ok: true, data: { ...this.payoutDetails } };
+  }
+
+  async getSettings(): Promise<ApiResult<CreatorSettings>> {
+    await mockLatency(150, 100);
+    const forced = consumeForcedFailure<CreatorSettings>();
+    if (forced) return forced;
+    return { ok: true, data: { ...this.settings } };
+  }
+
+  async updateSettings(
+    patch: Partial<Pick<CreatorSettings, "notifySaleEmails" | "notifyWeeklySummary" | "notifyProductTips">>,
+  ): Promise<ApiResult<CreatorSettings>> {
+    await mockLatency(200, 150);
+    const forced = consumeForcedFailure<CreatorSettings>();
+    if (forced) return forced;
+    this.settings = { ...this.settings, ...patch };
+    return { ok: true, data: { ...this.settings } };
+  }
+
   async getProfile(): Promise<ApiResult<CreatorProfile>> {
     await mockLatency(200, 150);
     const forced = consumeForcedFailure<CreatorProfile>();
@@ -233,9 +308,7 @@ class MockCreatorDataService implements CreatorDataService {
     return { ok: true, data: { ...this.profile } };
   }
 
-  async updateProfile(
-    patch: Partial<Pick<CreatorProfile, "handle" | "displayName" | "tagline" | "niche" | "links">>,
-  ): Promise<ApiResult<CreatorProfile>> {
+  async updateProfile(patch: ProfilePatch): Promise<ApiResult<CreatorProfile>> {
     await mockLatency(300, 200);
     const forced = consumeForcedFailure<CreatorProfile>();
     if (forced) return forced;
@@ -271,12 +344,13 @@ class MockCreatorDataService implements CreatorDataService {
         };
       }
       this.profile.handle = normalized;
-      this.profile.publicUrl = `https://coursekit.app/@${normalized}`;
+      this.profile.publicUrl = `https://beevo.in/@${normalized}`;
     }
     if (patch.displayName) this.profile.displayName = patch.displayName.trim();
     if (patch.tagline !== undefined) this.profile.tagline = patch.tagline.trim();
     if (patch.niche !== undefined) this.profile.niche = patch.niche.trim();
     if (patch.links) this.profile.links = patch.links;
+    if (patch.avatarAssetId) this.profile.avatarUrl = patch.avatarAssetId;
     return { ok: true, data: { ...this.profile } };
   }
 
@@ -334,7 +408,7 @@ function getMock(): MockCreatorDataService {
 // Live adapter — real creator data via /api/v1/creator/*
 // ---------------------------------------------------------------------------
 
-import { get as apiGet, post as apiPost, patch as apiPatch } from "@/lib/services/api";
+import { get as apiGet, post as apiPost, patch as apiPatch, put as apiPut } from "@/lib/services/api";
 
 class ApiCreatorDataService implements CreatorDataService {
   getDashboard() {
@@ -352,12 +426,24 @@ class ApiCreatorDataService implements CreatorDataService {
   getEarnings() {
     return apiGet<{ summary: EarningsSummary; payouts: PayoutRecord[] }>("creator/earnings");
   }
+  getPayoutDetails() {
+    return apiGet<PayoutDetails>("creator/payout-details");
+  }
+  updatePayoutDetails(input: { accountNumber: string; ifsc: string }) {
+    return apiPut<PayoutDetails>("creator/payout-details", input);
+  }
+  getSettings() {
+    return apiGet<CreatorSettings>("creator/settings");
+  }
+  updateSettings(
+    patch: Partial<Pick<CreatorSettings, "notifySaleEmails" | "notifyWeeklySummary" | "notifyProductTips">>,
+  ) {
+    return apiPatch<CreatorSettings>("creator/settings", patch);
+  }
   getProfile() {
     return apiGet<CreatorProfile>("creator/profile");
   }
-  updateProfile(
-    patch: Partial<Pick<CreatorProfile, "handle" | "displayName" | "tagline" | "niche" | "links">>,
-  ) {
+  updateProfile(patch: ProfilePatch) {
     return apiPatch<CreatorProfile>("creator/profile", patch);
   }
   listNotifications() {

@@ -111,7 +111,7 @@ export interface CreatorLink {
 
 export interface CreatorPublicProfile {
   id: string;
-  /** URL-safe handle, e.g. "meera-shoots" -> coursekit.app/@meera-shoots */
+  /** URL-safe handle, e.g. "meera-shoots" -> beevo.in/@meera-shoots */
   handle: string;
   displayName: string;
   tagline: string;

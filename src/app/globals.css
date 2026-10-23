@@ -20,6 +20,28 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 6rem;
+  /* Vertical scroll stays available on every browser — only the bar is hidden. */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome/Safari/Edge */
+}
+
+/* Inner scroll areas (sidebar, sheets, modals) hide their bars too. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 body {

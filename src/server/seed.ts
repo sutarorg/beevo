@@ -24,7 +24,7 @@ if (!connectionString) {
 const pool = new Pool({ connectionString });
 const db = drizzle(pool, { schema });
 
-const PASSWORD = cleanEnv(process.env.SEED_PASSWORD) || "Demo1234";
+const PASSWORD = cleanEnv(process.env.SEED_PASSWORD) || "Beevo1234";
 
 async function upsertUser(input: {
   email: string;
@@ -58,15 +58,15 @@ async function upsertUser(input: {
 
 async function main() {
   const creator = await upsertUser({
-    email: "meera@coursekit.dev",
+    email: "meera@beevo.dev",
     name: "Meera Kapoor",
     handle: "meera-shoots",
     tagline: "Teaching 86k subscribers to shoot on film, not filters.",
     niche: "Photography",
     verified: true,
   });
-  await upsertUser({ email: "kavya@coursekit.dev", name: "Kavya Raghavan", verified: true });
-  const adminEmail = cleanEnv(process.env.ADMIN_EMAIL).toLowerCase() || "admin@coursekit.dev";
+  await upsertUser({ email: "kavya@beevo.dev", name: "Kavya Raghavan", verified: true });
+  const adminEmail = cleanEnv(process.env.ADMIN_EMAIL).toLowerCase() || "admin@beevo.dev";
   const admin = await upsertUser({
     email: adminEmail,
     name: "Platform Admin",

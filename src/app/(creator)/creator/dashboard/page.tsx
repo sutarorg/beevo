@@ -22,7 +22,6 @@ import { NotificationsList } from "@/components/creator/notifications";
 import {
   CardListSkeleton,
   CopyButton,
-  DemoChip,
   FailedState,
   PageHeader,
   StatCard,
@@ -54,9 +53,15 @@ export default function CreatorDashboardPage() {
     return { ok: true as const, data: { ...dashboard.data, courses: courses.data } };
   }, []);
 
+  const firstName =
+    state.status === "success" ? state.data.profile.displayName.trim().split(" ")[0] : "";
+
   return (
     <div>
-      <PageHeader title="Welcome back, Meera" sub="Here's the shape of your course business today.">
+      <PageHeader
+        title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
+        sub="Here's the shape of your course business today."
+      >
         <Button href="/creator/courses/new" variant="accent" size="sm">
           <Plus className="size-4" aria-hidden="true" />
           Create course
@@ -98,28 +103,23 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
           icon={<IndianRupee className="size-4.5" aria-hidden="true" />}
           label="Gross · last 30 days"
           value={formatINR(data.overview.grossLast30dInPaise)}
-          hint="Illustrative demo figures"
-          demo
         />
         <StatCard
           icon={<UserRoundPlus className="size-4.5" aria-hidden="true" />}
           label="Enrolments · 30 days"
           value={String(data.overview.enrollmentsLast30d)}
           hint="One enrolment per sale"
-          demo
         />
         <StatCard
           icon={<ReceiptText className="size-4.5" aria-hidden="true" />}
           label="Orders · 30 days"
           value={String(data.overview.ordersLast30d)}
-          demo
         />
         <StatCard
           icon={<Wallet className="size-4.5" aria-hidden="true" />}
           label="Available balance"
           value={formatINR(data.earnings.availableInPaise)}
           hint="After 8% commission and recorded payouts"
-          demo
         />
       </div>
 
@@ -128,13 +128,18 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
         <section aria-labelledby="recent-orders" className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
           <div className="flex items-center justify-between gap-2">
             <h2 id="recent-orders" className="flex items-center gap-2 text-base font-bold text-ink">
-              Recent orders <DemoChip />
+              Recent orders
             </h2>
             <Link href="/creator/orders" className="inline-flex items-center gap-1 text-xs font-bold text-accent">
               All orders <ArrowRight className="size-3.5" aria-hidden="true" />
             </Link>
           </div>
           <ul className="mt-4 divide-y divide-ink/10">
+            {data.recentOrders.length === 0 ? (
+              <li className="rounded-xl border-2 border-dashed border-ink/25 bg-parchment/50 px-4 py-6 text-center text-sm text-smoke">
+                No orders yet. They appear here the moment a course sells.
+              </li>
+            ) : null}
             {data.recentOrders.map((order) => (
               <li key={order.id} className="flex items-center gap-3 py-2.5">
                 <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-ink bg-parchment text-xs font-bold">
@@ -196,7 +201,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
         {/* Notifications */}
         <section aria-labelledby="dash-ntf" className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
           <h2 id="dash-ntf" className="mb-4 flex items-center gap-2 text-base font-bold text-ink">
-            Notifications <DemoChip />
+            Notifications
           </h2>
           <NotificationsList
             notifications={data.notifications}
@@ -214,7 +219,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
           <section aria-labelledby="dash-earnings" className="rounded-3xl border-2 border-ink bg-ink p-5 text-cream shadow-hard-xs">
             <div className="flex items-center justify-between gap-2">
               <h2 id="dash-earnings" className="text-base font-bold">
-                Earnings <span className="ml-1 align-middle"><DemoChip /></span>
+                Earnings
               </h2>
               <Link href="/creator/earnings" className="inline-flex items-center gap-1 text-xs font-bold text-lime">
                 Details <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -223,7 +228,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
             <p className="mt-4 font-editorial text-4xl italic tabular-nums">
               {formatINR(data.earnings.creatorShareInPaise)}
             </p>
-            <p className="text-xs text-cream/60">Your 92% share, all time (demo figures)</p>
+            <p className="text-xs text-cream/60">Your 92% share, all time</p>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border-2 border-cream/20 bg-cream/5 p-3">
                 <p className="text-lime tabular-nums">{formatINR(data.earnings.availableInPaise)}</p>
@@ -246,6 +251,11 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
               </Link>
             </div>
             <ul className="mt-4 space-y-2.5">
+              {data.performance.length === 0 ? (
+                <li className="rounded-xl border-2 border-dashed border-ink/25 bg-parchment/50 px-4 py-6 text-center text-sm text-smoke">
+                  Publish a course and share your link — sales will show up here.
+                </li>
+              ) : null}
               {data.performance.map((row) => (
                 <li key={row.courseId} className="rounded-xl border-2 border-ink/10 bg-cream p-3">
                   <p className="truncate text-sm font-bold text-ink">{row.title}</p>

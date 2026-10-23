@@ -49,27 +49,17 @@ export function StatusChip({ status, className }: { status: CourseStatus; classN
   );
 }
 
-export function DemoChip({ label = "Demo" }: { label?: string }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-dashed border-accent/60 px-2 py-0.5 text-[10px] font-bold tracking-[0.14em] text-accent-deep uppercase">
-      {label}
-    </span>
-  );
-}
-
 export function StatCard({
   icon,
   label,
   value,
   hint,
-  demo = false,
   className,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   hint?: string;
-  demo?: boolean;
   className?: string;
 }) {
   return (
@@ -78,7 +68,6 @@ export function StatCard({
         <span className="grid size-9 place-items-center rounded-xl border-2 border-ink bg-parchment">
           {icon}
         </span>
-        {demo ? <DemoChip /> : null}
       </div>
       <p className="mt-3 text-2xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
       <p className="text-xs font-bold tracking-wide text-smoke uppercase">{label}</p>

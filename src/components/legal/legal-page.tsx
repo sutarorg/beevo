@@ -33,7 +33,7 @@ export function LegalPage({
       <div className="mt-6 flex items-start gap-3 rounded-2xl border-2 border-ink bg-parchment p-4">
         <Info className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
         <p className="text-xs leading-relaxed text-smoke">
-          This document is the working policy copy for the CourseKit product
+          This document is the working policy copy for the Beevo product
           launch. It is provided for informational purposes and does not
           constitute legal advice. If anything here conflicts with a right you
           hold under applicable law, the law prevails.

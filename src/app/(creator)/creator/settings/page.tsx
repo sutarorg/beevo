@@ -1,9 +1,13 @@
 "use client";
 
 import { BellRing, CircleAlert, KeyRound, Landmark, LifeBuoy, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
+import { useAsyncData } from "@/lib/hooks";
+import type { CreatorSettings } from "@/lib/creator-types";
+import { getCreatorDataService } from "@/lib/services/creator-data";
 import { ConfirmDialog } from "@/components/creator/dialogs";
-import { PageHeader } from "@/components/creator/ui";
+import { FailedState, PageHeader, Skeleton } from "@/components/creator/ui";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
@@ -42,19 +46,55 @@ function Toggle({
 
 export default function CreatorSettingsPage() {
   const toast = useToast();
-  const [saleEmails, setSaleEmails] = useState(true);
-  const [weeklySummary, setWeeklySummary] = useState(true);
-  const [productTips, setProductTips] = useState(false);
+  const service = getCreatorDataService();
+  const { state, reload } = useAsyncData(
+    () =>
+      service
+        ? service.getSettings()
+        : Promise.resolve({ ok: false as const, error: { code: "unavailable", message: "Service unavailable" } }),
+    [],
+  );
+  const [override, setOverride] = useState<CreatorSettings | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const savePreference = (label: string) => {
-    toast.push({ variant: "success", title: `${label} updated (demo)`, description: "Email delivery itself connects in Prompt 5." });
+  const settings: CreatorSettings | null =
+    override ?? (state.status === "success" ? state.data : null);
+
+  const savePreference = async (
+    key: "notifySaleEmails" | "notifyWeeklySummary" | "notifyProductTips",
+    label: string,
+    value: boolean,
+  ) => {
+    if (!service || !settings) return;
+    const previous = settings;
+    setOverride({ ...settings, [key]: value });
+    setSavingKey(key);
+    const result = await service.updateSettings({ [key]: value });
+    setSavingKey(null);
+    if (!result.ok) {
+      setOverride(previous);
+      toast.push({ variant: "error", title: "Preference not saved", description: result.error.message });
+      return;
+    }
+    setOverride(result.data);
+    toast.push({
+      variant: "success",
+      title: `${label} ${value ? "turned on" : "turned off"}`,
+      description: "Saved to your account.",
+    });
   };
 
   return (
     <div>
       <PageHeader title="Settings" sub="Account, notifications, payouts, and the danger zone." />
+
+      {state.status === "error" ? (
+        <div className="mb-5">
+          <FailedState body={state.error.message} onRetry={reload} />
+        </div>
+      ) : null}
 
       <div className="space-y-5">
         {/* Account */}
@@ -66,17 +106,18 @@ export default function CreatorSettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-ink/10 bg-cream px-4 py-3">
               <div>
                 <dt className="text-xs font-bold tracking-wide text-smoke uppercase">Sign-in email</dt>
-                <dd className="text-sm font-bold text-ink">meera@example.in (demo account)</dd>
+                <dd className="text-sm font-bold text-ink">
+                  {settings?.email ?? <Skeleton className="h-4 w-40" />}
+                </dd>
               </div>
             </div>
           </dl>
           <p className="mt-3 text-xs leading-relaxed text-smoke">
-            Password and email changes are handled by the authentication provider. That flow
-            connects in Prompt 5 — until then, the public{" "}
-            <a href="/forgot-password" className="font-semibold text-accent underline underline-offset-2">
-              password reset screens
-            </a>{" "}
-            show the intended experience.
+            To change your password, use the{" "}
+            <Link href="/forgot-password" className="font-semibold text-accent underline underline-offset-2">
+              password reset flow
+            </Link>
+            . Email changes are handled by support so your account stays secure.
           </p>
         </section>
 
@@ -89,29 +130,20 @@ export default function CreatorSettingsPage() {
             <Toggle
               label="New sale emails"
               description="A heads-up every time someone enrols."
-              checked={saleEmails}
-              onChange={(value) => {
-                setSaleEmails(value);
-                savePreference("New sale emails");
-              }}
+              checked={settings?.notifySaleEmails ?? false}
+              onChange={(value) => void savePreference("notifySaleEmails", "New sale emails", value)}
             />
             <Toggle
               label="Weekly summary"
               description="Sales, enrolments, and payout status every Monday."
-              checked={weeklySummary}
-              onChange={(value) => {
-                setWeeklySummary(value);
-                savePreference("Weekly summary");
-              }}
+              checked={settings?.notifyWeeklySummary ?? false}
+              onChange={(value) => void savePreference("notifyWeeklySummary", "Weekly summary", value)}
             />
             <Toggle
               label="Product tips"
               description="Occasional, unsubscribe-anytime advice for selling more."
-              checked={productTips}
-              onChange={(value) => {
-                setProductTips(value);
-                savePreference("Product tips");
-              }}
+              checked={settings?.notifyProductTips ?? false}
+              onChange={(value) => void savePreference("notifyProductTips", "Product tips", value)}
             />
           </div>
         </section>
@@ -121,18 +153,14 @@ export default function CreatorSettingsPage() {
           <h2 id="settings-payout" className="flex items-center gap-2 text-base font-bold text-ink">
             <Landmark className="size-4.5 text-accent" aria-hidden="true" /> Payout details
           </h2>
-          <div className="mt-4 rounded-2xl border-2 border-dashed border-ink/40 bg-parchment/60 p-4 text-sm leading-relaxed text-smoke">
-            <p>
-              Bank and settlement details are <span className="font-semibold text-ink">never</span>{" "}
-              collected through this app. They're gathered securely during payment-provider
-              onboarding, and payouts are recorded manually by platform administration under the
-              intended payment arrangement, subject to provider approval (Prompt 5 wires the secure
-              flow).
-            </p>
-          </div>
-          <Button href="/creator/support" variant="outline" size="sm" className="mt-4">
-            <LifeBuoy className="size-4" aria-hidden="true" />
-            Update payout details via support
+          <p className="mt-3 text-sm leading-relaxed text-smoke">
+            Add the bank account and IFSC where your earnings should be transferred. Payouts are
+            recorded manually by platform administration under the intended payment arrangement,
+            subject to provider approval.
+          </p>
+          <Button href="/creator/earnings" variant="outline" size="sm" className="mt-4">
+            <Landmark className="size-4" aria-hidden="true" />
+            Manage payout details
           </Button>
         </section>
 
@@ -154,25 +182,38 @@ export default function CreatorSettingsPage() {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Delete your account?"
+        title="Request account deletion?"
         body={
           <>
-            In this demo nothing is actually deleted — the request is simply recorded as a support
-            ticket. In production this is a two-step verified flow handled with an administrator.
+            This opens a support request. Our team verifies ownership and handles the deletion with
+            you — courses with enrolled students stay accessible to them, per the Terms.
           </>
         }
-        confirmLabel="Request deletion (demo)"
+        confirmLabel="Send deletion request"
         danger
         loading={deleting}
         onConfirm={async () => {
+          if (!service) return;
           setDeleting(true);
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          const result = await service.submitSupportTicket({
+            category: "Account",
+            subject: "Account deletion request",
+            body: `The creator${settings?.email ? ` (${settings.email})` : ""} has requested deletion of their Beevo account and all associated creator data.`,
+          });
           setDeleting(false);
           setConfirmDelete(false);
+          if (!result.ok) {
+            toast.push({
+              variant: "error",
+              title: "Request not sent",
+              description: result.error.message,
+            });
+            return;
+          }
           toast.push({
-            variant: "info",
-            title: "Deletion request submitted (demo)",
-            description: "No data was removed. Real deletion flow arrives with the backend.",
+            variant: "success",
+            title: "Deletion request sent",
+            description: "Support will confirm once your account is verified and removed.",
           });
         }}
         onCancel={() => setConfirmDelete(false)}
