@@ -23,8 +23,14 @@ export function hashPassword(password: string): string {
 export function verifyPassword(password: string, stored: string): boolean {
   const [saltHex, keyHex] = stored.split(":");
   if (!saltHex || !keyHex) return false;
-  const key = scryptSync(password, Buffer.from(saltHex, "hex"), 64, SCRYPT);
-  return timingSafeEqual(key, Buffer.from(keyHex, "hex"));
+  try {
+    const storedBuf = Buffer.from(keyHex, "hex");
+    if (storedBuf.length !== 64) return false;
+    const key = scryptSync(password, Buffer.from(saltHex, "hex"), 64, SCRYPT);
+    return timingSafeEqual(key, storedBuf);
+  } catch {
+    return false;
+  }
 }
 
 export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -59,6 +65,15 @@ export async function setSessionCookie(token: string): Promise<void> {
 
 export async function clearSessionCookie(): Promise<void> {
   const jar = await cookies();
+  jar.delete(SESSION_COOKIE);
+}
+
+export async function destroyCurrentSession(): Promise<void> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (token && token.length <= 256) {
+    await db.delete(sessions).where(eq(sessions.tokenHash, hmacHash(token)));
+  }
   jar.delete(SESSION_COOKIE);
 }
 

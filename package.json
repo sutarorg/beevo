@@ -6,7 +6,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx src/server/seed.ts",
+    "db:grant-admin": "tsx src/server/grant-admin.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

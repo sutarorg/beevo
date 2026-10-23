@@ -13,7 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { route } from "@/server/router";
-import { fail, ok, parseBody, requireVerifiedUser, type Ctx } from "@/server/http";
+import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/http";
 import { newId } from "@/server/auth";
 import { buildStorageKey, presignUrl, UPLOAD_LIMITS, verifyObjectExists } from "@/server/storage";
 import { R2 } from "@/server/env";
@@ -25,11 +25,6 @@ import { readinessChecklist } from "@/lib/services/courses";
  * (even though RLS also exists) and validates with zod.
  */
 
-function userOr401(ctx: Ctx) {
-  const user = requireVerifiedUser(ctx);
-  return user instanceof NextResponse ? null : user;
-}
-
 async function ownCourse(courseId: string, creatorId: string) {
   const course = await db.query.courses.findFirst({
     where: and(eq(courses.id, courseId), eq(courses.creatorId, creatorId)),
@@ -38,7 +33,11 @@ async function ownCourse(courseId: string, creatorId: string) {
 }
 
 function slugify(title: string): string {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
   return slug || "untitled-course";
 }
 
@@ -65,7 +64,10 @@ async function editorFor(courseId: string): Promise<CourseEditor | null> {
   });
   const lessonRows = sectionRows.length
     ? await db.query.lessons.findMany({
-        where: inArray(lessons.sectionId, sectionRows.map((row) => row.id)),
+        where: inArray(
+          lessons.sectionId,
+          sectionRows.map((row) => row.id),
+        ),
         orderBy: [asc(lessons.position)],
       })
     : [];
@@ -74,7 +76,16 @@ async function editorFor(courseId: string): Promise<CourseEditor | null> {
         .select({ lessonId: lessonMedia.lessonId, asset: mediaAssets })
         .from(lessonMedia)
         .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
-        .where(and(inArray(lessonMedia.lessonId, lessonRows.map((row) => row.id)), eq(mediaAssets.status, "verified")))
+        .where(
+          and(
+            inArray(
+              lessonMedia.lessonId,
+              lessonRows.map((row) => row.id),
+            ),
+            eq(mediaAssets.status, "verified"),
+          ),
+        )
+        .orderBy(asc(lessonMedia.position))
     : [];
   const cover = course.coverAssetId
     ? await db.query.mediaAssets.findFirst({
@@ -118,21 +129,17 @@ async function editorFor(courseId: string): Promise<CourseEditor | null> {
 }
 
 route("POST", "courses", async (_req, ctx) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
-  return createDraft(user);
-});
-
-async function createDraft(user: { id: string }) {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const id = newId("course");
   await db.insert(courses).values({ id, creatorId: user.id });
   const editor = await editorFor(id);
   return ok(editor, { status: 201 });
-}
+});
 
 route("GET", "courses", async (_req, ctx) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
   const rows = await db.query.courses.findMany({
     where: eq(courses.creatorId, user.id),
     orderBy: [sql`${courses.updatedAt} DESC`],
@@ -144,7 +151,12 @@ route("GET", "courses", async (_req, ctx) => {
           count: sql<number>`count(*)::int`,
         })
         .from(enrollments)
-        .where(inArray(enrollments.courseId, rows.map((row) => row.id)))
+        .where(
+          inArray(
+            enrollments.courseId,
+            rows.map((row) => row.id),
+          ),
+        )
         .groupBy(enrollments.courseId)
     : [];
   const grosses = rows.length
@@ -154,7 +166,15 @@ route("GET", "courses", async (_req, ctx) => {
           gross: sql<number>`coalesce(sum(gross_in_paise),0)::int`,
         })
         .from(orders)
-        .where(and(inArray(orders.courseId, rows.map((row) => row.id)), eq(orders.status, "paid")))
+        .where(
+          and(
+            inArray(
+              orders.courseId,
+              rows.map((row) => row.id),
+            ),
+            eq(orders.status, "paid"),
+          ),
+        )
         .groupBy(orders.courseId)
     : [];
   const coverIds = rows.map((row) => row.coverAssetId).filter(Boolean) as string[];
@@ -171,7 +191,12 @@ route("GET", "courses", async (_req, ctx) => {
         })
         .from(lessons)
         .innerJoin(sections, eq(sections.id, lessons.sectionId))
-        .where(inArray(sections.courseId, rows.map((row) => row.id)))
+        .where(
+          inArray(
+            sections.courseId,
+            rows.map((row) => row.id),
+          ),
+        )
         .groupBy(sections.courseId)
     : [];
   const items: CourseListItem[] = rows.map((row) => ({
@@ -193,10 +218,14 @@ route("GET", "courses", async (_req, ctx) => {
 });
 
 route("GET", "courses/:id", async (_req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireUser(ctx);
+  if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) {
-    return fail("not_found", "We couldn't find that course. It may have been removed or the link is wrong.", 404);
+    return fail(
+      "not_found",
+      "We couldn't find that course. It may have been removed or the link is wrong.",
+      404,
+    );
   }
   return ok(await editorFor(params.id));
 });
@@ -210,8 +239,8 @@ const detailsSchema = z.object({
 });
 
 route("PATCH", "courses/:id", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
   if (course.status === "archived") {
@@ -220,7 +249,11 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
   const parsed = parseBody(detailsSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
   const patch = parsed.values;
-  if (patch.coverAssetId !== undefined && patch.coverAssetId !== null) {
+
+  let nextCoverAssetId: string | null | undefined;
+  if (patch.coverAssetId === null) {
+    nextCoverAssetId = null;
+  } else if (patch.coverAssetId !== undefined) {
     // Cover must be a verified image owned by this creator.
     const asset = await db.query.mediaAssets.findFirst({
       where: and(
@@ -235,8 +268,9 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
         cover: ["Upload a cover image first."],
       });
     }
-    await db.update(courses).set({ coverAssetId: asset.id }).where(eq(courses.id, course.id));
+    nextCoverAssetId = asset.id;
   }
+
   await db
     .update(courses)
     .set({
@@ -244,6 +278,7 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
       ...(patch.shortDescription !== undefined ? { shortDescription: patch.shortDescription } : {}),
       ...(patch.outcomes !== undefined ? { outcomes: patch.outcomes } : {}),
       ...(patch.priceInPaise !== undefined ? { priceInPaise: patch.priceInPaise } : {}),
+      ...(nextCoverAssetId !== undefined ? { coverAssetId: nextCoverAssetId } : {}),
       updatedAt: new Date(),
     })
     .where(eq(courses.id, course.id));
@@ -251,8 +286,8 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
 });
 
 route("POST", "courses/:id/status", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Course not found.", 404);
   const parsed = parseBody(
@@ -300,26 +335,41 @@ route("POST", "courses/:id/status", async (req, ctx, params) => {
     return ok(await editorFor(course.id));
   }
   if (action === "unpublish") {
-    if (course.status !== "published") return fail("invalid_state", "Only a published course can be unpublished.", 409);
-    await db.update(courses).set({ status: "unpublished", updatedAt: new Date() }).where(eq(courses.id, course.id));
+    if (course.status !== "published") {
+      return fail("invalid_state", "Only a published course can be unpublished.", 409);
+    }
+    await db
+      .update(courses)
+      .set({ status: "unpublished", updatedAt: new Date() })
+      .where(eq(courses.id, course.id));
     return ok(await editorFor(course.id));
   }
   if (action === "archive") {
-    await db.update(courses).set({ status: "archived", updatedAt: new Date() }).where(eq(courses.id, course.id));
+    await db
+      .update(courses)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(eq(courses.id, course.id));
     return ok(await editorFor(course.id));
   }
-  if (course.status !== "archived") return fail("invalid_state", "Only an archived course can be restored.", 409);
-  await db.update(courses).set({ status: "draft", updatedAt: new Date() }).where(eq(courses.id, course.id));
+  if (course.status !== "archived") {
+    return fail("invalid_state", "Only an archived course can be restored.", 409);
+  }
+  await db
+    .update(courses)
+    .set({ status: "draft", updatedAt: new Date() })
+    .where(eq(courses.id, course.id));
   return ok(await editorFor(course.id));
 });
 
 // ---- Sections ---------------------------------------------------------------
 
-const sectionSchema = z.object({ title: z.string().trim().min(1, "Give the section a title.").max(120) });
+const sectionSchema = z.object({
+  title: z.string().trim().min(1, "Give the section a title.").max(120),
+});
 
 route("POST", "courses/:id/sections", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
   const parsed = parseBody(sectionSchema, await req.json().catch(() => ({})));
@@ -333,35 +383,46 @@ route("POST", "courses/:id/sections", async (req, ctx, params) => {
     .values({ id: newId("sec"), courseId: course.id, title: parsed.values.title, position: max + 1 })
     .returning();
   await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, course.id));
-  return ok({ ...section, lessons: [] as never[] }, { status: 201 });
+  return ok({ id: section.id, title: section.title, lessons: [] as Lesson[] }, { status: 201 });
 });
 
 route("PATCH", "courses/:id/sections/:sectionId", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
   const parsed = parseBody(sectionSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
-  await db.update(sections).set({ title: parsed.values.title }).where(and(eq(sections.id, params.sectionId), eq(sections.courseId, course.id)));
-  const section = await db.query.sections.findFirst({ where: eq(sections.id, params.sectionId) });
-  if (!section) return fail("not_found", "Section not found — reload the editor.", 404);
-  return ok({ ...section, lessons: [] as never[] });
+  await db
+    .update(sections)
+    .set({ title: parsed.values.title })
+    .where(and(eq(sections.id, params.sectionId), eq(sections.courseId, course.id)));
+  await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, course.id));
+  const editor = await editorFor(course.id);
+  const updated = editor?.sections.find((s) => s.id === params.sectionId);
+  if (!updated) return fail("not_found", "Section not found — reload the editor.", 404);
+  return ok(updated);
 });
 
 route("DELETE", "courses/:id/sections/:sectionId", async (_req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
-  await db.delete(sections).where(and(eq(sections.id, params.sectionId), eq(sections.courseId, params.id)));
+  await db
+    .delete(sections)
+    .where(and(eq(sections.id, params.sectionId), eq(sections.courseId, params.id)));
+  await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, params.id));
   return ok(undefined);
 });
 
 route("PUT", "courses/:id/sections/reorder", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
-  const parsed = parseBody(z.object({ orderedSectionIds: z.array(z.string()).max(200) }), await req.json().catch(() => ({})));
+  const parsed = parseBody(
+    z.object({ orderedSectionIds: z.array(z.string()).max(200) }),
+    await req.json().catch(() => ({})),
+  );
   if ("response" in parsed) return parsed.response;
   await db.transaction(async (tx) => {
     for (const [index, sectionId] of parsed.values.orderedSectionIds.entries()) {
@@ -383,9 +444,16 @@ const lessonSchema = z.object({
   mediaIds: z.array(z.string()).max(5),
 });
 
-async function assertMediaUsable(userId: string, course: string, type: "video" | "resources", mediaIds: string[]) {
+async function assertMediaUsable(
+  userId: string,
+  course: string,
+  type: "video" | "resources",
+  mediaIds: string[],
+) {
   if (mediaIds.length === 0) return { error: "Attach the lesson content before saving." };
-  if (type === "video" && mediaIds.length !== 1) return { error: "A video lesson holds exactly one video file." };
+  if (type === "video" && mediaIds.length !== 1) {
+    return { error: "A video lesson holds exactly one video file." };
+  }
   const assets = await db.query.mediaAssets.findMany({
     where: and(
       inArray(mediaAssets.id, mediaIds),
@@ -394,15 +462,19 @@ async function assertMediaUsable(userId: string, course: string, type: "video" |
       eq(mediaAssets.status, "verified"),
     ),
   });
-  if (assets.length !== mediaIds.length) return { error: "One or more files aren't verified uploads yet." };
+  if (assets.length !== mediaIds.length) {
+    return { error: "One or more files aren't verified uploads yet." };
+  }
   const expectedKind = type === "video" ? "video" : "resource";
-  if (assets.some((asset) => asset.kind !== expectedKind)) return { error: "File type doesn't match the lesson type." };
+  if (assets.some((asset) => asset.kind !== expectedKind)) {
+    return { error: "File type doesn't match the lesson type." };
+  }
   return { assets };
 }
 
 route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
   const section = await db.query.sections.findFirst({
@@ -411,7 +483,12 @@ route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params
   if (!section) return fail("not_found", "Section not found — reload the editor.", 404);
   const parsed = parseBody(lessonSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
-  const media = await assertMediaUsable(user.id, course.id, parsed.values.type, parsed.values.mediaIds);
+  const media = await assertMediaUsable(
+    user.id,
+    course.id,
+    parsed.values.type,
+    parsed.values.mediaIds,
+  );
   if ("error" in media) {
     return fail("validation_failed", media.error!, 422, { media: [media.error!] });
   }
@@ -432,7 +509,11 @@ route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params
     })
     .returning();
   await db.insert(lessonMedia).values(
-    parsed.values.mediaIds.map((assetId, position) => ({ lessonId: lesson.id, assetId, position })),
+    parsed.values.mediaIds.map((assetId, position) => ({
+      lessonId: lesson.id,
+      assetId,
+      position,
+    })),
   );
   await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, course.id));
   const editor = await editorFor(course.id);
@@ -441,42 +522,63 @@ route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params
 });
 
 route("PATCH", "courses/:id/sections/:sectionId/lessons/:lessonId", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
   const parsed = parseBody(lessonSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
-  const media = await assertMediaUsable(user.id, course.id, parsed.values.type, parsed.values.mediaIds);
+  const media = await assertMediaUsable(
+    user.id,
+    course.id,
+    parsed.values.type,
+    parsed.values.mediaIds,
+  );
   if ("error" in media) {
     return fail("validation_failed", media.error!, 422, { media: [media.error!] });
   }
   await db
     .update(lessons)
-    .set({ type: parsed.values.type, title: parsed.values.title, description: parsed.values.description, updatedAt: new Date() })
+    .set({
+      type: parsed.values.type,
+      title: parsed.values.title,
+      description: parsed.values.description,
+      updatedAt: new Date(),
+    })
     .where(and(eq(lessons.id, params.lessonId), eq(lessons.sectionId, params.sectionId)));
   await db.delete(lessonMedia).where(eq(lessonMedia.lessonId, params.lessonId));
   await db.insert(lessonMedia).values(
-    parsed.values.mediaIds.map((assetId, position) => ({ lessonId: params.lessonId, assetId, position })),
+    parsed.values.mediaIds.map((assetId, position) => ({
+      lessonId: params.lessonId,
+      assetId,
+      position,
+    })),
   );
+  await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, course.id));
   const editor = await editorFor(course.id);
   const updated = editor?.sections.flatMap((s) => s.lessons).find((l) => l.id === params.lessonId);
   return ok(updated);
 });
 
 route("DELETE", "courses/:id/sections/:sectionId/lessons/:lessonId", async (_req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
-  await db.delete(lessons).where(and(eq(lessons.id, params.lessonId), eq(lessons.sectionId, params.sectionId)));
+  await db
+    .delete(lessons)
+    .where(and(eq(lessons.id, params.lessonId), eq(lessons.sectionId, params.sectionId)));
+  await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, params.id));
   return ok(undefined);
 });
 
 route("PUT", "courses/:id/sections/:sectionId/lessons/reorder", async (req, ctx, params) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
-  const parsed = parseBody(z.object({ orderedLessonIds: z.array(z.string()).max(400) }), await req.json().catch(() => ({})));
+  const parsed = parseBody(
+    z.object({ orderedLessonIds: z.array(z.string()).max(400) }),
+    await req.json().catch(() => ({})),
+  );
   if ("response" in parsed) return parsed.response;
   await db.transaction(async (tx) => {
     for (const [index, lessonId] of parsed.values.orderedLessonIds.entries()) {
@@ -500,8 +602,8 @@ const uploadSessionSchema = z.object({
 });
 
 route("POST", "uploads/session", async (req, ctx) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
   const parsed = parseBody(uploadSessionSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
   const input = parsed.values;
@@ -521,10 +623,19 @@ route("POST", "uploads/session", async (req, ctx) => {
     return fail("not_found", "Course not found.", 404);
   }
   if (!R2.configured) {
-    return fail("provider_not_configured", "Media storage isn't configured yet (R2 credentials missing). Uploads are disabled until it is.", 503);
+    return fail(
+      "provider_not_configured",
+      "Media storage isn't configured yet (R2 credentials missing). Uploads are disabled until it is.",
+      503,
+    );
   }
   const assetId = newId("media");
-  const storageKey = buildStorageKey({ courseId: input.courseId, kind: input.kind, assetId, fileName: input.fileName });
+  const storageKey = buildStorageKey({
+    courseId: input.courseId,
+    kind: input.kind,
+    assetId,
+    fileName: input.fileName,
+  });
   await db.insert(mediaAssets).values({
     id: assetId,
     uploaderId: user.id,
@@ -535,7 +646,12 @@ route("POST", "uploads/session", async (req, ctx) => {
     declaredSizeBytes: input.sizeBytes,
     storageKey,
   });
-  const signed = presignUrl({ method: "PUT", key: storageKey, expiresSeconds: 900, contentType: input.mimeType });
+  const signed = presignUrl({
+    method: "PUT",
+    key: storageKey,
+    expiresSeconds: 900,
+    contentType: input.mimeType,
+  });
   return ok(
     {
       uploadId: assetId,
@@ -550,9 +666,15 @@ route("POST", "uploads/session", async (req, ctx) => {
 });
 
 route("POST", "uploads/complete", async (req, ctx) => {
-  const user = userOr401(ctx);
-  if (!user) return fail("auth_required", "Sign in to continue.", 401);
-  const parsed = parseBody(z.object({ assetId: z.string().min(1) }), await req.json().catch(() => ({})));
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  const parsed = parseBody(
+    z.object({
+      assetId: z.string().min(1),
+      durationLabel: z.string().trim().max(20).optional(),
+    }),
+    await req.json().catch(() => ({})),
+  );
   if ("response" in parsed) return parsed.response;
   const asset = await db.query.mediaAssets.findFirst({
     where: and(eq(mediaAssets.id, parsed.values.assetId), eq(mediaAssets.uploaderId, user.id)),
@@ -562,16 +684,29 @@ route("POST", "uploads/complete", async (req, ctx) => {
   // Independent server-side verification — the client's claim is never trusted.
   const head = await verifyObjectExists(asset.storageKey);
   if (!head) {
-    return fail("upload_not_verified", "We couldn't verify the uploaded object in storage. Try the upload again.", 409);
+    return fail(
+      "upload_not_verified",
+      "We couldn't verify the uploaded object in storage. Try the upload again.",
+      409,
+    );
   }
   const drift = Math.abs(head.sizeBytes - Number(asset.declaredSizeBytes));
   if (drift > Math.max(1024, Number(asset.declaredSizeBytes) * 0.02)) {
     await db.delete(mediaAssets).where(eq(mediaAssets.id, asset.id));
-    return fail("upload_size_mismatch", "The uploaded file doesn't match the declared size. Upload it again.", 409);
+    return fail(
+      "upload_size_mismatch",
+      "The uploaded file doesn't match the declared size. Upload it again.",
+      409,
+    );
   }
   const [verified] = await db
     .update(mediaAssets)
-    .set({ status: "verified", verifiedSizeBytes: head.sizeBytes, verifiedAt: new Date() })
+    .set({
+      status: "verified",
+      verifiedSizeBytes: head.sizeBytes,
+      verifiedAt: new Date(),
+      ...(parsed.values.durationLabel ? { durationLabel: parsed.values.durationLabel } : {}),
+    })
     .where(eq(mediaAssets.id, asset.id))
     .returning();
   return ok(toMediaRef(verified));
@@ -579,7 +714,8 @@ route("POST", "uploads/complete", async (req, ctx) => {
 
 /** Server-authorized, short-lived media delivery (enrollment or public rules). */
 route("GET", "media/access", async (req, ctx) => {
-  const assetId = new URL(req.url).searchParams.get("assetId") ?? "";
+  const urlObj = new URL(req.url);
+  const assetId = urlObj.searchParams.get("assetId") ?? "";
   const asset = await db.query.mediaAssets.findFirst({
     where: and(eq(mediaAssets.id, assetId), eq(mediaAssets.status, "verified")),
   });
@@ -608,23 +744,65 @@ route("GET", "media/access", async (req, ctx) => {
       const course = await db.query.courses.findFirst({ where: eq(courses.id, asset.courseId) });
       if (course?.status === "published") {
         const firstVideo = await db
-          .select({ id: lessons.id })
+          .select({ assetId: lessonMedia.assetId })
           .from(lessonMedia)
           .innerJoin(lessons, eq(lessons.id, lessonMedia.lessonId))
           .innerJoin(sections, eq(sections.id, lessons.sectionId))
-          .where(and(eq(sections.courseId, asset.courseId), eq(lessons.type, "video"), eq(lessonMedia.assetId, asset.id)))
+          .where(and(eq(sections.courseId, asset.courseId), eq(lessons.type, "video")))
           .orderBy(asc(sections.position), asc(lessons.position))
           .limit(1);
-        if (firstVideo.length > 0) allowed = true;
+        if (firstVideo[0]?.assetId === asset.id) allowed = true;
       }
     }
   }
   if (!allowed) {
-    return fail(ctx.user ? "not_enrolled" : "auth_required", "You don't have access to this media.", ctx.user ? 403 : 401);
+    return fail(
+      ctx.user ? "not_enrolled" : "auth_required",
+      "You don't have access to this media.",
+      ctx.user ? 403 : 401,
+    );
   }
   if (!R2.configured) return fail("provider_not_configured", "Media storage isn't configured.", 503);
-  const signed = presignUrl({ method: "GET", key: asset.storageKey, expiresSeconds: 600 });
-  const download = new URL(req.url).searchParams.get("download") === "1";
-  const url = download ? `${signed.url}&response-content-disposition=${encodeURIComponent(`attachment; filename="${asset.fileName}"`)}` : signed.url;
-  return ok({ url, expiresAt: signed.expiresAt, fileName: asset.fileName, sizeBytes: Number(asset.verifiedSizeBytes ?? asset.declaredSizeBytes) });
+
+  const download = urlObj.searchParams.get("download") === "1";
+  const wantsJson =
+    download ||
+    urlObj.searchParams.get("format") === "json" ||
+    (req.headers.get("accept") ?? "").includes("application/json");
+  const safeFileName = asset.fileName.replace(/["\\\r\n]/g, "_");
+  const signed = presignUrl({
+    method: "GET",
+    key: asset.storageKey,
+    expiresSeconds: 600,
+    ...(download ? { responseContentDisposition: `attachment; filename="${safeFileName}"` } : {}),
+  });
+
+  if (wantsJson) {
+    return ok({
+      url: signed.url,
+      expiresAt: signed.expiresAt,
+      fileName: asset.fileName,
+      sizeBytes: Number(asset.verifiedSizeBytes ?? asset.declaredSizeBytes),
+    });
+  }
+
+  // Cover images are loaded via <Image> / <img>; streaming bytes avoids cross-origin 302 errors in /_next/image.
+  if (asset.kind === "cover") {
+    try {
+      const upstream = await fetch(signed.url);
+      if (upstream.ok && upstream.body) {
+        return new NextResponse(upstream.body, {
+          status: 200,
+          headers: {
+            "Content-Type": upstream.headers.get("content-type") || asset.mimeType || "image/jpeg",
+            "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
+          },
+        });
+      }
+    } catch {
+      // Fall through to 302 redirect if upstream stream fails
+    }
+  }
+
+  return NextResponse.redirect(signed.url, 302);
 });
