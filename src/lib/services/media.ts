@@ -35,6 +35,11 @@ export interface MediaService {
   performUpload(session: UploadSession, callbacks: UploadCallbacks): Promise<ApiResult<MediaRef>>;
   /** Permanently discard an unattached upload and its stored bytes. */
   deleteUpload(assetId: string): Promise<ApiResult<{ deleted: true }>>;
+  /**
+   * Persist a re-measured duration for an already stored video. Used to heal
+   * assets uploaded before durations were captured (owner only, video only).
+   */
+  updateDuration(assetId: string, durationLabel: string): Promise<ApiResult<MediaRef>>;
 }
 
 /** Frontend validation rules, mirrored by the real backend later. */
@@ -182,6 +187,14 @@ class MockMediaService implements MediaService {
     await mockLatency(120, 80);
     return { ok: true, data: { deleted: true } };
   }
+
+  async updateDuration(): Promise<ApiResult<MediaRef>> {
+    // Demo uploads never leave the device; there is nothing durable to update.
+    return {
+      ok: false,
+      error: { code: "not_applicable", message: "Demo uploads keep their duration on this device." },
+    };
+  }
 }
 
 const mockMediaService = new MockMediaService();
@@ -191,7 +204,7 @@ const mockMediaService = new MockMediaService();
 // server-side verification (the client never claims success as proof).
 // ---------------------------------------------------------------------------
 
-import { del as apiDelete, post as apiPost } from "@/lib/services/api";
+import { del as apiDelete, patch as apiPatch, post as apiPost } from "@/lib/services/api";
 
 interface LiveSessionResponse {
   uploadId: string;
@@ -529,6 +542,10 @@ class ApiMediaService implements MediaService {
 
   deleteUpload(assetId: string): Promise<ApiResult<{ deleted: true }>> {
     return apiDelete<{ deleted: true }>(`uploads/${encodeURIComponent(assetId)}`);
+  }
+
+  updateDuration(assetId: string, durationLabel: string): Promise<ApiResult<MediaRef>> {
+    return apiPatch<MediaRef>(`uploads/${encodeURIComponent(assetId)}`, { durationLabel });
   }
 }
 

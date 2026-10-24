@@ -51,6 +51,22 @@ export interface PublicCreatorPage extends PublicCreatorInfo {
   courses: PublicCourseCard[];
 }
 
+/**
+ * Short-lived, same-origin playback session for a creator-designated free
+ * preview lesson. The URL is re-authorized by the server on every byte, and
+ * only lessons explicitly marked `isPreview` on a published course resolve.
+ */
+export interface PublicPreviewPlayback {
+  lessonId: string;
+  lessonTitle: string;
+  durationLabel?: string;
+  durationSeconds: number;
+  /** Same-origin delivery URL — never a storage key or bucket path. */
+  url: string;
+  expiresAt: string;
+  note: string;
+}
+
 export interface PublicCoursePage {
   id: string;
   slug: string;

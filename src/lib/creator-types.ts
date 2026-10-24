@@ -33,6 +33,11 @@ export interface Lesson {
   title: string;
   description: string;
   media: MediaRef[];
+  /**
+   * Video lessons only: playable on the public storefront without buying.
+   * Resource lessons are never previewable.
+   */
+  isPreview?: boolean;
 }
 
 export interface CourseSection {

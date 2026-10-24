@@ -20,7 +20,21 @@ import { consumeForcedFailure, mockId, mockLatency } from "@/lib/services/mock-u
 export type PaymentOutcome = "success" | "failed";
 export type PendingResolution = "success";
 
+/**
+ * Whether this deployment can actually take a payment. The server derives it
+ * from provider configuration only (never from the presence of a browser
+ * key), so the UI can explain a disabled gateway before the buyer tries.
+ */
+export interface CheckoutReadiness {
+  ready: boolean;
+  code: string;
+  message: string;
+  mode: "test" | "live" | "unconfigured";
+}
+
 export interface CheckoutService {
+  /** Non-secret readiness probe (provider config + approval gates). */
+  getStatus(): Promise<ApiResult<CheckoutReadiness>>;
   createOrder(courseId: string): Promise<ApiResult<CheckoutOrder>>;
   /** Simulated gateway settlement (mock adapter only). */
   settlePayment(orderId: string, outcome: PaymentOutcome): Promise<ApiResult<PaymentReceipt>>;
@@ -45,6 +59,15 @@ function err<T>(code: string, message: string): ApiResult<T> {
 
 class MockCheckoutService implements CheckoutService {
   private orders = new Map<string, CheckoutOrder>();
+
+  async getStatus(): Promise<ApiResult<CheckoutReadiness>> {
+    return ok({
+      ready: true,
+      code: "ready",
+      message: "Demo gateway — every outcome is simulated and no money can move.",
+      mode: "test",
+    });
+  }
 
   async createOrder(courseId: string): Promise<ApiResult<CheckoutOrder>> {
     await mockLatency(500, 350);
@@ -111,9 +134,12 @@ class MockCheckoutService implements CheckoutService {
 // Live adapter — real Razorpay order creation + server signature verification
 // ---------------------------------------------------------------------------
 
-import { post as apiPost } from "@/lib/services/api";
+import { get as apiGet, post as apiPost } from "@/lib/services/api";
 
 class ApiCheckoutService implements CheckoutService {
+  getStatus() {
+    return apiGet<CheckoutReadiness>("checkout/status");
+  }
   createOrder(courseId: string) {
     return apiPost<CheckoutOrder>("checkout", { courseId });
   }

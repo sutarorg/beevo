@@ -73,6 +73,7 @@ export function seedCourses(): CourseEditor[] {
             {
               id: "les_film_1",
               type: "video",
+              isPreview: true,
               title: "Welcome & how this course works",
               description: "What you need, what you'll shoot, and how the community works.",
               media: [
@@ -169,6 +170,7 @@ export function seedCourses(): CourseEditor[] {
             {
               id: "les_street_1",
               type: "video",
+              isPreview: true,
               title: "Asking without being awkward",
               description: "The 3-line script that works in any city.",
               media: [

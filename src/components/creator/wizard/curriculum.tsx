@@ -13,7 +13,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   CourseEditor,
   CourseSection,
@@ -22,8 +22,10 @@ import type {
   MediaRef,
 } from "@/lib/creator-types";
 import type { CourseService } from "@/lib/services/courses";
-import { UPLOAD_RULES } from "@/lib/services/media";
-import { formatBytes } from "@/lib/utils";
+import { getMediaService, UPLOAD_RULES } from "@/lib/services/media";
+import { formatBytes, formatDurationLabel, isMissingDuration } from "@/lib/utils";
+import { readRemoteVideoDurationSeconds, readVideoDurationSeconds } from "@/lib/video";
+import { USE_MOCK_SERVICES } from "@/lib/config";
 import { ConfirmDialog, Modal } from "@/components/creator/dialogs";
 import { useMediaUpload, UploadProgressRow } from "@/components/creator/wizard/uploads";
 import { Button } from "@/components/ui/button";
@@ -59,7 +61,13 @@ function LessonDialog({
   lesson: Lesson | null;
   presetType: LessonType;
   onClose: () => void;
-  onSave: (input: { type: LessonType; title: string; description: string; media: MediaRef[] }) => Promise<{ ok: boolean; fieldErrors?: Record<string, string[]>; message?: string }>;
+  onSave: (input: {
+    type: LessonType;
+    title: string;
+    description: string;
+    media: MediaRef[];
+    isPreview: boolean;
+  }) => Promise<{ ok: boolean; fieldErrors?: Record<string, string[]>; message?: string }>;
   disabled: boolean;
 }) {
   const toast = useToast();
@@ -67,6 +75,8 @@ function LessonDialog({
   const [title, setTitle] = useState(lesson?.title ?? "");
   const [description, setDescription] = useState(lesson?.description ?? "");
   const [media, setMedia] = useState<MediaRef[]>(lesson?.media ?? []);
+  const [isPreview, setIsPreview] = useState(lesson?.isPreview === true);
+  const [readingDuration, setReadingDuration] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -84,6 +94,8 @@ function LessonDialog({
     setTitle(lesson?.title ?? "");
     setDescription(lesson?.description ?? "");
     setMedia(lesson?.media ?? []);
+    setIsPreview(lesson?.isPreview === true);
+    setReadingDuration(false);
     setTitleError(null);
     setMediaError(null);
     setSaving(false);
@@ -151,7 +163,13 @@ function LessonDialog({
       return;
     }
     setSaving(true);
-    const result = await onSave({ type, title: cleanTitle, description: description.trim(), media });
+    const result = await onSave({
+      type,
+      title: cleanTitle,
+      description: description.trim(),
+      media,
+      isPreview: type === "video" && isPreview,
+    });
     setSaving(false);
     if (!result.ok) {
       setTitleError(result.fieldErrors?.title?.[0] ?? null);
@@ -200,6 +218,37 @@ function LessonDialog({
           </Field>
         ) : null}
 
+        {type === "video" ? (
+          <label
+            htmlFor="lesson-free-preview"
+            className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-ink bg-white p-3.5 transition-colors hover:bg-lime/20"
+          >
+            <input
+              id="lesson-free-preview"
+              type="checkbox"
+              checked={isPreview}
+              onChange={(event) => setIsPreview(event.target.checked)}
+              disabled={saving || disabled}
+              className="mt-0.5 size-4 shrink-0 accent-[#e8490f]"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 text-sm font-bold text-ink">
+                Free preview
+                {isPreview ? (
+                  <span className="rounded-full border-2 border-ink bg-lime px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase">
+                    On
+                  </span>
+                ) : null}
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-smoke">
+                Anyone visiting your course page can watch this video before buying. Use it to
+                show how you teach. Preview playback is re-checked server-side, so the rest of the
+                course stays locked.
+              </span>
+            </span>
+          </label>
+        ) : null}
+
         {/* Existing attachments */}
         {media.length > 0 ? (
           <ul className="space-y-2">
@@ -239,7 +288,12 @@ function LessonDialog({
         {/* Upload area */}
         {type === "video" && hasMedia ? null : (
           <div>
-            {upload.state.phase === "readying" || upload.state.phase === "uploading" ? (
+            {readingDuration ? (
+              <div className="flex items-center gap-2.5 rounded-xl border-2 border-ink bg-white p-3">
+                <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-ink border-t-transparent" aria-hidden="true" />
+                <p className="text-xs font-bold text-ink">Reading the video duration…</p>
+              </div>
+            ) : upload.state.phase === "readying" || upload.state.phase === "uploading" ? (
               <UploadProgressRow
                 fileName={upload.state.fileName}
                 progress={upload.state.phase === "uploading" ? upload.state.progress : 0}
@@ -318,10 +372,10 @@ function LessonDialog({
             type="button"
             variant="accent"
             onClick={save}
-            loading={saving}
-            disabled={uploadBusy}
+            loading={saving || readingDuration}
+            disabled={uploadBusy || readingDuration}
           >
-            Save lesson
+            {readingDuration ? "Reading video…" : "Save lesson"}
           </Button>
         </div>
       </div>
@@ -335,7 +389,15 @@ function LessonDialog({
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
-          const result = await upload.start(file, { durationLabel: "0:00" });
+          // Read the real duration from the file's own metadata before the
+          // upload starts. If the browser can't decode it we omit the label
+          // entirely instead of storing a misleading "0:00".
+          setReadingDuration(true);
+          const durationSeconds = await readVideoDurationSeconds(file);
+          setReadingDuration(false);
+          const result = await upload.start(file, {
+            ...(durationSeconds ? { durationLabel: formatDurationLabel(durationSeconds) } : {}),
+          });
           if (result.ok) {
             setMedia([result.data]);
             setMediaError(null);
@@ -401,6 +463,62 @@ export function CurriculumStage({
   } | null>(null);
 
   const sections = course.sections;
+
+  /**
+   * Duration self-heal.
+   *
+   * Video lessons uploaded before durations were measured from the file carry
+   * no label (or a stale placeholder), which is why the storefront curriculum
+   * used to show "0:00". Opening the curriculum measures those videos once in
+   * the creator's browser and writes the real value back, so existing courses
+   * are corrected without re-uploading anything.
+   */
+  const repairedCourseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (USE_MOCK_SERVICES) return;
+    if (repairedCourseRef.current === course.id) return;
+    repairedCourseRef.current = course.id;
+    const mediaService = getMediaService();
+    if (!mediaService) return;
+    const missing = course.sections
+      .flatMap((section) => section.lessons)
+      .filter((lesson) => lesson.type === "video")
+      .map((lesson) => lesson.media[0])
+      .filter((ref): ref is MediaRef => Boolean(ref && ref.previewUrl && isMissingDuration(ref.durationLabel)));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const repaired = new Map<string, string>();
+      for (const ref of missing.slice(0, 20)) {
+        if (cancelled) return;
+        const seconds = await readRemoteVideoDurationSeconds(ref.previewUrl ?? "");
+        if (cancelled || !seconds) continue;
+        const label = formatDurationLabel(seconds);
+        const saved = await mediaService.updateDuration(ref.id, label);
+        if (saved.ok) repaired.set(ref.id, label);
+      }
+      if (cancelled || repaired.size === 0) return;
+      setCourse({
+        ...course,
+        sections: course.sections.map((section) => ({
+          ...section,
+          lessons: section.lessons.map((lesson) => ({
+            ...lesson,
+            media: lesson.media.map((ref) =>
+              repaired.has(ref.id) ? { ...ref, durationLabel: repaired.get(ref.id) } : ref,
+            ),
+          })),
+        })),
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Runs once per course load; `course` is captured deliberately as the
+    // snapshot the measurements were taken from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course.id]);
 
   const showError = (message: string) =>
     toast.push({ variant: "error", title: "That didn't work", description: message });
@@ -512,7 +630,13 @@ export function CurriculumStage({
   const saveLesson = async (
     section: CourseSection,
     lesson: Lesson | null,
-    input: { type: LessonType; title: string; description: string; media: MediaRef[] },
+    input: {
+      type: LessonType;
+      title: string;
+      description: string;
+      media: MediaRef[];
+      isPreview: boolean;
+    },
   ) => {
     const result = lesson
       ? await service.updateLesson(course.id, section.id, lesson.id, input)
@@ -661,7 +785,14 @@ export function CurriculumStage({
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-ink">{lesson.title}</p>
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+                      <span className="truncate">{lesson.title}</span>
+                      {lesson.isPreview && lesson.type === "video" ? (
+                        <span className="shrink-0 rounded-full border-2 border-ink bg-lime px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase">
+                          Free preview
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-[11px] text-smoke">
                       {lesson.type === "video" ? "Video lesson" : `${lesson.media.length} file${lesson.media.length === 1 ? "" : "s"}`}
                       {lesson.media[0]?.durationLabel ? ` · ${lesson.media[0].durationLabel}` : ""}

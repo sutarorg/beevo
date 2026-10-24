@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS "lessons" (
 	"type" text NOT NULL,
 	"title" text NOT NULL,
 	"description" text DEFAULT '' NOT NULL,
+	"is_preview" boolean DEFAULT false NOT NULL,
 	"position" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -397,6 +398,10 @@ ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_weekly_summary" boolean DEF
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_product_tips" boolean DEFAULT false NOT NULL;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_lesson_emails" boolean DEFAULT true NOT NULL;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "notify_receipt_emails" boolean DEFAULT true NOT NULL;
+
+-- Free preview lessons (added after the initial release): a video lesson can be
+-- watched from the public course page before purchase.
+ALTER TABLE "lessons" ADD COLUMN IF NOT EXISTS "is_preview" boolean DEFAULT false NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "users_handle_idx" ON "users" USING btree ("handle");
 

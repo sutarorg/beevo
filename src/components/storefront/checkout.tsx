@@ -17,7 +17,7 @@ import {
 import { useEffect, useState } from "react";
 import { formatINR } from "@/lib/domain";
 import type { CheckoutOrder, PaymentReceipt, PublicCoursePage } from "@/lib/learner-types";
-import { getCheckoutService } from "@/lib/services/checkout";
+import { getCheckoutService, type CheckoutReadiness } from "@/lib/services/checkout";
 import { getLearnerService } from "@/lib/services/learner";
 import { fetchSession, isMockAuth } from "@/lib/services/auth";
 import { cn } from "@/lib/utils";
@@ -77,6 +77,10 @@ export function CheckoutSheet({
   const [email, setEmail] = useState("kavya.learns@example.in");
   const [signingIn, setSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<CheckoutReadiness | null>(null);
+  const [checkingReadiness, setCheckingReadiness] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [alreadyEnrolled, setAlreadyEnrolled] = useState(false);
 
   // Reset when reopened for a different course / fresh attempt.
   useEffect(() => {
@@ -92,6 +96,25 @@ export function CheckoutSheet({
     };
   }, [open]);
 
+  // Ask the server whether this deployment can take a payment. This turns an
+  // opaque "Couldn't start checkout" toast into a specific, fixable reason
+  // (missing keys, live mode not enabled, …) before the buyer tries.
+  const probeReadiness = async () => {
+    if (!checkout) return;
+    setCheckingReadiness(true);
+    const result = await checkout.getStatus();
+    setCheckingReadiness(false);
+    if (result.ok) setReadiness(result.data);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setStartError(null);
+    setAlreadyEnrolled(false);
+    void probeReadiness();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   if (!open) return null;
 
   const busy =
@@ -100,12 +123,29 @@ export function CheckoutSheet({
     state.stage === "pending";
 
   const beginCheckout = async () => {
-    if (!checkout) return;
+    if (!checkout) {
+      setStartError("Checkout isn't available in this build. Try again in a moment.");
+      return;
+    }
+    setStartError(null);
     setState({ stage: "creating_order" });
     const result = await checkout.createOrder(course.id);
     if (!result.ok) {
-      toast.push({ variant: "error", title: "Couldn't start checkout", description: result.error.message });
+      if (result.error.code === "auth_required") {
+        setState({ stage: "sign_in" });
+        return;
+      }
+      if (result.error.code === "already_enrolled") {
+        setAlreadyEnrolled(true);
+        setState({ stage: "ready" });
+        return;
+      }
+      // Keep the reason visible inside the sheet — a toast disappears before
+      // the buyer can act on configuration guidance.
+      setStartError(result.error.message);
       setState({ stage: "ready" });
+      toast.push({ variant: "error", title: "Couldn't start checkout", description: result.error.message });
+      void probeReadiness();
       return;
     }
     setState({ stage: "checkout_open", order: result.data });
@@ -325,10 +365,69 @@ export function CheckoutSheet({
           </div>
 
           {state.stage === "ready" ? (
-            <div className="py-6 text-center">
-              <Button variant="accent" size="lg" onClick={start} className="w-full">
-                Continue to payment
-              </Button>
+            <div className="space-y-3 py-4">
+              {alreadyEnrolled ? (
+                <div className="rounded-2xl border-2 border-ink bg-lime/40 p-4 text-left">
+                  <p className="text-sm font-bold text-ink">You already own this course</p>
+                  <p className="mt-1 text-xs leading-relaxed text-smoke">
+                    “{course.title}” is in your library — no second payment is needed.
+                  </p>
+                  <Button href="/learn/courses" variant="ink" size="sm" className="mt-3">
+                    Open my library
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {readiness && !readiness.ready ? (
+                    <div className="rounded-2xl border-2 border-accent-deep bg-accent/5 p-4 text-left">
+                      <p className="flex items-center gap-2 text-sm font-bold text-accent-deep">
+                        <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                        Checkout isn't available yet
+                      </p>
+                      <p className="mt-1.5 text-xs leading-relaxed text-smoke">{readiness.message}</p>
+                      <button
+                        type="button"
+                        onClick={() => void probeReadiness()}
+                        className="mt-2 text-xs font-bold text-accent-deep underline underline-offset-2"
+                      >
+                        {checkingReadiness ? "Checking…" : "Re-check payment status"}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {startError ? (
+                    <div role="alert" className="rounded-2xl border-2 border-accent-deep bg-accent/5 p-4 text-left">
+                      <p className="flex items-center gap-2 text-sm font-bold text-accent-deep">
+                        <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+                        Couldn't start checkout
+                      </p>
+                      <p className="mt-1.5 text-xs leading-relaxed text-smoke">{startError}</p>
+                      <button
+                        type="button"
+                        onClick={() => void beginCheckout()}
+                        className="mt-2 text-xs font-bold text-accent-deep underline underline-offset-2"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <Button
+                    variant="accent"
+                    size="lg"
+                    onClick={start}
+                    className="w-full"
+                    disabled={readiness !== null && !readiness.ready}
+                  >
+                    Continue to payment
+                  </Button>
+                  {readiness?.ready ? (
+                    <p className="text-center text-[10px] font-semibold text-smoke">
+                      {readiness.message}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : null}
 

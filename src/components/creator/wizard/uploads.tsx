@@ -30,6 +30,8 @@ export function useMediaUpload(kind: UploadKind, courseId: string) {
   const service: MediaService | null = getMediaService();
   const abortRef = useRef<AbortController | null>(null);
   const fileRef = useRef<File | null>(null);
+  // Remembered so a retry keeps the measured duration/preview of the same file.
+  const optsRef = useRef<{ previewUrl?: string; durationLabel?: string }>({});
   const [state, setState] = useState<UploadPhase>({ phase: "idle" });
 
   const start = async (
@@ -48,6 +50,7 @@ export function useMediaUpload(kind: UploadKind, courseId: string) {
     }
 
     fileRef.current = file;
+    optsRef.current = { previewUrl: opts?.previewUrl, durationLabel: opts?.durationLabel };
     abortRef.current = new AbortController();
     setState({ phase: "readying", fileName: file.name });
 
@@ -92,17 +95,18 @@ export function useMediaUpload(kind: UploadKind, courseId: string) {
   const cancel = () => abortRef.current?.abort();
 
   const retry = async (
-    opts?: { previewUrl?: string },
+    opts?: { previewUrl?: string; durationLabel?: string },
   ): Promise<ApiResult<MediaRef>> => {
     const file = fileRef.current;
     if (!file) {
       return { ok: false, error: { code: "no_file", message: "Choose the file again to retry." } };
     }
-    return start(file, opts);
+    return start(file, { ...optsRef.current, ...opts });
   };
 
   const reset = () => {
     fileRef.current = null;
+    optsRef.current = {};
     setState({ phase: "idle" });
   };
 

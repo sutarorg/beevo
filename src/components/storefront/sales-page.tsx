@@ -17,7 +17,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { formatINR } from "@/lib/domain";
-import type { PublicCoursePage } from "@/lib/learner-types";
+import type { PublicCoursePage, PublicLessonMeta } from "@/lib/learner-types";
 import { useAsyncData } from "@/lib/hooks";
 import { getLearnerService } from "@/lib/services/learner";
 import { getStorefrontService } from "@/lib/services/storefront";
@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { CardListSkeleton, FailedState, Skeleton } from "@/components/creator/ui";
 import { CourseNotFound, PoweredByBanner } from "@/components/storefront/cards";
 import { CheckoutSheet } from "@/components/storefront/checkout";
+import { PreviewPlayerModal } from "@/components/storefront/preview-player";
 import { Button } from "@/components/ui/button";
 import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 
@@ -70,8 +71,15 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [purchased, setPurchased] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(course.sections[0]?.id ?? null);
+  const [previewLesson, setPreviewLesson] = useState<PublicLessonMeta | null>(null);
 
-  const previewLesson = course.sections.flatMap((section) => section.lessons).find((lesson) => lesson.isPreview);
+  const freePreviewLesson = course.sections
+    .flatMap((section) => section.lessons)
+    .find((lesson) => lesson.isPreview);
+  const previewCount = course.sections.reduce(
+    (total, section) => total + section.lessons.filter((lesson) => lesson.isPreview).length,
+    0,
+  );
 
   return (
     <>
@@ -115,7 +123,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           </div>
 
           {/* Buy card */}
-          <div className="lg:pt-8">
+          <div className="lg:pt-8" id="course-enrol-card">
             <div className="overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard">
               <div className="relative aspect-[4/3] border-b-2 border-ink bg-parchment">
                 {course.coverPreviewUrl ? (
@@ -210,6 +218,9 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">Curriculum</h2>
                 <p className="text-xs font-semibold text-smoke">
                   {course.sections.length} sections · {course.videoCount} videos · {course.resourceCount} files
+                  {previewCount > 0
+                    ? ` · ${previewCount} free preview${previewCount === 1 ? "" : "s"}`
+                    : ""}
                 </p>
               </div>
               <ol className="mt-5 space-y-3">
@@ -235,13 +246,25 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                         <ul className="divide-y divide-ink/10 border-t border-ink/10">
                           {section.lessons.map((lesson) => (
                             <li key={lesson.id} className="flex items-start gap-3 px-4 py-3">
-                              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-white">
-                                {lesson.type === "video" ? (
-                                  <Play className="size-3.5" aria-hidden="true" />
-                                ) : (
-                                  <FileText className="size-3.5" aria-hidden="true" />
-                                )}
-                              </span>
+                              {lesson.isPreview ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewLesson(lesson)}
+                                  aria-label={`Play free preview: ${lesson.title}`}
+                                  title="Watch the free preview"
+                                  className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-lime transition-transform hover:-translate-y-0.5 hover:shadow-hard-xs"
+                                >
+                                  <Play className="size-3.5 fill-current" aria-hidden="true" />
+                                </button>
+                              ) : (
+                                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-white">
+                                  {lesson.type === "video" ? (
+                                    <Play className="size-3.5" aria-hidden="true" />
+                                  ) : (
+                                    <FileText className="size-3.5" aria-hidden="true" />
+                                  )}
+                                </span>
+                              )}
                               <div className="min-w-0 flex-1">
                                 <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
                                   {lesson.title}
@@ -256,9 +279,25 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                 {lesson.description ? (
                                   <p className="mt-0.5 text-xs leading-relaxed text-smoke">{lesson.description}</p>
                                 ) : null}
-                                <p className="mt-1 text-[11px] text-smoke">
-                                  {lesson.type === "video" ? "Video" : `${lesson.resourceCount} downloadable file${lesson.resourceCount === 1 ? "" : "s"}`}
-                                  {lesson.durationLabel ? ` · ${lesson.durationLabel}` : ""}
+                                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-smoke">
+                                  <span>
+                                    {lesson.type === "video" ? "Video" : `${lesson.resourceCount} downloadable file${lesson.resourceCount === 1 ? "" : "s"}`}
+                                  </span>
+                                  {lesson.type === "video" ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock3 className="size-3" aria-hidden="true" />
+                                      {lesson.durationLabel ?? "Duration unavailable"}
+                                    </span>
+                                  ) : null}
+                                  {lesson.isPreview ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewLesson(lesson)}
+                                      className="font-bold text-accent underline underline-offset-2"
+                                    >
+                                      Watch free preview
+                                    </button>
+                                  ) : null}
                                 </p>
                               </div>
                             </li>
@@ -274,17 +313,25 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
 
           {/* Sidebar */}
           <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-            {previewLesson ? (
+            {freePreviewLesson ? (
               <div className="rounded-3xl border-2 border-ink bg-ink p-5 text-cream shadow-hard-xs">
                 <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">Free preview</p>
-                <h3 className="mt-2 text-lg font-bold leading-snug">{previewLesson.title}</h3>
+                <h3 className="mt-2 text-lg font-bold leading-snug">{freePreviewLesson.title}</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-cream/70">
-                  {previewLesson.description || "The first video lesson is open to preview."}
-                  {previewLesson.durationLabel ? ` · ${previewLesson.durationLabel}` : ""}
+                  {freePreviewLesson.description || "Watch a full lesson before you decide."}
+                  {freePreviewLesson.durationLabel ? ` · ${freePreviewLesson.durationLabel}` : ""}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setPreviewLesson(freePreviewLesson)}
+                  className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-lime bg-lime px-3 py-1.5 text-xs font-bold text-ink transition-transform hover:-translate-y-0.5"
+                >
+                  <Play className="size-3.5 fill-current" aria-hidden="true" />
+                  Watch now — no payment
+                </button>
                 <p className="mt-3 flex items-center gap-2 text-[11px] text-cream/50">
-                  <Clock3 className="size-3.5" aria-hidden="true" />
-                  Preview access unlocks in your account right after checkout.
+                  <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
+                  Preview playback is checked server-side; the rest of the course stays locked.
                 </p>
               </div>
             ) : null}
@@ -340,6 +387,16 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           setPurchased(true);
           setCheckoutOpen(false);
         }}
+      />
+
+      <PreviewPlayerModal
+        open={previewLesson !== null}
+        lesson={previewLesson}
+        handle={course.creator.handle}
+        slug={course.slug}
+        courseTitle={course.title}
+        posterUrl={course.coverPreviewUrl}
+        onClose={() => setPreviewLesson(null)}
       />
     </>
   );

@@ -38,6 +38,8 @@ export interface LessonInput {
   title: string;
   description: string;
   media: MediaRef[];
+  /** Video lessons only: watchable on the public storefront before purchase. */
+  isPreview?: boolean;
 }
 
 export interface CourseService {
@@ -401,7 +403,12 @@ class MockCourseService implements CourseService {
         media: [input.type === "video" ? "Upload the lesson video." : "Attach at least one file."],
       });
     }
-    const lesson: Lesson = { id: mockId("les"), ...input, title: input.title.trim() };
+    const lesson: Lesson = {
+      id: mockId("les"),
+      ...input,
+      title: input.title.trim(),
+      isPreview: input.type === "video" ? input.isPreview === true : false,
+    };
     section.lessons.push(lesson);
     this.touch(course);
     return ok(structuredClone(lesson));
@@ -427,6 +434,7 @@ class MockCourseService implements CourseService {
     lesson.title = patch.title.trim();
     lesson.description = patch.description;
     lesson.media = patch.media;
+    lesson.isPreview = patch.type === "video" ? patch.isPreview === true : false;
     this.touch(course);
     return ok(structuredClone(lesson));
   }
@@ -602,6 +610,7 @@ class ApiCourseService implements CourseService {
       title: input.title,
       description: input.description,
       mediaIds: input.media.map((ref) => ref.id),
+      isPreview: input.type === "video" ? input.isPreview === true : false,
     });
   }
   updateLesson(courseId: string, sectionId: string, lessonId: string, patch: LessonInput) {
@@ -610,6 +619,7 @@ class ApiCourseService implements CourseService {
       title: patch.title,
       description: patch.description,
       mediaIds: patch.media.map((ref) => ref.id),
+      isPreview: patch.type === "video" ? patch.isPreview === true : false,
     });
   }
   deleteLesson(courseId: string, sectionId: string, lessonId: string) {
