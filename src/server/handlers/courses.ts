@@ -17,8 +17,10 @@ import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/
 import { newId } from "@/server/auth";
 import {
   buildStorageKey,
+  deleteObject,
   LOCAL_UPLOADS_ENABLED,
   presignUrl,
+  putObject,
   readLocalObject,
   statLocalObject,
   UPLOAD_LIMITS,
@@ -28,6 +30,7 @@ import {
 import { R2 } from "@/server/env";
 import type { CourseEditor, CourseListItem, CourseSection, Lesson, MediaRef } from "@/lib/creator-types";
 import { readinessChecklist } from "@/lib/services/courses";
+import { audit } from "@/server/audit";
 
 /**
  * Creator course management — every mutation verifies ownership server-side
@@ -126,6 +129,7 @@ async function editorFor(courseId: string): Promise<CourseEditor | null> {
   return {
     id: course.id,
     creatorHandle: creator?.handle ?? "",
+    creatorName: creator?.name ?? "",
     status: course.status as CourseEditor["status"],
     slug: course.slug,
     title: course.title,
@@ -371,6 +375,64 @@ route("POST", "courses/:id/status", async (req, ctx, params) => {
     .set({ status: "draft", updatedAt: new Date() })
     .where(eq(courses.id, course.id));
   return ok(await editorFor(course.id));
+});
+
+/**
+ * Delete a course.
+ *
+ * Business rule: a course is only deletable while it has no history — no paid
+ * orders and no enrolments. Once a learner has bought access, the course row
+ * (and its financial trail) must survive; archiving is the offered alternative.
+ * Objects in R2 for the course's media are cleaned up best-effort afterwards.
+ */
+route("DELETE", "courses/:id", async (_req, ctx, params) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  const course = await ownCourse(params.id, user.id);
+  if (!course) {
+    return fail("not_found", "We couldn't find that course — it may already be deleted.", 404);
+  }
+
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.courseId, course.id))
+    .limit(1);
+  const [enrolment] = await db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(eq(enrollments.courseId, course.id))
+    .limit(1);
+
+  if (order || enrolment) {
+    return fail(
+      "course_has_history",
+      "This course already has learners or orders, so it can't be deleted. Archive it instead — existing learners keep access and financial records stay intact.",
+      409,
+    );
+  }
+
+  const assets = await db.query.mediaAssets.findMany({
+    where: eq(mediaAssets.courseId, course.id),
+  });
+
+  await db.delete(courses).where(eq(courses.id, course.id));
+
+  // Storage cleanup never blocks the delete; orphans are harmless.
+  for (const asset of assets) {
+    await deleteObject(asset.storageKey).catch(() => {});
+  }
+
+  await audit({
+    actorId: user.id,
+    actorLabel: user.name,
+    area: "courses",
+    action: "course_deleted",
+    detail: `Deleted course “${course.title || course.id}” (${assets.length} media object(s)).`,
+    kind: "event",
+  });
+
+  return ok({ deleted: true as const, id: course.id });
 });
 
 // ---- Sections ---------------------------------------------------------------
@@ -702,12 +764,30 @@ route("POST", "uploads/session", async (req, ctx) => {
   );
 });
 
-/** Local-development upload target (used only when R2 isn't configured). */
+/**
+ * Same-origin upload target.
+ *
+ * Two legitimate uses, one handler:
+ *  1. Local development without R2 credentials — bytes land in .uploads/.
+ *  2. A relay when the browser's direct PUT to R2 is blocked (bucket CORS not
+ *     yet allowing the app origin, corporate proxies, …). The bytes are then
+ *     written to the same R2 bucket server-side, so the media still ends up in
+ *     the cloud bucket instead of failing the upload.
+ *
+ * Large videos should always use the presigned direct PUT: serverless request
+ * bodies are capped well below the 500 MB video limit.
+ */
+const MAX_RELAY_BYTES = 20 * 1024 * 1024;
+
 route("PUT", "uploads/put/:assetId", async (req, ctx, params) => {
   const user = requireVerifiedUser(ctx);
   if (user instanceof Response) return user;
-  if (!LOCAL_UPLOADS_ENABLED) {
-    return fail("provider_not_configured", "Direct uploads are handled by storage.", 503);
+  if (!R2.configured && !LOCAL_UPLOADS_ENABLED) {
+    return fail(
+      "provider_not_configured",
+      "Media storage isn't configured yet (R2 credentials missing). Uploads are disabled until it is.",
+      503,
+    );
   }
   const asset = await db.query.mediaAssets.findFirst({
     where: and(eq(mediaAssets.id, params.assetId), eq(mediaAssets.uploaderId, user.id)),
@@ -719,16 +799,35 @@ route("PUT", "uploads/put/:assetId", async (req, ctx, params) => {
   const declared = Number(asset.declaredSizeBytes);
   const limits = UPLOAD_LIMITS[asset.kind as keyof typeof UPLOAD_LIMITS];
   if (!limits) return fail("validation_failed", "Unsupported upload type.", 422);
+  const declaredLength = Number(req.headers.get("content-length") ?? 0);
+  if (declaredLength > Math.min(limits.maxBytes, MAX_RELAY_BYTES)) {
+    return fail(
+      "relay_too_large",
+      "This file is too large to relay through the app. Upload it again on a network that can reach storage directly.",
+      413,
+    );
+  }
   const body = Buffer.from(await req.arrayBuffer());
   if (body.byteLength === 0) return fail("validation_failed", "The uploaded file was empty.", 422);
-  if (body.byteLength > limits.maxBytes) {
+  if (body.byteLength > Math.min(limits.maxBytes, MAX_RELAY_BYTES)) {
     return fail("validation_failed", "File is too large for this upload type.", 422);
   }
   if (Math.abs(body.byteLength - declared) > Math.max(1024, declared * 0.02)) {
     return fail("upload_size_mismatch", "The uploaded file doesn't match the declared size.", 409);
   }
+  if (R2.configured) {
+    const written = await putObject(asset.storageKey, body, asset.mimeType);
+    if (!written) {
+      return fail(
+        "upload_failed",
+        "We couldn't write the file to storage. Check the R2 bucket credentials and try again.",
+        502,
+      );
+    }
+    return ok({ uploaded: true, storage: "r2" as const });
+  }
   await writeLocalObject(asset.storageKey, body);
-  return ok({ uploaded: true });
+  return ok({ uploaded: true, storage: "local" as const });
 });
 
 route("POST", "uploads/complete", async (req, ctx) => {
@@ -880,8 +979,9 @@ route("GET", "media/access", async (req, ctx) => {
     });
   }
 
-  // Cover images are loaded via <Image> / <img>; streaming bytes avoids cross-origin 302 errors in /_next/image.
-  if (asset.kind === "cover") {
+  // Cover + avatar images are loaded via <Image> / <img>; streaming bytes avoids
+  // cross-origin 302 errors in /_next/image and keeps the URL stable for CSS.
+  if (asset.kind === "cover" || asset.kind === "avatar") {
     try {
       const upstream = await fetch(signed.url);
       if (upstream.ok && upstream.body) {

@@ -30,7 +30,8 @@ export interface PublicSectionMeta {
 export interface PublicCreatorInfo {
   handle: string;
   displayName: string;
-  avatarUrl: string;
+  /** Null until the creator uploads a photo — the UI shows the user icon. */
+  avatarUrl: string | null;
   tagline: string;
   niche: string;
   links: { label: string; url: string }[];

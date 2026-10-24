@@ -44,6 +44,7 @@ export function seedCourses(): CourseEditor[] {
     {
       id: "course_film",
       creatorHandle: "meera-shoots",
+      creatorName: "Meera Kapoor",
       status: "published",
       slug: "film-photography-foundations",
       title: "Film Photography Foundations",
@@ -143,6 +144,7 @@ export function seedCourses(): CourseEditor[] {
     {
       id: "course_street",
       creatorHandle: "meera-shoots",
+      creatorName: "Meera Kapoor",
       status: "unpublished",
       slug: "street-portraits-natural-light",
       title: "Street Portraits in Natural Light",
@@ -191,6 +193,7 @@ export function seedCourses(): CourseEditor[] {
     {
       id: "course_scanning",
       creatorHandle: "meera-shoots",
+      creatorName: "Meera Kapoor",
       status: "draft",
       slug: null,
       title: "The Scanning & Editing Workflow",
@@ -230,6 +233,7 @@ export function seedCourses(): CourseEditor[] {
     {
       id: "course_buyers",
       creatorHandle: "meera-shoots",
+      creatorName: "Meera Kapoor",
       status: "archived",
       slug: "35mm-buyers-guide",
       title: "The 35mm Buyer's Guide",

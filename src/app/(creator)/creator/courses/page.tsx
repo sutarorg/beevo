@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatINR } from "@/lib/domain";
@@ -54,7 +55,7 @@ export default function CreatorCoursesPage() {
   const [filter, setFilter] = useState<CourseStatus | "all">("all");
   const [sort, setSort] = useState<Sort>("updated");
   const [confirm, setConfirm] = useState<
-    | { kind: "publish" | "unpublish" | "archive" | "restore"; course: CourseListItem }
+    | { kind: "publish" | "unpublish" | "archive" | "restore" | "delete"; course: CourseListItem }
     | null
   >(null);
   const [acting, setActing] = useState(false);
@@ -97,7 +98,9 @@ export default function CreatorCoursesPage() {
           ? await service.unpublish(course.id)
           : kind === "archive"
             ? await service.archive(course.id)
-            : await service.unarchive(course.id);
+            : kind === "delete"
+              ? await service.deleteCourse(course.id)
+              : await service.unarchive(course.id);
     setActing(false);
     setConfirm(null);
     if (!result.ok) {
@@ -243,7 +246,9 @@ export default function CreatorCoursesPage() {
               ? "Unpublish this course?"
               : confirm?.kind === "archive"
                 ? "Archive this course?"
-                : "Restore this course?"
+                : confirm?.kind === "delete"
+                  ? "Delete this course?"
+                  : "Restore this course?"
         }
         body={
           confirm ? (
@@ -256,7 +261,7 @@ export default function CreatorCoursesPage() {
               ),
               unpublish: (
                 <>
-                  New buyers won't be able to purchase{" "}
+                  New buyers won&apos;t be able to purchase{" "}
                   <span className="font-semibold text-ink">“{confirm.course.title}”</span>. Enrolled students
                   keep their access.
                 </>
@@ -274,6 +279,13 @@ export default function CreatorCoursesPage() {
                   drafts so you can edit and re-publish it.
                 </>
               ),
+              delete: (
+                <>
+                  <span className="font-semibold text-ink">“{confirm.course.title}”</span> and its
+                  uploaded course media are permanently deleted. Courses with learners or orders
+                  can&apos;t be deleted — archive those instead.
+                </>
+              ),
             }[confirm.kind]
           ) : null
         }
@@ -284,9 +296,15 @@ export default function CreatorCoursesPage() {
               ? "Unpublish"
               : confirm?.kind === "archive"
                 ? "Archive"
-                : "Restore"
+                : confirm?.kind === "delete"
+                  ? "Delete course"
+                  : "Restore"
         }
-        danger={confirm?.kind === "archive" || confirm?.kind === "unpublish"}
+        danger={
+          confirm?.kind === "archive" ||
+          confirm?.kind === "unpublish" ||
+          confirm?.kind === "delete"
+        }
         loading={acting}
         onConfirm={runAction}
         onCancel={() => setConfirm(null)}
@@ -308,7 +326,7 @@ function CourseRow({
   course: CourseListItem;
   previewLoading: boolean;
   onPreview: () => void;
-  onAction: (kind: "publish" | "unpublish" | "archive" | "restore") => void;
+  onAction: (kind: "publish" | "unpublish" | "archive" | "restore" | "delete") => void;
 }) {
   return (
     <li className="rounded-3xl border-2 border-ink bg-white p-4 shadow-hard-xs sm:p-5">
@@ -359,6 +377,17 @@ function CourseRow({
         {course.status === "published" ? (
           <Button variant="outline" size="sm" onClick={() => onAction("unpublish")}>
             Unpublish
+          </Button>
+        ) : null}
+        {course.salesCount === 0 && course.enrollmentCount === 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onAction("delete")}
+            className="border-accent-deep text-accent-deep hover:bg-accent-deep hover:text-cream"
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Delete
           </Button>
         ) : null}
         {course.status !== "archived" ? (

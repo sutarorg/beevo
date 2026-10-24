@@ -22,7 +22,7 @@ Client-side via Supabase SDK implementing the `AuthService` interface from `src/
 | `/api/creators/check-handle?handle=` | GET | Availability probe for the profile form. |
 | `/api/creators/[handle]` | GET | Public storefront payload = `CreatorPublicProfile`. 404s render the public not-found UI. |
 
-Media: avatar upload via `/api/v1/uploads/session` (`kind: "avatar"`, `courseId: ""`) → signed PUT URL → `/api/v1/uploads/complete`; 5 MB, JPEG/PNG/WebP only. The resulting asset id is attached with `PATCH /api/v1/creator/profile { avatarAssetId }` (send `null` to clear), and the asset must be verified and owned by the caller.
+Media: avatar upload via `/api/v1/uploads/session` (`kind: "avatar"`, **no** `courseId` field) → signed PUT URL → `/api/v1/uploads/complete`; 5 MB, JPEG/PNG/WebP only. The resulting asset id is attached with `PATCH /api/v1/creator/profile { avatarAssetId }` (send `null` to clear), and the asset must be verified and owned by the caller.
 
 | Route | Methods | Notes |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ Media: avatar upload via `/api/v1/uploads/session` (`kind: "avatar"`, `courseId:
 | Route | Methods | Notes |
 | --- | --- | --- |
 | `/api/courses` | GET, POST | GET lists the creator’s courses with stats (`CourseListItem[]`); POST creates an empty draft and returns the full `CourseEditor` (editor opens at “details”). |
-| `/api/courses/[id]` | GET, PATCH | GET returns `CourseEditor`. PATCH autosaves details (`title`, `shortDescription`, `outcomes`, `cover` media ref) and `priceInPaise` — per-field debounced calls expected. |
+| `/api/courses/[id]` | GET, PATCH, DELETE | GET returns `CourseEditor` (including `creatorName` for the “Publishing as …” banner). PATCH autosaves details (`title`, `shortDescription`, `outcomes`, `cover` media ref) and `priceInPaise` — per-field debounced calls expected. DELETE permanently removes a course that has **no** orders and **no** enrolments (returns `409 course_has_history` otherwise — archive instead) and best-effort deletes its R2 objects. |
 | `/api/courses/[id]/status` | POST | `{ action: "publish" \| "unpublish" \| "archive" \| "unarchive" }`. Publish re-validates the readiness checklist authoritatively; failure returns `validation_failed` with `fieldErrors` grouped by editor stage. |
 | `/api/courses/[id]/sections` | POST, PATCH, DELETE | Create/rename/delete sections; delete cascades lessons within the draft. |
 | `/api/courses/[id]/sections/reorder` | PUT | `{ orderedSectionIds: string[] }` — unknown ids ignored, missing ids appended (idempotent). Same rule for lessons. |
@@ -45,6 +45,10 @@ Media: avatar upload via `/api/v1/uploads/session` (`kind: "avatar"`, `courseId:
 | `/api/c/[slug]` | GET | Public, SEO-indexed course sales page: `CourseSummary` + curriculum outline + `CreatorPublicProfile` (creator subset). |
 
 Media (R2): `POST /api/uploads/session` `{kind, fileName, sizeBytes, mimeType}` → `{ uploadId, signedUrl, expiresAt }`; client PUTs direct to R2; `POST /api/uploads/complete` `{uploadId}` → `MediaRef` (R2 key + delivery URL). Server re-validates the type/size limits from `UPLOAD_RULES`.
+
+Upload relay: `PUT /api/v1/uploads/put/[assetId]` accepts the same bytes when the browser cannot reach R2 directly (bucket CORS not yet allowing the app origin, proxy/network blocking). The server writes the object to the **same** R2 bucket, so media still lands in cloud storage. Relays are capped at 20 MB — videos must use the presigned direct PUT (bucket CORS: allow `PUT, GET, HEAD` from the app origin with `content-type`).
+
+Storefront handles: every account is given a unique lowercase handle at signup (`suggestHandle`), legacy accounts are backfilled on sign-in / first profile read. `/@handle` resolves case-insensitively, so a live storefront never 404s on a hand-typed link.
 
 Rules: price as integer paise; readiness checklist = title + description + cover + creator profile + ≥1 section + every section has lessons with content + valid price; unpublish keeps enrolled students’ access; archived courses are read-only; deleting a course with purchases is a soft-delete.
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { Camera, Globe, Link2, Loader2, Plus, Trash2 } from "lucide-react";
+import { Camera, Globe, Link2, Loader2, Plus, Trash2, UserRound } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { APP_URL } from "@/lib/config";
+import { shareableOrigin } from "@/lib/config";
 import { useAsyncData } from "@/lib/hooks";
 import { getCreatorDataService } from "@/lib/services/creator-data";
 import { getMediaService, UPLOAD_RULES, validateUploadFile } from "@/lib/services/media";
@@ -36,7 +36,7 @@ export default function CreatorProfilePage() {
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [handleError, setHandleError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarProgress, setAvatarProgress] = useState(0);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -71,8 +71,9 @@ export default function CreatorProfilePage() {
   }
 
   const profile = state.data;
-  const publicHost = APP_URL.replace(/^https?:\/\//, "");
-  const publicUrl = `${APP_URL}/@${handle || profile.handle}`;
+  const origin = shareableOrigin();
+  const publicHost = origin.replace(/^https?:\/\//, "");
+  const publicUrl = `${origin}/@${handle || profile.handle}`;
 
   const changeAvatar = async (file: File | undefined) => {
     if (!file || !service) return;
@@ -118,6 +119,23 @@ export default function CreatorProfilePage() {
     toast.push({ variant: "success", title: "Profile photo updated", description: "Your storefront now shows this photo." });
   };
 
+  const removeAvatar = async () => {
+    if (!service) return;
+    setAvatarBusy(true);
+    const saved = await service.updateProfile({ avatarAssetId: null });
+    setAvatarBusy(false);
+    if (!saved.ok) {
+      toast.push({ variant: "error", title: "Photo not removed", description: saved.error.message });
+      return;
+    }
+    setAvatarUrl(saved.data.avatarUrl);
+    toast.push({
+      variant: "success",
+      title: "Profile photo removed",
+      description: "Your storefront shows the default user icon again.",
+    });
+  };
+
   const save = async () => {
     if (!service) return;
     setSaving(true);
@@ -153,8 +171,8 @@ export default function CreatorProfilePage() {
                 {avatarUrl ? (
                   <Image src={avatarUrl} alt="Your profile photo" fill sizes="64px" className="object-cover" />
                 ) : (
-                  <span className="grid h-full w-full place-items-center bg-parchment text-lg font-bold text-smoke">
-                    {(displayName || "B").slice(0, 1).toUpperCase()}
+                  <span className="grid h-full w-full place-items-center bg-parchment text-smoke">
+                    <UserRound className="size-7" strokeWidth={2} aria-hidden="true" />
                   </span>
                 )}
                 <span className="absolute inset-0 grid place-items-center bg-ink/55 text-cream opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -170,11 +188,23 @@ export default function CreatorProfilePage() {
                   </span>
                 ) : null}
               </button>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-bold text-ink">Profile photo</p>
                 <p className="mt-0.5 text-xs text-smoke">
-                  Click your photo to upload a new one. {UPLOAD_RULES.avatar.label}.
+                  {avatarUrl ? "Click your photo to replace it." : "No photo yet — the default user icon is shown."}{" "}
+                  {UPLOAD_RULES.avatar.label}.
                 </p>
+                {avatarUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => void removeAvatar()}
+                    disabled={avatarBusy}
+                    className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-accent underline underline-offset-2 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                    Remove photo
+                  </button>
+                ) : null}
               </div>
               <input
                 ref={avatarInputRef}
@@ -303,14 +333,32 @@ export default function CreatorProfilePage() {
               <Globe className="size-4" aria-hidden="true" />
               Public storefront URL
             </p>
-            <p className="mt-2 truncate text-sm font-bold">{publicUrl}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <CopyButton text={publicUrl} variant="lime" />
-            </div>
-            <p className="mt-3 text-[11px] text-cream/50">
-              Share this link anywhere your audience already follows you — it opens your public
-              storefront with every published course.
-            </p>
+            {(handle || profile.handle) ? (
+              <>
+                <p className="mt-2 truncate text-sm font-bold">{publicUrl}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <CopyButton text={publicUrl} variant="lime" />
+                  <a
+                    href={publicUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border-2 border-cream/40 px-3 py-1.5 text-xs font-bold text-cream transition-colors hover:border-lime hover:text-lime"
+                  >
+                    <Globe className="size-3.5" aria-hidden="true" />
+                    Open storefront
+                  </a>
+                </div>
+                <p className="mt-3 text-[11px] text-cream/50">
+                  Share this link anywhere your audience already follows you — it opens your public
+                  storefront with every published course.
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 rounded-xl border-2 border-lime/40 bg-lime/10 p-3 text-xs leading-relaxed text-cream/80">
+                Choose a handle and save — your storefront link goes live the moment it&apos;s
+                saved.
+              </p>
+            )}
           </div>
 
           <div aria-hidden="true" className="pointer-events-none rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
@@ -318,13 +366,11 @@ export default function CreatorProfilePage() {
               Live preview
             </p>
             <div className="flex items-center gap-3">
-              <div className="relative size-12 overflow-hidden rounded-full border-2 border-ink">
+              <div className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ink bg-parchment">
                 {avatarUrl ? (
                   <Image src={avatarUrl} alt="" fill sizes="48px" className="object-cover" />
                 ) : (
-                  <span className="grid h-full w-full place-items-center bg-parchment text-sm font-bold text-smoke">
-                    {(displayName || "B").slice(0, 1).toUpperCase()}
-                  </span>
+                  <UserRound className="size-6 text-smoke" strokeWidth={2} aria-hidden="true" />
                 )}
               </div>
               <div>

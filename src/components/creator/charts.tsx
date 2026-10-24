@@ -67,34 +67,43 @@ export function TrendLine({
 
   return (
     <div className={className}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label={`Trend chart. Values: ${points.map((p) => `${p.label} ${p.value}`).join(", ")}`}
-        className="h-40 w-full"
-        preserveAspectRatio="none"
-      >
-        <polygon points={area} fill="var(--color-lime)" opacity="0.35" />
-        <polyline
-          points={line}
-          fill="none"
-          stroke="var(--color-ink)"
-          strokeWidth="3"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        {coords.map((c, index) => (
-          <circle
-            key={index}
-            cx={c.x}
-            cy={c.y}
-            r="5"
-            fill="var(--color-accent)"
+      {/*
+        The chart is deliberately stretched to the card width
+        (preserveAspectRatio="none"), which would squash SVG <circle> markers
+        into ellipses. The markers are therefore drawn as HTML dots positioned
+        by percentage — they stay perfectly round at every breakpoint.
+      */}
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={`Trend chart. Values: ${points.map((p) => `${p.label} ${p.value}`).join(", ")}`}
+          className="h-40 w-full"
+          preserveAspectRatio="none"
+        >
+          <polygon points={area} fill="var(--color-lime)" opacity="0.35" />
+          <polyline
+            points={line}
+            fill="none"
             stroke="var(--color-ink)"
-            strokeWidth="2"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        {coords.map((c, index) => (
+          <span
+            key={index}
+            aria-hidden="true"
+            className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink bg-accent"
+            style={{
+              left: `${(c.x / width) * 100}%`,
+              top: `${(c.y / height) * 100}%`,
+            }}
           />
         ))}
-      </svg>
+      </div>
       <div className="mt-1 flex justify-between text-[10px] font-semibold text-smoke">
         <span>{points[0]?.label}</span>
         <span>{points[points.length - 1]?.label}</span>

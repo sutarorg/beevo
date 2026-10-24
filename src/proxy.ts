@@ -28,13 +28,20 @@ const KNOWN_SEGMENTS = new Set([
   "favicon.ico",
 ]);
 
-const HANDLE_PATTERN = /^@[a-z0-9-]{1,40}$/;
+/** `@username` — matched case-insensitively (the page normalises to lowercase). */
+const HANDLE_PATTERN = /^@[A-Za-z0-9-]{1,40}$/;
 
 export function proxy(request: NextRequest) {
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   if (segments.length === 0) return NextResponse.next();
 
-  const first = decodeURIComponent(segments[0]);
+  let first: string;
+  try {
+    first = decodeURIComponent(segments[0]).toLowerCase();
+  } catch {
+    // Malformed escape sequence in the URL — treat it as an unknown segment.
+    first = segments[0].toLowerCase();
+  }
   if (KNOWN_SEGMENTS.has(first) || first.startsWith("_next")) {
     return NextResponse.next();
   }

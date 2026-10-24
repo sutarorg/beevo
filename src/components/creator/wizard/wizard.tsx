@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, ArchiveRestore, Eye } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArchiveRestore, Eye, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CourseEditor } from "@/lib/creator-types";
 import { useAsyncData } from "@/lib/hooks";
@@ -34,6 +35,7 @@ export function CourseWizard({
   initialStage?: CourseStage;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const service = getCourseService();
   const { state, reload } = useAsyncData(
     () =>
@@ -51,6 +53,8 @@ export function CourseWizard({
   const [savingDraft, setSavingDraft] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (state.status === "success") setCourse(state.data);
@@ -120,6 +124,27 @@ export function CourseWizard({
     toast.push({ variant: "success", title: "Course restored", description: "It's back in drafts and fully editable." });
   };
 
+  const removeCourse = async () => {
+    setDeleting(true);
+    const result = await service.deleteCourse(course.id);
+    setDeleting(false);
+    setConfirmDelete(false);
+    if (!result.ok) {
+      toast.push({
+        variant: "error",
+        title: result.error.code === "course_has_history" ? "Can't delete this course" : "Couldn't delete the course",
+        description: result.error.message,
+      });
+      return;
+    }
+    toast.push({
+      variant: "success",
+      title: "Course deleted",
+      description: "The course and its unpublished content have been removed.",
+    });
+    router.replace("/creator/courses");
+  };
+
   return (
     <div className="pb-6">
       {/* Editor header */}
@@ -133,6 +158,16 @@ export function CourseWizard({
           <span className="text-[11px] font-semibold text-smoke">
             Updated {formatDateTime(course.updatedAt)}
           </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmDelete(true)}
+            className="border-accent-deep text-accent-deep hover:bg-accent-deep hover:text-cream"
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -243,6 +278,28 @@ export function CourseWizard({
       </div>
 
       <StorefrontPreviewModal course={course} open={previewOpen} onClose={() => setPreviewOpen(false)} />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this course?"
+        body={
+          <>
+            <p>
+              “{course.title || "Untitled course"}” and all of its sections, lessons and uploaded
+              course media will be permanently deleted. This can&apos;t be undone.
+            </p>
+            <p className="mt-2">
+              Courses that already have learners or orders can&apos;t be deleted — archive those
+              instead so buyers keep access.
+            </p>
+          </>
+        }
+        confirmLabel="Delete course"
+        danger
+        loading={deleting}
+        onConfirm={removeCourse}
+        onCancel={() => setConfirmDelete(false)}
+      />
 
       <ConfirmDialog
         open={confirmRestore}

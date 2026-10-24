@@ -118,6 +118,33 @@ export function presignUrl(input: {
   return { url, expiresAt: new Date(now.getTime() + input.expiresSeconds * 1000).toISOString() };
 }
 
+/**
+ * Server-side object write (fallback path only).
+ *
+ * Browsers normally PUT straight to a presigned R2 URL — fastest, and the only
+ * option for large videos. When that direct PUT is impossible (bucket CORS not
+ * yet configured, a network middlebox stripping the request, …) the client can
+ * relay the bytes through the app instead; this performs the actual R2 write.
+ */
+export async function putObject(
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<boolean> {
+  if (!R2.configured) return false;
+  const { url } = presignUrl({ method: "PUT", key, expiresSeconds: 300, contentType });
+  try {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "content-type": contentType },
+      body: new Uint8Array(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Server-side object verification (never trust the client's claim). */
 export async function verifyObjectExists(
   key: string,

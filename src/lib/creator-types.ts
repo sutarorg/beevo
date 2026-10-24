@@ -45,7 +45,10 @@ export interface CourseSection {
 /** Full course shape used by the editor. */
 export interface CourseEditor {
   id: string;
+  /** Public handle of the signed-in creator (their storefront address). */
   creatorHandle: string;
+  /** Display name of the signed-in creator — never demo data. */
+  creatorName: string;
   status: CourseStatus;
   slug: string | null;
   title: string;
@@ -185,7 +188,8 @@ export interface CreatorProfile {
   handle: string;
   displayName: string;
   tagline: string;
-  avatarUrl: string;
+  /** Null until the creator uploads a photo — the UI shows the user icon. */
+  avatarUrl: string | null;
   niche: string;
   links: { label: string; url: string }[];
   publicUrl: string;

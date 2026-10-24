@@ -26,6 +26,22 @@ function resolvePublicAppUrl(): string {
 /** Public marketing URL used in metadata and email copy. */
 export const APP_URL = resolvePublicAppUrl();
 
+/**
+ * Origin to use for links the creator will actually share (storefront, sales
+ * page).
+ *
+ * On the client this is the origin the creator is browsing right now — so a
+ * storefront link copied from the studio opens the same live site, never a
+ * hardcoded domain or `localhost`. On the server (SSR/first paint) it falls
+ * back to NEXT_PUBLIC_APP_URL.
+ */
+export function shareableOrigin(): string {
+  if (typeof window !== "undefined" && window.location.origin) {
+    return window.location.origin;
+  }
+  return APP_URL;
+}
+
 export const SUPPORT_EMAIL = "support@beevo.in";
 
 /**
