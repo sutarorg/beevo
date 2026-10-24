@@ -14,26 +14,24 @@ import { Button } from "@/components/ui/button";
 import { Sticker } from "@/components/ui/primitives";
 
 /**
- * Brand mark — the Beevo bolt itself, nothing behind it.
- *
- * The artwork is a transparent PNG: no black tile, no frame, no shadow. The
- * mark alone carries the brand on every surface (cream, ink, lime).
+ * Square Beevo brand tile, shared by the header, footer and app shells.
+ * Keep the image square at every size so its rounded corners stay proportional.
  */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "relative grid size-9 shrink-0 place-items-center transition-transform duration-200 group-hover:-rotate-6",
+        "relative inline-flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-[22%] transition-transform duration-200 group-hover:-rotate-6",
         className,
       )}
     >
       <Image
         src="/images/brand/beevo-mark.png"
         alt=""
-        width={231}
-        height={405}
-        sizes="40px"
-        className="h-full w-auto object-contain"
+        width={500}
+        height={500}
+        sizes="36px"
+        className="block size-full object-contain"
         priority
       />
     </span>
