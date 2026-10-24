@@ -100,7 +100,7 @@ Routes `/creator/*` (Studio shell: sidebar on desktop, bottom-nav + "More" sheet
 
 ### MediaService (src/lib/services/media.ts)
 
-`beginUpload({kind, fileName, sizeBytes, mimeType}) → UploadSession`, `performUpload(session, {onProgress, signal, previewUrl, durationLabel}) → MediaRef`. Kinds/rule table in `UPLOAD_RULES`; `validateUploadFile` is the shared client-side check (cover ≤5MB images; video ≤500MB mp4/mov/webm; resources ≤50MB pdf/zip/images/csv, max 5). Every mock `MediaRef` carries `simulated: true` and UI shows `SIMULATED_UPLOAD_NOTE` ("no file left your device"). Cancellation returns `upload_cancelled` (silent in UI); errors support retry with the retained File.
+`beginUpload({kind, fileName, sizeBytes, mimeType}) → UploadSession`, `performUpload(session, {onProgress, signal, previewUrl, durationLabel}) → MediaRef`, and `deleteUpload(assetId)` for unattached files. Kinds/rule table in `UPLOAD_RULES`; `validateUploadFile` is the shared client-side check (cover/avatar ≤5MB images; video ≤1GB mp4/mov/webm; resources ≤500MB pdf/zip/images/csv, max 5). Large live uploads use direct R2 multipart requests; R2 CORS must allow `POST` and expose `ETag`. A single-PUT HTTP 413 also switches to multipart rather than failing. Every mock `MediaRef` carries `simulated: true` and UI shows `SIMULATED_UPLOAD_NOTE` ("no file left your device"). Cancellation returns `upload_cancelled` (silent in UI); errors support retry with the retained File.
 
 ### CreatorDataService (src/lib/services/creator-data.ts)
 

@@ -44,9 +44,13 @@ Media: avatar upload via `/api/v1/uploads/session` (`kind: "avatar"`, **no** `co
 | `/api/courses/[id]/sections/[sectionId]/lessons` | POST, PATCH, DELETE | Types: `video` (exactly one video `MediaRef`) and `resources` (1–5 file `MediaRef`s). |
 | `/api/c/[slug]` | GET | Public, SEO-indexed course sales page: `CourseSummary` + curriculum outline + `CreatorPublicProfile` (creator subset). |
 
-Media (R2): `POST /api/uploads/session` `{kind, fileName, sizeBytes, mimeType}` → `{ uploadId, signedUrl, expiresAt }`; client PUTs direct to R2; `POST /api/uploads/complete` `{uploadId}` → `MediaRef` (R2 key + delivery URL). Server re-validates the type/size limits from `UPLOAD_RULES`.
+Media (R2): `POST /api/v1/uploads/session` `{kind, courseId?, fileName, sizeBytes, mimeType}` → `{ uploadId, signedUrl, expiresAt }`; small files PUT directly to R2 and `POST /api/v1/uploads/complete` verifies the object before returning `MediaRef`. Limits are cover/avatar 5 MB, video 1 GB, and each resource 500 MB (up to five per resource lesson).
 
-Upload relay: `PUT /api/v1/uploads/put/[assetId]` accepts the same bytes when the browser cannot reach R2 directly (bucket CORS not yet allowing the app origin, proxy/network blocking). The server writes the object to the **same** R2 bucket, so media still lands in cloud storage. Relays are capped at 20 MB — videos must use the presigned direct PUT (bucket CORS: allow `PUT, GET, HEAD` from the app origin with `content-type`).
+Large files use direct R2 multipart upload: `POST /api/v1/uploads/multipart/start`, `/sign-part`, `/complete`, and `/abort`. Parts are 16 MiB, signed just in time, uploaded in parallel by the browser, and completed with their R2 ETags. An HTTP 413 from single-PUT storage also retries through this path, so intermediary request-body caps do not reject the second attempt. Only small JSON signing requests pass through the app; media bytes remain direct-to-R2.
+
+Upload relay: `PUT /api/v1/uploads/put/[assetId]` accepts small-file bytes when the browser cannot reach R2 directly (bucket CORS not yet allowing the app origin, proxy/network blocking). The server writes the object to the **same** R2 bucket. Relays are capped at 20 MB. Bucket CORS must allow `PUT, POST, GET, HEAD, DELETE` from the app origin (`POST` is required for multipart create/complete), allow `content-type` and `x-amz-content-sha256`, and expose `ETag` for multipart completion.
+
+`DELETE /api/v1/uploads/[assetId]` permanently discards an owned, unattached upload. Replacing/removing covers and avatars, updating lesson attachments, and deleting lessons, sections, or courses also deletes newly unreferenced R2/local objects after the database mutation; assets still referenced by another lesson/profile are retained.
 
 Storefront handles: every account is given a unique lowercase handle at signup (`suggestHandle`), legacy accounts are backfilled on sign-in / first profile read. `/@handle` resolves case-insensitively, so a live storefront never 404s on a hand-typed link.
 
