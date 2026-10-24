@@ -30,6 +30,11 @@ export function formatINR(
   }).format(rupees);
 }
 
+/** Storefront price label — a zero-priced course is presented as FREE. */
+export function priceLabel(amountInPaise: number): string {
+  return amountInPaise === 0 ? "FREE" : formatINR(amountInPaise);
+}
+
 // ---------------------------------------------------------------------------
 // Pricing — the fixed business rules (single plan, 8% commission, no Pro)
 // ---------------------------------------------------------------------------

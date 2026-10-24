@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { CourseEditor } from "@/lib/creator-types";
 import { shareableOrigin } from "@/lib/config";
-import { commissionBreakdown, formatINR } from "@/lib/domain";
+import { commissionBreakdown, formatINR, priceLabel } from "@/lib/domain";
 import { readinessChecklist, type CourseService, type CourseStage } from "@/lib/services/courses";
 import { cn, formatDate } from "@/lib/utils";
 import { ConfirmDialog, Modal } from "@/components/creator/dialogs";
@@ -165,13 +165,14 @@ export function PricingStage({
   const [saving, setSaving] = useState(false);
 
   const parsed = Number(rupees);
-  const validNumber = rupees.trim() !== "" && Number.isFinite(parsed) && parsed > 0;
-  const preview = validNumber ? commissionBreakdown(Math.round(parsed * 100)) : null;
+  const validNumber = rupees.trim() !== "" && Number.isFinite(parsed) && parsed >= 0;
+  const isFree = validNumber && Math.round(parsed * 100) === 0;
+  const preview = validNumber && !isFree ? commissionBreakdown(Math.round(parsed * 100)) : null;
   const dirty = validNumber && Math.round(parsed * 100) !== course.priceInPaise;
 
   const savePrice = async () => {
     if (!validNumber) {
-      setError("Enter a price above ₹0 in whole or decimal rupees.");
+      setError("Enter a price of ₹0 or more in whole or decimal rupees.");
       return;
     }
     if (parsed > 500000) {
@@ -193,7 +194,15 @@ export function PricingStage({
       return;
     }
     setCourse(result.data);
-    toast.push({ variant: "success", title: "Price saved", description: `${formatINR(result.data.priceInPaise ?? 0)} per enrolment.` });
+    const savedPrice = result.data.priceInPaise ?? 0;
+    toast.push({
+      variant: "success",
+      title: "Price saved",
+      description:
+        savedPrice === 0
+          ? "Listed as a FREE course — buyers enrol instantly with no payment."
+          : `${formatINR(savedPrice)} per enrolment.`,
+    });
   };
 
   return (
@@ -209,6 +218,10 @@ export function PricingStage({
         <label htmlFor="course-price" className="block text-sm font-semibold text-ink">
           Course price (INR)
         </label>
+        <p className="mt-1 text-xs text-smoke">
+          Set it to 0 to publish this as a free course. Free courses show a FREE badge and skip
+          payment entirely.
+        </p>
         <div className="mt-2 flex items-center gap-3">
           <span className="grid size-12 shrink-0 place-items-center rounded-xl border-2 border-ink bg-parchment text-xl font-bold">
             ₹
@@ -232,6 +245,20 @@ export function PricingStage({
         </div>
         {error ? (
           <p role="alert" className="mt-2 text-xs font-bold text-accent-deep">{error}</p>
+        ) : null}
+
+        {isFree ? (
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border-2 border-ink bg-lime px-4 py-3">
+            <span className="grid size-8 place-items-center rounded-lg border-2 border-ink bg-white text-[10px] font-black tracking-widest">
+              ₹0
+            </span>
+            <div>
+              <p className="text-sm font-bold text-ink">FREE course</p>
+              <p className="text-[11px] text-ink/80">
+                No payment step. Anyone with the link can enrol and get dashboard access.
+              </p>
+            </div>
+          </div>
         ) : null}
 
         {preview ? (
@@ -277,9 +304,10 @@ export function PricingStage({
         <p className="mt-1">
           Commission is computed in integer paise: fee = Math.round(price × 8%), i.e. rounded to the
           nearest paise (half up). Example: ₹1,000 → ₹80 fee → ₹920 remaining before other
-          deductions. This is a frontend estimate only — the authoritative calculation happens
-          server-side at checkout, and payment-gateway charges and applicable taxes are settled
-          separately per the provider&apos;s terms.
+          deductions. Free courses (₹0) have no sale, so no commission is charged. This is a
+          frontend estimate only — the authoritative calculation happens server-side at checkout,
+          and payment-gateway charges and applicable taxes are settled separately per the
+          provider&apos;s terms.
         </p>
       </div>
     </div>
@@ -316,7 +344,7 @@ export function StorefrontPreviewModal({
             <div className="grid h-full place-items-center text-sm text-smoke">No cover yet</div>
           )}
           <span className="absolute bottom-3 left-3 rounded-full border-2 border-ink bg-lime px-3 py-1 text-sm font-bold shadow-hard-xs">
-            {course.priceInPaise !== null ? formatINR(course.priceInPaise) : "No price"}
+            {course.priceInPaise !== null ? priceLabel(course.priceInPaise) : "No price"}
           </span>
         </div>
         <div className="p-5">
@@ -579,7 +607,7 @@ export function ReviewStage({
         <div role="alert" className="rounded-2xl border-2 border-accent-deep bg-accent/5 p-4">
           <p className="flex items-center gap-2 text-sm font-bold text-accent-deep">
             <CircleAlert className="size-4.5" aria-hidden="true" />
-            The service says this course isn't ready. Your draft is untouched.
+            The service says this course isn&apos;t ready. Your draft is untouched.
           </p>
           <ul className="mt-3 space-y-1.5">
             {Object.entries(publishErrors).map(([stage, messages]) =>

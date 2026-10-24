@@ -261,7 +261,7 @@ const detailsSchema = z.object({
   shortDescription: z.string().trim().max(220).optional(),
   outcomes: z.array(z.string().trim().min(1).max(140)).max(12).optional(),
   coverAssetId: z.string().nullable().optional(),
-  priceInPaise: z.number().int().positive().max(50_000_000).optional(),
+  priceInPaise: z.number().int().min(0).max(50_000_000).optional(),
 });
 
 route("PATCH", "courses/:id", async (req, ctx, params) => {
@@ -1142,7 +1142,54 @@ route("POST", "uploads/complete", async (req, ctx) => {
   return ok(toMediaRef(verified));
 });
 
-/** Server-authorized, short-lived media delivery (enrollment or public rules). */
+/** Server-authorized media delivery: inline streaming, range support, no downloads for video. */
+function mediaResponse(
+  bytes: Buffer,
+  req: Request,
+  options: { mimeType: string; fileName: string; download: boolean },
+): NextResponse {
+  const size = bytes.byteLength;
+  const disposition = options.download
+    ? `attachment; filename="${options.fileName.replace(/["\\\r\n]/g, "_")}"`
+    : "inline";
+  const common = {
+    "Content-Type": options.mimeType || "application/octet-stream",
+    "Content-Disposition": disposition,
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "private, no-store, max-age=0",
+    "X-Content-Type-Options": "nosniff",
+  } as Record<string, string>;
+
+  const rangeHeader = req.headers.get("range");
+  if (rangeHeader) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+    if (match) {
+      const start = match[1] ? Number(match[1]) : 0;
+      const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+      if (Number.isFinite(start) && Number.isFinite(end) && start <= end && start < size) {
+        const chunk = bytes.subarray(start, end + 1);
+        return new NextResponse(new Uint8Array(chunk), {
+          status: 206,
+          headers: {
+            ...common,
+            "Content-Range": `bytes ${start}-${end}/${size}`,
+            "Content-Length": String(chunk.byteLength),
+          },
+        });
+      }
+      return new NextResponse(null, {
+        status: 416,
+        headers: { ...common, "Content-Range": `bytes */${size}` },
+      });
+    }
+  }
+
+  return new NextResponse(new Uint8Array(bytes), {
+    status: 200,
+    headers: { ...common, "Content-Length": String(size) },
+  });
+}
+
 route("GET", "media/access", async (req, ctx) => {
   const urlObj = new URL(req.url);
   const assetId = urlObj.searchParams.get("assetId") ?? "";
@@ -1198,46 +1245,48 @@ route("GET", "media/access", async (req, ctx) => {
       ctx.user ? 403 : 401,
     );
   }
+
+  const download = urlObj.searchParams.get("download") === "1";
+  const wantsJson = urlObj.searchParams.get("format") === "json";
+  // Videos are for streaming only — never a downloadable file.
+  if (asset.kind === "video" && download) {
+    return fail(
+      "download_disabled",
+      "Course videos stream inside Beevo and can't be downloaded.",
+      403,
+    );
+  }
+  const safeFileName = asset.fileName.replace(/["\\\r\n]/g, "_");
+
   if (!R2.configured) {
     if (!LOCAL_UPLOADS_ENABLED) {
       return fail("provider_not_configured", "Media storage isn't configured.", 503);
     }
-    const downloadLocal = urlObj.searchParams.get("download") === "1";
-    if (downloadLocal) {
-      const signedLocal = `/api/v1/media/access?assetId=${asset.id}&download=1`;
-      return ok({
-        url: signedLocal,
-        expiresAt: new Date(Date.now() + 600 * 1000).toISOString(),
-        fileName: asset.fileName,
-        sizeBytes: Number(asset.verifiedSizeBytes ?? asset.declaredSizeBytes),
-      });
-    }
     const bytes = await readLocalObject(asset.storageKey);
     if (!bytes) return fail("not_found", "Media not found.", 404);
-    return new NextResponse(new Uint8Array(bytes), {
-      status: 200,
-      headers: {
-        "Content-Type": asset.mimeType || "application/octet-stream",
-        "Content-Length": String(bytes.byteLength),
-        "Cache-Control": "private, max-age=300",
-      },
+    if (wantsJson) {
+      return ok({
+        url: `/api/v1/media/access?assetId=${asset.id}${download ? "&download=1" : ""}`,
+        expiresAt: new Date(Date.now() + 600 * 1000).toISOString(),
+        fileName: asset.fileName,
+        sizeBytes: bytes.byteLength,
+      });
+    }
+    return mediaResponse(bytes, req, {
+      mimeType: asset.mimeType,
+      fileName: safeFileName,
+      download,
     });
   }
 
-  const download = urlObj.searchParams.get("download") === "1";
-  const wantsJson =
-    download ||
-    urlObj.searchParams.get("format") === "json" ||
-    (req.headers.get("accept") ?? "").includes("application/json");
-  const safeFileName = asset.fileName.replace(/["\\\r\n]/g, "_");
-  const signed = presignUrl({
-    method: "GET",
-    key: asset.storageKey,
-    expiresSeconds: 600,
-    ...(download ? { responseContentDisposition: `attachment; filename="${safeFileName}"` } : {}),
-  });
-
+  // --- Cloudflare R2 ---
   if (wantsJson) {
+    const signed = presignUrl({
+      method: "GET",
+      key: asset.storageKey,
+      expiresSeconds: 600,
+      ...(download ? { responseContentDisposition: `attachment; filename="${safeFileName}"` } : {}),
+    });
     return ok({
       url: signed.url,
       expiresAt: signed.expiresAt,
@@ -1249,6 +1298,7 @@ route("GET", "media/access", async (req, ctx) => {
   // Cover + avatar images are loaded via <Image> / <img>; streaming bytes avoids
   // cross-origin 302 errors in /_next/image and keeps the URL stable for CSS.
   if (asset.kind === "cover" || asset.kind === "avatar") {
+    const signed = presignUrl({ method: "GET", key: asset.storageKey, expiresSeconds: 600 });
     try {
       const upstream = await fetch(signed.url);
       if (upstream.ok && upstream.body) {
@@ -1263,7 +1313,45 @@ route("GET", "media/access", async (req, ctx) => {
     } catch {
       // Fall through to 302 redirect if upstream stream fails
     }
+    return NextResponse.redirect(signed.url, 302);
   }
 
-  return NextResponse.redirect(signed.url, 302);
+  if (download) {
+    // Resources are legitimately downloadable, through a short-lived signed URL
+    // that already carries an attachment disposition.
+    const signed = presignUrl({
+      method: "GET",
+      key: asset.storageKey,
+      expiresSeconds: 300,
+      responseContentDisposition: `attachment; filename="${safeFileName}"`,
+    });
+    return NextResponse.redirect(signed.url, 302);
+  }
+
+  // Video (and inline resources): proxy bytes so the browser never receives a
+  // shareable object URL, honour range requests, and forbid caching.
+  const signed = presignUrl({ method: "GET", key: asset.storageKey, expiresSeconds: 600 });
+  const range = req.headers.get("range");
+  try {
+    const upstream = await fetch(signed.url, {
+      headers: range ? { Range: range } : undefined,
+    });
+    if (!upstream.ok && upstream.status !== 206) {
+      return fail("media_unavailable", "This media isn't available right now.", 502);
+    }
+    const headers: Record<string, string> = {
+      "Content-Type": upstream.headers.get("content-type") || asset.mimeType || "application/octet-stream",
+      "Content-Disposition": "inline",
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    };
+    const length = upstream.headers.get("content-length");
+    const contentRange = upstream.headers.get("content-range");
+    if (length) headers["Content-Length"] = length;
+    if (contentRange) headers["Content-Range"] = contentRange;
+    return new NextResponse(upstream.body, { status: upstream.status, headers });
+  } catch {
+    return fail("media_unavailable", "This media isn't available right now.", 502);
+  }
 });

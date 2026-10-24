@@ -1,7 +1,7 @@
 import { ArrowRight, ArrowUpRight, Ghost, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { formatINR } from "@/lib/domain";
+import { priceLabel } from "@/lib/domain";
 import type { PublicCourseCard, PublicCreatorPage } from "@/lib/learner-types";
 import { Button } from "@/components/ui/button";
 import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
@@ -10,39 +10,41 @@ import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 export function CreatorHero({ creator }: { creator: PublicCreatorPage }) {
   return (
     <section className="border-b-2 border-ink bg-parchment">
-      <div className="mx-auto max-w-4xl px-4 py-12 text-center sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-6xl px-4 py-12 text-center sm:px-6 sm:py-16 lg:flex lg:items-center lg:gap-12 lg:py-20 lg:text-left">
         <ProfileAvatar
           src={creator.avatarUrl}
           name={creator.displayName}
-          sizePx={128}
+          sizePx={160}
           priority
-          className="mx-auto size-28 shadow-hard-sm sm:size-32"
+          className="mx-auto size-28 shadow-hard-sm sm:size-32 lg:mx-0 lg:size-40"
         />
-        <h1 className="mt-5 text-3xl font-bold tracking-tight text-ink sm:text-5xl">
-          {creator.displayName}
-        </h1>
-        <p className="mt-1.5 text-base font-bold text-accent sm:text-lg">@{creator.handle}</p>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-pretty text-smoke sm:text-base">
-          {creator.tagline}
-        </p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Sticker color="lime">{creator.niche}</Sticker>
-          {creator.links.map((link) => (
-            <a
-              key={link.label}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-full border-2 border-ink bg-white px-3 py-1 text-[11px] font-bold tracking-[0.12em] text-ink uppercase shadow-hard-xs transition-transform hover:-translate-y-0.5"
-            >
-              {link.label}
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </a>
-          ))}
+        <div className="lg:min-w-0 lg:flex-1">
+          <h1 className="mt-5 text-3xl font-bold tracking-tight text-ink sm:text-5xl lg:mt-0">
+            {creator.displayName}
+          </h1>
+          <p className="mt-1.5 text-base font-bold text-accent sm:text-lg">@{creator.handle}</p>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-pretty text-smoke sm:text-base lg:mx-0 lg:max-w-2xl">
+            {creator.tagline}
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2 lg:justify-start">
+            <Sticker color="lime">{creator.niche}</Sticker>
+            {creator.links.map((link) => (
+              <a
+                key={link.label}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border-2 border-ink bg-white px-3 py-1 text-[11px] font-bold tracking-[0.12em] text-ink uppercase shadow-hard-xs transition-transform hover:-translate-y-0.5"
+              >
+                {link.label}
+                <ArrowUpRight className="size-3" aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+          <p className="mt-5 text-xs font-semibold text-smoke">
+            {creator.courses.length} published course{creator.courses.length === 1 ? "" : "s"}
+          </p>
         </div>
-        <p className="mt-5 text-xs font-semibold text-smoke">
-          {creator.courses.length} published course{creator.courses.length === 1 ? "" : "s"}
-        </p>
       </div>
     </section>
   );
@@ -59,7 +61,7 @@ export function StorefrontCourseCard({
   return (
     <Link
       href={`/@${handle}/${course.slug}`}
-      className="group flex flex-col overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard-sm transition-transform duration-200 hover:-translate-y-1.5"
+      className="group flex h-full flex-col overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard-sm transition-transform duration-200 hover:-translate-y-1.5"
     >
       <div className="relative aspect-[4/3] border-b-2 border-ink bg-parchment">
         {course.coverPreviewUrl ? (
@@ -76,8 +78,13 @@ export function StorefrontCourseCard({
           </div>
         )}
         <span className="absolute top-3 left-3 rounded-full border-2 border-ink bg-lime px-3 py-1 text-sm font-bold shadow-hard-xs">
-          {formatINR(course.priceInPaise)}
+          {priceLabel(course.priceInPaise)}
         </span>
+        {course.priceInPaise === 0 ? (
+          <span className="absolute top-3 right-3 rounded-full border-2 border-ink bg-white px-2.5 py-1 text-[10px] font-black tracking-[0.14em] uppercase">
+            No payment
+          </span>
+        ) : null}
       </div>
       <div className="flex flex-1 flex-col p-5">
         <h2 className="text-lg font-bold tracking-tight text-ink transition-colors group-hover:text-accent sm:text-xl">
@@ -168,10 +175,10 @@ export function CourseNotFound({ handle }: { handle: string }) {
 export function PoweredByBanner() {
   return (
     <section className="border-t-2 border-ink bg-ink">
-      <div className="mx-auto flex max-w-4xl flex-col items-center gap-3 px-4 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
         <p className="flex items-center gap-2 text-sm font-semibold text-cream/80">
           <Sparkles className="size-4 text-lime" aria-hidden="true" />
-          This storefront runs on Beevo — free plan, 8% only per sale.
+          This storefront runs on Beevo.
         </p>
         <Button href="/signup" variant="lime" size="sm">
           Create yours free

@@ -41,6 +41,8 @@ export const users = pgTable("users", {
   notifyProductTips: boolean("notify_product_tips").notNull().default(false),
   notifyLessonEmails: boolean("notify_lesson_emails").notNull().default(true),
   notifyReceiptEmails: boolean("notify_receipt_emails").notNull().default(true),
+  /** True while an account was created during checkout and hasn't received its dashboard credentials yet. */
+  provisionedViaCheckout: boolean("provisioned_via_checkout").notNull().default(false),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   suspendedReason: text("suspended_reason"),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
@@ -63,6 +65,28 @@ export const authTokens = pgTable("auth_tokens", {
   usedAt: timestamp("used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Checkout email verification (OTP) records.
+ *
+ * A buyer proves they control the delivery inbox before any order exists.
+ * Only the SHA-256 hashes of the one-time code and of the short-lived
+ * verification token are stored; both expire quickly and attempts are
+ * capped server-side.
+ */
+export const checkoutVerifications = pgTable("checkout_verifications", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  tokenHash: text("token_hash"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("checkout_verifications_email_idx").on(t.email, t.createdAt),
+  index("checkout_verifications_token_idx").on(t.tokenHash),
+]);
 
 /** Admin membership is provisioned server-side only (script/ops), never via API payloads. */
 export const adminRoles = pgTable("admin_roles", {

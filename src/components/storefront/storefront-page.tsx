@@ -23,7 +23,7 @@ export function CreatorStorefront({ handle }: { handle: string }) {
 
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-6xl space-y-4 px-4 py-16 sm:px-6">
         <Skeleton className="h-40" />
         <Skeleton className="h-64" />
       </div>
@@ -44,16 +44,24 @@ export function CreatorStorefront({ handle }: { handle: string }) {
   return (
     <>
       <CreatorHero creator={creator} />
-      <section className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
-        <h2 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          Courses by {creator.displayName.split(" ")[0]}
-        </h2>
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+            Courses by {creator.displayName.split(" ")[0]}
+          </h2>
+          {creator.courses.length > 0 ? (
+            <p className="text-xs font-bold tracking-[0.14em] text-smoke uppercase">
+              {creator.courses.length} course{creator.courses.length === 1 ? "" : "s"} · pick your
+              starting point
+            </p>
+          ) : null}
+        </div>
         {creator.courses.length === 0 ? (
           <div className="mt-8">
             <EmptyStorefrontState handle={handle} />
           </div>
         ) : (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {creator.courses.map((course) => (
               <StorefrontCourseCard key={course.id} course={course} handle={handle} />
             ))}

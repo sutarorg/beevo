@@ -137,7 +137,7 @@ export function PlanCard({ className }: { className?: string }) {
           <span className="font-bold">
             {PLATFORM_COMMISSION_LABEL} commission
           </span>{" "}
-          per successful eligible course sale. That's the only way we earn — no
+          per successful eligible course sale. That&apos;s the only way we earn — no
           subscription, no setup fee, no Pro tier.
         </p>
       </div>

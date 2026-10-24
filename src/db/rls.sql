@@ -162,3 +162,8 @@ ALTER TABLE payout_events FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS payout_events_creator_read ON payout_events;
 CREATE POLICY payout_events_creator_read ON payout_events FOR SELECT TO app_user
   USING (payout_id IN (SELECT id FROM payouts WHERE creator_id = current_setting('app.user_id', true)));
+
+ALTER TABLE checkout_verifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checkout_verifications FORCE ROW LEVEL SECURITY;
+-- No app_user policy: verification codes/tokens are only touched by the
+-- privileged server role during checkout.

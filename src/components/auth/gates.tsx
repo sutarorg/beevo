@@ -3,7 +3,7 @@
 import { ShieldAlert } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { fetchSession, isMockAuth } from "@/lib/services/auth";
+import { fetchSession } from "@/lib/services/auth";
 import { FullPageLoader } from "@/components/states";
 import { Button } from "@/components/ui/button";
 
@@ -29,10 +29,6 @@ export function RequireSession({
   >({ status: "loading" });
 
   useEffect(() => {
-    if (isMockAuth()) {
-      setState({ status: "ok", name: "demo", email: "demo" });
-      return;
-    }
     let cancelled = false;
     fetchSession().then((session) => {
       if (cancelled) return;
@@ -57,7 +53,6 @@ export function RequireSession({
     }
   }, [state, router, pathname]);
 
-  if (isMockAuth()) return <>{children}</>;
   if (state.status === "loading" || state.status === "anonymous") {
     return <FullPageLoader label={state.status === "anonymous" ? "Taking you to sign in" : "Checking your session"} />;
   }
@@ -70,8 +65,8 @@ export function RequireSession({
           </span>
           <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink">Administrator access required</h1>
           <p className="mt-2 text-sm leading-relaxed text-smoke">
-            This account isn't an administrator. Admins are provisioned through a secure server-side
-            process only — there's no self-service promotion.
+            This account isn&apos;t an administrator. Admins are provisioned through a secure server-side
+            process only — there&apos;s no self-service promotion.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button href="/" variant="outline" size="sm">

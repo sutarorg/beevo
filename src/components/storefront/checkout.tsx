@@ -1,29 +1,28 @@
 "use client";
 
 import {
+  ArrowLeft,
   BadgeCheck,
   Banknote,
   CircleAlert,
-  Clock3,
   CreditCard,
-  Landmark,
   Loader2,
   Lock,
-  LogIn,
+  MailCheck,
   ShieldCheck,
-  Smartphone,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatINR } from "@/lib/domain";
-import type { CheckoutOrder, PaymentReceipt, PublicCoursePage } from "@/lib/learner-types";
+import type {
+  CheckoutAccountInfo,
+  CheckoutOrder,
+  PaymentReceipt,
+  PublicCoursePage,
+} from "@/lib/learner-types";
 import { getCheckoutService, type CheckoutReadiness } from "@/lib/services/checkout";
-import { getLearnerService } from "@/lib/services/learner";
-import { fetchSession, isMockAuth } from "@/lib/services/auth";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/primitives";
-import { useToast } from "@/components/ui/toast";
 
 /** Loads the official Razorpay Checkout.js once per page. */
 let razorpayScriptPromise: Promise<void> | null = null;
@@ -42,22 +41,27 @@ function loadRazorpayScript(): Promise<void> {
   return razorpayScriptPromise;
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 type UiState =
+  | { stage: "email" }
+  | { stage: "sending_code" }
+  | { stage: "code"; previewCode?: string }
+  | { stage: "verifying_code" }
   | { stage: "ready" }
   | { stage: "creating_order" }
-  | { stage: "sign_in"; email?: string }
   | { stage: "checkout_open"; order: CheckoutOrder }
   | { stage: "processing"; order: CheckoutOrder }
-  | { stage: "pending"; order: CheckoutOrder }
   | { stage: "success"; order: CheckoutOrder; receipt: PaymentReceipt }
-  | { stage: "failed"; order: CheckoutOrder; message: string }
-  | { stage: "cancelled" };
+  | { stage: "failed"; order?: CheckoutOrder; message: string; retry: "order" | "gateway" | "verify" }
+  | { stage: "cancelled"; order?: CheckoutOrder };
 
 /**
- * Mock checkout — the full payment state machine against the checkout
- * service contract. NO real payment is processed; the simulated gateway
- * panel offers explicit success/failure/pending/cancel paths so every state
- * can be exercised. Sign-in happens inline and preserves the course context.
+ * Checkout.
+ *
+ * Email (verified with a one-time code) → payment → account + access. The
+ * buyer never leaves this sheet, and the selected course stays in view the
+ * whole way through.
  */
 export function CheckoutSheet({
   course,
@@ -70,23 +74,31 @@ export function CheckoutSheet({
   onClose: () => void;
   onPurchased: (courseId: string) => void;
 }) {
-  const toast = useToast();
   const checkout = getCheckoutService();
-  const learner = getLearnerService();
-  const [state, setState] = useState<UiState>({ stage: "ready" });
-  const [email, setEmail] = useState("kavya.learns@example.in");
-  const [signingIn, setSigningIn] = useState(false);
-  const [signInError, setSignInError] = useState<string | null>(null);
+  const isFree = course.priceInPaise === 0;
+
+  const [state, setState] = useState<UiState>({ stage: "email" });
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [emailTouched, setEmailTouched] = useState(false);
   const [readiness, setReadiness] = useState<CheckoutReadiness | null>(null);
   const [checkingReadiness, setCheckingReadiness] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
   const [alreadyEnrolled, setAlreadyEnrolled] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
 
-  // Reset when reopened for a different course / fresh attempt.
+  // Fresh attempt each time the sheet opens.
   useEffect(() => {
-    if (open && state.stage === "cancelled") setState({ stage: "ready" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    if (!open) return;
+    setState({ stage: "email" });
+    setCode("");
+    setVerificationToken(null);
+    setFormError(null);
+    setEmailTouched(false);
+    setResendNotice(null);
+    setAlreadyEnrolled(false);
+  }, [open, course.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -96,11 +108,8 @@ export function CheckoutSheet({
     };
   }, [open]);
 
-  // Ask the server whether this deployment can take a payment. This turns an
-  // opaque "Couldn't start checkout" toast into a specific, fixable reason
-  // (missing keys, live mode not enabled, …) before the buyer tries.
   const probeReadiness = async () => {
-    if (!checkout) return;
+    if (!checkout || isFree) return;
     setCheckingReadiness(true);
     const result = await checkout.getStatus();
     setCheckingReadiness(false);
@@ -109,97 +118,120 @@ export function CheckoutSheet({
 
   useEffect(() => {
     if (!open) return;
-    setStartError(null);
-    setAlreadyEnrolled(false);
     void probeReadiness();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, isFree]);
 
   if (!open) return null;
 
   const busy =
+    state.stage === "sending_code" ||
+    state.stage === "verifying_code" ||
     state.stage === "creating_order" ||
-    state.stage === "processing" ||
-    state.stage === "pending";
+    state.stage === "processing";
 
-  const beginCheckout = async () => {
+  const sendCode = async (resend = false) => {
     if (!checkout) {
-      setStartError("Checkout isn't available in this build. Try again in a moment.");
+      setFormError("Checkout isn't available right now. Try again in a moment.");
       return;
     }
-    setStartError(null);
-    setState({ stage: "creating_order" });
-    const result = await checkout.createOrder(course.id);
+    const clean = email.trim().toLowerCase();
+    if (!EMAIL_PATTERN.test(clean)) {
+      setFormError("Enter a valid email address — this is where your access is sent.");
+      return;
+    }
+    setFormError(null);
+    setResendNotice(null);
+    setState({ stage: "sending_code" });
+    const result = await checkout.startEmailVerification(clean);
     if (!result.ok) {
-      if (result.error.code === "auth_required") {
-        setState({ stage: "sign_in" });
-        return;
-      }
+      setFormError(result.error.message);
+      setState({ stage: resend ? "code" : "email" });
+      return;
+    }
+    setEmail(result.data.email);
+    setCode("");
+    setState({ stage: "code", previewCode: result.data.previewCode });
+    if (resend) setResendNotice("A new code is on its way. Earlier codes no longer work.");
+  };
+
+  const confirmCode = async () => {
+    if (!checkout) return;
+    const cleanCode = code.replace(/\s+/g, "");
+    if (!/^\d{6}$/.test(cleanCode)) {
+      setFormError("Enter the 6-digit code from the email.");
+      return;
+    }
+    setFormError(null);
+    setState({ stage: "verifying_code" });
+    const result = await checkout.confirmEmailVerification(email, cleanCode);
+    if (!result.ok) {
+      setFormError(result.error.message);
+      setState({ stage: "code" });
+      return;
+    }
+    setVerificationToken(result.data.verificationToken);
+    setState({ stage: "ready" });
+  };
+
+  const createOrder = async () => {
+    if (!checkout || !verificationToken) {
+      setState({ stage: "email" });
+      setFormError("Your email verification expired. Verify your email again.");
+      return;
+    }
+    setFormError(null);
+    setState({ stage: "creating_order" });
+    const result = await checkout.createOrder({
+      courseId: course.id,
+      email,
+      verificationToken,
+    });
+    if (!result.ok) {
       if (result.error.code === "already_enrolled") {
         setAlreadyEnrolled(true);
         setState({ stage: "ready" });
         return;
       }
-      // Keep the reason visible inside the sheet — a toast disappears before
-      // the buyer can act on configuration guidance.
-      setStartError(result.error.message);
-      setState({ stage: "ready" });
-      toast.push({ variant: "error", title: "Couldn't start checkout", description: result.error.message });
+      if (result.error.code === "email_not_verified") {
+        setVerificationToken(null);
+        setState({ stage: "code" });
+        setFormError(result.error.message);
+        return;
+      }
+      setState({
+        stage: "failed",
+        message: result.error.message,
+        retry: "order",
+      });
       void probeReadiness();
       return;
     }
-    setState({ stage: "checkout_open", order: result.data });
+
+    const order = result.data;
+    if (order.free || order.enrolled) {
+      const receipt: PaymentReceipt = {
+        paymentId: "free",
+        orderId: order.orderId,
+        amountInPaise: 0,
+        note: "Free course — access granted instantly.",
+        enrolled: true,
+        account: order.account,
+      };
+      setState({ stage: "success", order, receipt });
+      onPurchased(course.id);
+      return;
+    }
+    setState({ stage: "checkout_open", order });
   };
 
-  const start = async () => {
-    if (isMockAuth()) {
-      if (learner && !learner.getSession().signedIn) {
-        setState({ stage: "sign_in" });
-        return;
-      }
-      void beginCheckout();
-      return;
-    }
-    // Live: verify the server-side session before creating an order.
-    setState({ stage: "creating_order" });
-    const session = await fetchSession();
-    if (!session.user) {
-      setState({ stage: "sign_in" });
-      return;
-    }
-    void beginCheckout();
-  };
-
-  const signIn = async () => {
-    if (!learner) return;
-    const clean = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-      setSignInError("Enter a valid email to continue.");
-      return;
-    }
-    if (!isMockAuth()) {
-      // Live: hand off to the real login page; the course stays the `next` hop.
-      const next = `${window.location.pathname}${window.location.search}`;
-      window.location.assign(`/login?next=${encodeURIComponent(next)}`);
-      return;
-    }
-    setSigningIn(true);
-    setSignInError(null);
-    const result = await learner.signIn(clean);
-    setSigningIn(false);
-    if (!result.ok) {
-      setSignInError(result.error.message);
-      return;
-    }
-    // Handoff preserves the course — straight back into checkout.
-    void beginCheckout();
-  };
-
-  // --- Real Razorpay checkout (live flow) ---
   const launchRazorpay = async () => {
     if (!checkout || state.stage !== "checkout_open") return;
     const { order } = state;
-    if (order.gateway !== "razorpay" || !order.razorpayOrderId) return;
+    if (!order.razorpayOrderId) {
+      setState({ stage: "failed", order, message: "This order is incomplete. Start checkout again.", retry: "order" });
+      return;
+    }
     try {
       await loadRazorpayScript();
     } catch {
@@ -207,12 +239,20 @@ export function CheckoutSheet({
         stage: "failed",
         order,
         message: "Couldn't load the secure payment window. Check your connection and retry.",
+        retry: "gateway",
       });
       return;
     }
-    const RazorpayCtor = (window as unknown as { Razorpay?: new (options: Record<string, unknown>) => { open: () => void; on: (event: string, cb: (payload: unknown) => void) => void } }).Razorpay;
+    const RazorpayCtor = (
+      window as unknown as {
+        Razorpay?: new (options: Record<string, unknown>) => {
+          open: () => void;
+          on: (event: string, cb: (payload: unknown) => void) => void;
+        };
+      }
+    ).Razorpay;
     if (!RazorpayCtor) {
-      setState({ stage: "failed", order, message: "The payment library failed to initialise." });
+      setState({ stage: "failed", order, message: "The payment library failed to initialise.", retry: "gateway" });
       return;
     }
     setState({ stage: "processing", order });
@@ -227,7 +267,7 @@ export function CheckoutSheet({
       theme: { color: "#e8490f" },
       modal: {
         ondismiss: () => {
-          setState({ stage: "cancelled" });
+          setState({ stage: "cancelled", order });
         },
       },
       handler: async (response: unknown) => {
@@ -236,6 +276,7 @@ export function CheckoutSheet({
           razorpay_payment_id: string;
           razorpay_signature: string;
         };
+        setState({ stage: "processing", order });
         const verified = await checkout.verifyPayment({
           orderId: order.orderId,
           razorpayOrderId: payload.razorpay_order_id,
@@ -243,7 +284,7 @@ export function CheckoutSheet({
           razorpaySignature: payload.razorpay_signature,
         });
         if (!verified.ok) {
-          setState({ stage: "failed", order, message: verified.error.message });
+          setState({ stage: "failed", order, message: verified.error.message, retry: "verify" });
           return;
         }
         setState({
@@ -253,9 +294,12 @@ export function CheckoutSheet({
             paymentId: verified.data.paymentId,
             orderId: order.orderId,
             amountInPaise: order.amountInPaise,
-            note: "Payment verified by the server — you're enrolled.",
+            note: verified.data.note,
+            enrolled: verified.data.enrolled,
+            account: verified.data.account,
           },
         });
+        onPurchased(course.id);
       },
     });
     rzp.on("payment.failed", (payload: unknown) => {
@@ -263,70 +307,52 @@ export function CheckoutSheet({
       setState({
         stage: "failed",
         order,
-        message: description ? `Payment failed: ${description}` : "Payment failed at the provider. No access was granted.",
+        message: description
+          ? `Payment failed: ${description}`
+          : "The payment failed at the provider. No access was granted.",
+        retry: "gateway",
       });
     });
     rzp.open();
   };
 
-  const settle = async (outcome: "success" | "failed" | "pending") => {
-    if (!checkout || state.stage !== "checkout_open") return;
-    const { order } = state;
-    if (outcome === "pending") {
-      setState({ stage: "pending", order });
-      const resolved = await checkout.confirmPendingPayment(order.orderId);
-      if (!resolved.ok) {
-        setState({ stage: "failed", order, message: resolved.error.message });
-        return;
-      }
-      await completePurchase(order, resolved.data);
+  const retryFromFailed = () => {
+    if (state.stage !== "failed") return;
+    if (state.retry === "order") {
+      void createOrder();
       return;
     }
-    setState({ stage: "processing", order });
-    const result = await checkout.settlePayment(order.orderId, outcome);
-    if (!result.ok) {
-      setState({ stage: "failed", order, message: result.error.message });
+    if (state.retry === "verify" && state.order) {
+      setState({ stage: "checkout_open", order: state.order });
       return;
     }
-    await completePurchase(order, result.data);
-  };
-
-  const completePurchase = async (order: CheckoutOrder, receipt: PaymentReceipt) => {
-    if (learner) {
-      const enrolment = await learner.recordDemoPurchase(order);
-      if (!enrolment.ok) {
-        setState({ stage: "failed", order, message: "Payment simulated OK, but enrolment recording failed. Retry — no money moved." });
-        return;
-      }
-    }
-    setState({ stage: "success", order, receipt });
+    if (state.order) setState({ stage: "checkout_open", order: state.order });
   };
 
   const cancel = () => {
     if (busy) return;
-    setState({ stage: "cancelled" });
-  };
-
-  const retryFromFailed = () => {
-    if (state.stage === "failed") setState({ stage: "checkout_open", order: state.order });
+    setState({ stage: "cancelled", order: state.stage === "checkout_open" ? state.order : undefined });
   };
 
   const close = () => {
     if (state.stage === "checkout_open") {
-      setState({ stage: "cancelled" });
+      setState({ stage: "cancelled", order: state.order });
       return;
     }
     if (busy) return;
     onClose();
   };
 
+  const stepLabel =
+    state.stage === "email" || state.stage === "sending_code"
+      ? "1 · Your email"
+      : state.stage === "code" || state.stage === "verifying_code"
+        ? "2 · Verify email"
+        : "3 · Payment";
+
   return (
     <div className="fixed inset-0 z-[85] flex items-end justify-center sm:items-center sm:p-6">
-      <div
-        className="absolute inset-0 bg-ink/60"
-        onClick={close}
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-ink/60" onClick={close} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
@@ -334,15 +360,15 @@ export function CheckoutSheet({
         className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl border-2 border-ink bg-cream shadow-hard sm:max-w-md sm:rounded-3xl"
       >
         <div className="flex items-center justify-between border-b-2 border-ink bg-white px-5 py-3.5">
-          <p className="flex items-center gap-2 text-sm font-bold text-ink">
-            <Lock className="size-4 text-moss" aria-hidden="true" />
-            {state.stage === "sign_in" ? "Sign in to enrol" : "Secure checkout"}
-            {isMockAuth() ? (
-              <span className="rounded-full border border-dashed border-accent/60 px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-accent-deep uppercase">
-                Test mode
-              </span>
-            ) : null}
-          </p>
+          <div>
+            <p className="flex items-center gap-2 text-sm font-bold text-ink">
+              <Lock className="size-4 text-moss" aria-hidden="true" />
+              Secure checkout
+            </p>
+            <p className="mt-0.5 text-[10px] font-bold tracking-[0.16em] text-smoke uppercase">
+              {stepLabel}
+            </p>
+          </div>
           <button
             type="button"
             onClick={close}
@@ -355,17 +381,163 @@ export function CheckoutSheet({
         </div>
 
         <div className="overflow-y-auto p-5">
-          {/* Course context — always visible, preserved through sign-in */}
+          {/* Course context — always visible */}
           <div className="mb-4 rounded-2xl border-2 border-ink bg-white p-3.5">
             <p className="text-[10px] font-bold tracking-[0.18em] text-smoke uppercase">You’re buying</p>
             <p className="mt-1 text-sm font-bold text-ink">{course.title}</p>
             <p className="text-xs text-smoke">
-              by {course.creator.displayName} · <span className="font-bold text-ink tabular-nums">{formatINR(course.priceInPaise)}</span>
+              by {course.creator.displayName} ·{" "}
+              <span className="font-bold text-ink tabular-nums">
+                {isFree ? "FREE" : formatINR(course.priceInPaise)}
+              </span>
             </p>
           </div>
 
-          {state.stage === "ready" ? (
-            <div className="space-y-3 py-4">
+          {(state.stage === "email" || state.stage === "sending_code") && (
+            <div>
+              <div className="mb-4 flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-ink bg-lime">
+                  <MailCheck className="size-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-ink">Where should we send your access?</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-smoke">
+                    We’ll email a 6-digit code to confirm it’s yours.
+                  </p>
+                </div>
+              </div>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setEmailTouched(true);
+                  void sendCode();
+                }}
+              >
+                <Field
+                  id="checkout-email"
+                  label="Email"
+                  error={emailTouched ? (formError ?? undefined) : undefined}
+                >
+                  <Input
+                    id="checkout-email"
+                    type="email"
+                    inputMode="email"
+                    value={email}
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    invalid={emailTouched && Boolean(formError)}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setFormError(null);
+                    }}
+                  />
+                </Field>
+                <p className="mt-2 text-[11px] leading-relaxed text-smoke">
+                  Access to this purchase will be sent to this account.
+                </p>
+                <Button
+                  type="submit"
+                  variant="accent"
+                  size="lg"
+                  className="mt-4 w-full"
+                  loading={state.stage === "sending_code"}
+                  disabled={state.stage === "sending_code"}
+                >
+                  Send my code
+                </Button>
+              </form>
+              <p className="mt-3 text-center text-[10px] leading-relaxed text-smoke">
+                No account needed yet. We create or reuse the learner account for this email at
+                payment.
+              </p>
+            </div>
+          )}
+
+          {(state.stage === "code" || state.stage === "verifying_code") && (
+            <div>
+              <div className="mb-4 flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-ink bg-lime">
+                  <MailCheck className="size-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-ink">Check your inbox</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-smoke">
+                    We sent a 6-digit code to <span className="font-bold text-ink">{email}</span>.
+                  </p>
+                </div>
+              </div>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void confirmCode();
+                }}
+              >
+                <Field id="checkout-code" label="6-digit code" error={formError ?? undefined}>
+                  <Input
+                    id="checkout-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={code}
+                    placeholder="000000"
+                    invalid={Boolean(formError)}
+                    onChange={(event) => {
+                      setCode(event.target.value.replace(/[^0-9]/g, ""));
+                      setFormError(null);
+                    }}
+                    className="tracking-[0.5em] tabular-nums"
+                  />
+                </Field>
+                {state.stage === "code" && state.previewCode ? (
+                  <p className="mt-2 rounded-xl border-2 border-dashed border-ink/40 bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
+                    <span className="font-bold text-ink">Email delivery isn’t configured here.</span>{" "}
+                    Your code is{" "}
+                    <span className="font-mono text-sm font-bold tracking-[0.2em] text-ink">
+                      {state.previewCode}
+                    </span>
+                    . Add RESEND_API_KEY to send these by email.
+                  </p>
+                ) : null}
+                {resendNotice ? (
+                  <p className="mt-2 text-[11px] font-semibold text-moss">{resendNotice}</p>
+                ) : null}
+                <Button
+                  type="submit"
+                  variant="accent"
+                  size="lg"
+                  className="mt-4 w-full"
+                  loading={state.stage === "verifying_code"}
+                  disabled={state.stage === "verifying_code"}
+                >
+                  Verify and continue
+                </Button>
+              </form>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setState({ stage: "email" });
+                    setCode("");
+                    setFormError(null);
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-smoke underline underline-offset-2"
+                >
+                  <ArrowLeft className="size-3" aria-hidden="true" /> Change email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void sendCode(true)}
+                  className="text-[11px] font-bold text-accent underline underline-offset-2"
+                >
+                  Resend code
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(state.stage === "ready" || state.stage === "creating_order") && (
+            <div className="space-y-3">
               {alreadyEnrolled ? (
                 <div className="rounded-2xl border-2 border-ink bg-lime/40 p-4 text-left">
                   <p className="text-sm font-bold text-ink">You already own this course</p>
@@ -378,11 +550,22 @@ export function CheckoutSheet({
                 </div>
               ) : (
                 <>
-                  {readiness && !readiness.ready ? (
+                  <div className="rounded-2xl border-2 border-ink bg-white p-4">
+                    <p className="flex items-center gap-2 text-xs font-bold text-ink">
+                      <BadgeCheck className="size-4 text-moss" aria-hidden="true" />
+                      Email verified
+                    </p>
+                    <p className="mt-1 text-xs text-smoke">{email}</p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-smoke">
+                      Access to this purchase will be sent to this account.
+                    </p>
+                  </div>
+
+                  {!isFree && readiness && !readiness.ready ? (
                     <div className="rounded-2xl border-2 border-accent-deep bg-accent/5 p-4 text-left">
                       <p className="flex items-center gap-2 text-sm font-bold text-accent-deep">
                         <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
-                        Checkout isn't available yet
+                        Paid checkout isn’t available yet
                       </p>
                       <p className="mt-1.5 text-xs leading-relaxed text-smoke">{readiness.message}</p>
                       <button
@@ -395,193 +578,86 @@ export function CheckoutSheet({
                     </div>
                   ) : null}
 
-                  {startError ? (
-                    <div role="alert" className="rounded-2xl border-2 border-accent-deep bg-accent/5 p-4 text-left">
-                      <p className="flex items-center gap-2 text-sm font-bold text-accent-deep">
-                        <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
-                        Couldn't start checkout
-                      </p>
-                      <p className="mt-1.5 text-xs leading-relaxed text-smoke">{startError}</p>
-                      <button
-                        type="button"
-                        onClick={() => void beginCheckout()}
-                        className="mt-2 text-xs font-bold text-accent-deep underline underline-offset-2"
+                  {isFree ? (
+                    <>
+                      <div className="rounded-2xl border-2 border-ink bg-lime p-4">
+                        <p className="text-lg font-bold text-ink">Free course</p>
+                        <p className="mt-1 text-xs leading-relaxed text-ink/80">
+                          No payment needed. Enrol now and it’s added to your library immediately.
+                        </p>
+                      </div>
+                      <Button
+                        variant="ink"
+                        size="lg"
+                        className="w-full"
+                        onClick={() => void createOrder()}
+                        loading={state.stage === "creating_order"}
                       >
-                        Try again
-                      </button>
-                    </div>
-                  ) : null}
-
-                  <Button
-                    variant="accent"
-                    size="lg"
-                    onClick={start}
-                    className="w-full"
-                    disabled={readiness !== null && !readiness.ready}
-                  >
-                    Continue to payment
-                  </Button>
-                  {readiness?.ready ? (
-                    <p className="text-center text-[10px] font-semibold text-smoke">
-                      {readiness.message}
-                    </p>
-                  ) : null}
+                        Enrol free
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="accent"
+                        size="lg"
+                        className="w-full"
+                        onClick={() => void createOrder()}
+                        loading={state.stage === "creating_order"}
+                        disabled={readiness !== null && !readiness.ready}
+                      >
+                        Continue to payment
+                      </Button>
+                      {readiness?.ready ? (
+                        <p className="text-center text-[10px] font-semibold text-smoke">
+                          {readiness.message}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </>
               )}
             </div>
-          ) : null}
+          )}
 
-          {state.stage === "creating_order" ? (
-            <StatePanel
-              icon={<Loader2 className="size-6 animate-spin" aria-hidden="true" />}
-              title="Creating your order"
-              body="Reserving a checkout session…"
-            />
-          ) : null}
-
-          {state.stage === "sign_in" ? (
-            <div>
-              <div className="mb-4 flex items-start gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-ink bg-lime">
-                  <LogIn className="size-5" aria-hidden="true" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-bold text-ink">One quick step</h3>
-                  <p className="mt-0.5 text-xs leading-relaxed text-smoke">
-                    Courses live in your learner account. Sign in and we’ll bring you straight back
-                    here — your course stays selected.
-                  </p>
-                </div>
-              </div>
-              <Field id="checkout-email" label="Email" error={signInError ?? undefined}>
-                <Input
-                  id="checkout-email"
-                  type="email"
-                  value={email}
-                  invalid={Boolean(signInError)}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setSignInError(null);
-                  }}
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                />
-              </Field>
-              <Button variant="accent" size="lg" className="mt-4 w-full" onClick={signIn} loading={signingIn}>
-                {isMockAuth() ? "Sign in & continue" : "Continue to sign in"}
-              </Button>
-              <p className="mt-3 text-center text-[11px] text-smoke">
-                {isMockAuth()
-                  ? "Demo sign-in — any valid email works."
-                  : "You'll sign in on the secure account page and return right here."}
-              </p>
-            </div>
-          ) : null}
-
-          {state.stage === "checkout_open" ? (
-            state.order.gateway === "razorpay" ? (
-              <div>
-                <div className="rounded-2xl border-2 border-ink bg-ink p-4 text-cream">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
-                      Razorpay {state.order.keyId.startsWith("rzp_test_") ? "(test mode)" : ""}
-                    </p>
-                    <ShieldCheck className="size-4.5 text-lime" aria-hidden="true" />
-                  </div>
-                  <p className="mt-3 text-2xl font-bold tabular-nums">{formatINR(state.order.amountInPaise)}</p>
-                  <p className="mt-0.5 font-mono text-[10px] text-cream/50">
-                    {state.order.orderId} · payment verified server-side
-                  </p>
-                  <p className="mt-2 text-[11px] text-cream/60">
-                    You'll complete payment in the secure Razorpay window (UPI, card, net‑banking,
-                    wallets). Access is granted only after the server verifies the payment signature.
-                  </p>
-                </div>
-                <Button variant="accent" size="lg" className="mt-4 w-full" onClick={launchRazorpay}>
-                  <Lock className="size-4" aria-hidden="true" />
-                  Pay {formatINR(state.order.amountInPaise)} securely
-                </Button>
-                <button
-                  type="button"
-                  onClick={cancel}
-                  className="mt-3 w-full text-center text-sm font-semibold text-accent underline underline-offset-4"
-                >
-                  Cancel payment
-                </button>
-              </div>
-            ) : (
+          {state.stage === "checkout_open" && (
             <div>
               <div className="rounded-2xl border-2 border-ink bg-ink p-4 text-cream">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
-                    Razorpay (test mode)
+                    Razorpay {state.order.keyId.startsWith("rzp_test_") ? "· test keys" : ""}
                   </p>
                   <ShieldCheck className="size-4.5 text-lime" aria-hidden="true" />
                 </div>
-                <p className="mt-3 text-2xl font-bold tabular-nums">{formatINR(state.order.amountInPaise)}</p>
-                <p className="mt-0.5 font-mono text-[10px] text-cream/50">
-                  {state.order.orderId} · key {state.order.keyId}
+                <p className="mt-3 text-2xl font-bold tabular-nums">
+                  {formatINR(state.order.amountInPaise)}
                 </p>
+                <p className="mt-0.5 font-mono text-[10px] text-cream/50">{state.order.orderId}</p>
                 <p className="mt-2 text-[11px] text-cream/60">
-                  Test gateway — choose an outcome to walk through each payment state. No card is
-                  charged.
+                  Pay by UPI, card, net-banking, or wallet in the secure Razorpay window. Access is
+                  granted only after the server verifies the payment signature.
                 </p>
               </div>
-              <div className="mt-4 space-y-2.5">
-                <CheckoutChoice
-                  icon={<Smartphone className="size-4.5" aria-hidden="true" />}
-                  label="UPI — pay now"
-                  note="Simulate a successful payment"
-                  onClick={() => settle("success")}
-                  primary
-                />
-                <CheckoutChoice
-                  icon={<CreditCard className="size-4.5" aria-hidden="true" />}
-                  label="Card — decline"
-                  note="Simulate a failed payment"
-                  onClick={() => settle("failed")}
-                />
-                <CheckoutChoice
-                  icon={<Landmark className="size-4.5" aria-hidden="true" />}
-                  label="Net-banking — bank pending"
-                  note="Simulate a pending confirmation"
-                  onClick={() => settle("pending")}
-                />
-              </div>
+              <Button variant="accent" size="lg" className="mt-4 w-full" onClick={() => void launchRazorpay()}>
+                <CreditCard className="size-4" aria-hidden="true" />
+                Pay {formatINR(state.order.amountInPaise)} securely
+              </Button>
               <button
                 type="button"
                 onClick={cancel}
-                className="mt-4 w-full text-center text-sm font-semibold text-accent underline underline-offset-4"
+                className="mt-3 w-full text-center text-sm font-semibold text-accent underline underline-offset-4"
               >
                 Cancel payment
               </button>
             </div>
-            )
-          ) : null}
+          )}
 
           {state.stage === "processing" ? (
             <StatePanel
               icon={<Loader2 className="size-6 animate-spin" aria-hidden="true" />}
-              title="Processing payment"
-              body="Talking to your bank… (simulated)"
+              title="Confirming payment"
+              body="Waiting for the payment provider to confirm and the server to verify."
             />
-          ) : null}
-
-          {state.stage === "pending" ? (
-            <div className="py-4 text-center">
-              <span className="mx-auto grid size-14 place-items-center rounded-2xl border-2 border-ink bg-sand">
-                <Clock3 className="size-7" aria-hidden="true" />
-              </span>
-              <h3 className="mt-4 text-lg font-bold text-ink">Payment pending</h3>
-              <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-smoke">
-                Your bank hasn&apos;t confirmed yet. We&apos;ll unlock the course automatically the
-                moment it does — nothing is charged twice.
-              </p>
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border-2 border-ink bg-white px-3 py-1.5 text-xs font-bold text-smoke">
-                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                Checking with the bank…
-              </div>
-            </div>
           ) : null}
 
           {state.stage === "success" ? (
@@ -591,15 +667,29 @@ export function CheckoutSheet({
               </span>
               <h3 className="mt-4 text-xl font-bold text-ink">You’re in!</h3>
               <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-smoke">
-                {state.order.courseTitle} is now in your library. A receipt was “emailed” to you.
+                {state.order.courseTitle} is now in your library.
               </p>
-              <p className="mt-2 font-mono text-[10px] text-smoke">{state.receipt.paymentId}</p>
-              <p className="mt-1 text-[10px] font-bold text-accent-deep">{state.receipt.note}</p>
+              <p className="mt-2 font-mono text-[10px] text-smoke">
+                {state.receipt.amountInPaise > 0 ? state.receipt.paymentId : state.receipt.orderId}
+              </p>
+              <AccountDelivery account={state.receipt.account} fallbackEmail={email} />
               <div className="mt-5 space-y-2.5">
-                <Button href="/learn/courses" variant="ink" size="lg" className="w-full" onClick={() => onPurchased(course.id)}>
+                <Button
+                  href="/learn/courses"
+                  variant="ink"
+                  size="lg"
+                  className="w-full"
+                  onClick={() => onPurchased(course.id)}
+                >
                   Start learning
                 </Button>
-                <Button href="/learn/purchases" variant="outline" size="sm" className="w-full" onClick={() => onPurchased(course.id)}>
+                <Button
+                  href="/learn/purchases"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => onPurchased(course.id)}
+                >
                   View purchase history
                 </Button>
               </div>
@@ -611,11 +701,11 @@ export function CheckoutSheet({
               <span className="mx-auto grid size-14 place-items-center rounded-2xl border-2 border-ink bg-accent text-cream">
                 <CircleAlert className="size-7" aria-hidden="true" />
               </span>
-              <h3 className="mt-4 text-xl font-bold text-ink">Payment failed</h3>
+              <h3 className="mt-4 text-xl font-bold text-ink">Payment not completed</h3>
               <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-smoke">{state.message}</p>
               <div className="mt-5 space-y-2.5">
                 <Button variant="accent" className="w-full" onClick={retryFromFailed}>
-                  Try another method
+                  Try again
                 </Button>
                 <Button variant="outline" size="sm" className="w-full" onClick={() => setState({ stage: "cancelled" })}>
                   Cancel checkout
@@ -631,11 +721,18 @@ export function CheckoutSheet({
               </span>
               <h3 className="mt-4 text-xl font-bold text-ink">Checkout cancelled</h3>
               <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-smoke">
-                No payment was attempted (and this is a simulation — no money can move). Your course
-                is waiting whenever you are.
+                No payment was taken. Your course is waiting whenever you are.
               </p>
               <div className="mt-5 space-y-2.5">
-                <Button variant="accent" className="w-full" onClick={() => setState({ stage: "ready" })}>
+                <Button
+                  variant="accent"
+                  className="w-full"
+                  onClick={() =>
+                    setState(
+                      state.order ? { stage: "checkout_open", order: state.order } : { stage: "ready" },
+                    )
+                  }
+                >
                   Resume checkout
                 </Button>
                 <Button variant="outline" size="sm" className="w-full" onClick={onClose}>
@@ -648,9 +745,8 @@ export function CheckoutSheet({
 
         <div className="border-t-2 border-ink bg-white px-5 py-3">
           <p className="text-center text-[10px] leading-relaxed text-smoke">
-            {isMockAuth()
-              ? "Test-mode checkout — no real payment is taken. Course purchases are non-refundable except where required by applicable law."
-              : "Payments are processed securely by Razorpay. Course purchases are non-refundable except where required by applicable law."}
+            Payments are processed securely by Razorpay. Course purchases are non-refundable except
+            where required by applicable law.
           </p>
         </div>
       </div>
@@ -658,36 +754,42 @@ export function CheckoutSheet({
   );
 }
 
-function CheckoutChoice({
-  icon,
-  label,
-  note,
-  onClick,
-  primary = false,
+function AccountDelivery({
+  account,
+  fallbackEmail,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  note: string;
-  onClick: () => void;
-  primary?: boolean;
+  account: CheckoutAccountInfo | undefined;
+  fallbackEmail: string;
 }) {
+  const email = account?.email ?? fallbackEmail;
+  if (!account) {
+    return (
+      <p className="mx-auto mt-3 max-w-xs text-[11px] leading-relaxed text-smoke">
+        Your receipt and dashboard access were sent to {email}.
+      </p>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-2xl border-2 border-ink px-4 py-3 text-left transition-transform hover:-translate-y-0.5",
-        primary ? "bg-lime shadow-hard-xs" : "bg-white",
-      )}
-    >
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-ink bg-white">
-        {icon}
-      </span>
-      <span>
-        <span className="block text-sm font-bold text-ink">{label}</span>
-        <span className="block text-xs text-smoke">{note}</span>
-      </span>
-    </button>
+    <div className="mx-auto mt-3 max-w-xs rounded-2xl border-2 border-ink bg-white p-3 text-left">
+      <p className="text-[11px] font-bold text-ink">Your learner dashboard</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-smoke">
+        {account.created
+          ? account.emailed
+            ? `Login details were emailed to ${email}.`
+            : `Your account is ready for ${email}.`
+          : `This course was added to your existing account (${email}).`}
+      </p>
+      {account.password ? (
+        <p className="mt-2 rounded-xl bg-parchment/70 p-2 font-mono text-[11px] leading-relaxed text-ink">
+          Email: {email}
+          <br />
+          Password: {account.password}
+          <span className="mt-1 block font-sans text-[10px] text-smoke">
+            Save this password now — we couldn’t confirm the email delivery.
+          </span>
+        </p>
+      ) : null}
+    </div>
   );
 }
 

@@ -138,7 +138,7 @@ export function readinessChecklist(course: CourseEditor): ReadinessItem[] {
     {
       key: "price",
       label: "Valid price in INR",
-      ok: course.priceInPaise !== null && course.priceInPaise > 0,
+      ok: course.priceInPaise !== null && course.priceInPaise >= 0,
       stage: "pricing",
     },
   ];
@@ -314,8 +314,8 @@ class MockCourseService implements CourseService {
     if (forced) return forced;
     const course = this.find(courseId);
     if (!course) return err("not_found", "Draft not found — reload the editor.");
-    if (!Number.isInteger(priceInPaise) || priceInPaise <= 0) {
-      return err("invalid_price", "Enter a price above ₹0.", { pricing: ["Enter a price above ₹0."] });
+    if (!Number.isInteger(priceInPaise) || priceInPaise < 0) {
+      return err("invalid_price", "Enter a price of ₹0 or more.", { pricing: ["Enter a price of ₹0 or more."] });
     }
     if (priceInPaise > 5_000_000_0) {
       return err("invalid_price", "Keep the price under ₹5,00,000.", {

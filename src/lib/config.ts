@@ -58,15 +58,14 @@ export const SUPPORT_EMAIL = "support@beevo.in";
  * NEXT_PUBLIC_USE_MOCKS=false); without mocks the UI renders explicit
  * "unavailable" states instead of faking success.
  */
-type ServiceMode = "mock" | "live";
-const REPO_SERVICE_MODE: ServiceMode = "live";
-
-const rawUseMocks = process.env.NEXT_PUBLIC_USE_MOCKS?.trim();
-
-export const USE_MOCK_SERVICES =
-  rawUseMocks !== undefined && rawUseMocks !== ""
-    ? rawUseMocks === "true"
-    : (REPO_SERVICE_MODE as ServiceMode) === "mock";
+/**
+ * Mock adapters are retired: every screen now reads and writes the real
+ * backend (checkout, courses, learner progress, media, admin). Keeping this
+ * permanently false means no deployment can accidentally serve simulated
+ * payments, uploads, or learner data — even if an old environment variable is
+ * still set.
+ */
+export const USE_MOCK_SERVICES = false as const;
 
 /**
  * Post-auth destination. The creator dashboard ships in a later phase;

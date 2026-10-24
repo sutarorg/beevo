@@ -91,7 +91,7 @@ export default function CreatorSupportPage() {
             </span>
             <span>
               <span className="block text-sm font-bold text-ink">Refund policy</span>
-              <span className="block text-xs text-smoke">What buyers can and can't claim, in plain language.</span>
+              <span className="block text-xs text-smoke">What buyers can and can&apos;t claim, in plain language.</span>
             </span>
           </Link>
         </div>

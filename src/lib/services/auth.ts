@@ -188,6 +188,7 @@ class ApiAuthService implements AuthService {
   }
 
   async signIn(params: SignInParams) {
+    invalidateSessionCache();
     const result = await api<SessionResponse>("auth/login", { method: "POST", body: params });
     if (!result.ok || !result.data.user) {
       return result.ok
@@ -210,27 +211,48 @@ class ApiAuthService implements AuthService {
   }
 
   async signOut() {
+    invalidateSessionCache();
     return api<{ success: true }>("auth/logout", { method: "POST" });
   }
 }
 
 const apiAuthService = new ApiAuthService();
 
-/** Fetch the current live session (used by app shells). */
-export async function fetchSession(): Promise<{
+export interface SessionSnapshot {
   user: { id: string; email: string; fullName: string } | null;
   isAdmin: boolean;
   emailVerifiedAt: string | null;
-}> {
-  const result = await api<SessionResponse>("auth/session");
-  if (!result.ok || !result.data.user) {
-    return { user: null, isAdmin: false, emailVerifiedAt: null };
+}
+
+/**
+ * Session reads are shared across shells and the player, and every tab switch
+ * used to re-hit the server. A short TTL keeps navigation instant while still
+ * reflecting sign-in/out almost immediately; mutations invalidate it.
+ */
+const SESSION_TTL_MS = 5_000;
+let sessionCache: { at: number; promise: Promise<SessionSnapshot> } | null = null;
+
+export function invalidateSessionCache(): void {
+  sessionCache = null;
+}
+
+/** Fetch the current live session (used by app shells). */
+export function fetchSession(): Promise<SessionSnapshot> {
+  if (sessionCache && Date.now() - sessionCache.at < SESSION_TTL_MS) {
+    return sessionCache.promise;
   }
-  return {
-    user: result.data.user,
-    isAdmin: Boolean(result.data.isAdmin),
-    emailVerifiedAt: result.data.emailVerifiedAt ?? null,
-  };
+  const promise = api<SessionResponse>("auth/session").then((result) => {
+    if (!result.ok || !result.data.user) {
+      return { user: null, isAdmin: false, emailVerifiedAt: null } satisfies SessionSnapshot;
+    }
+    return {
+      user: result.data.user,
+      isAdmin: Boolean(result.data.isAdmin),
+      emailVerifiedAt: result.data.emailVerifiedAt ?? null,
+    } satisfies SessionSnapshot;
+  });
+  sessionCache = { at: Date.now(), promise };
+  return promise;
 }
 
 /** True when auth forms should render instead of the unavailable state. */

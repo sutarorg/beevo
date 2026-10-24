@@ -8,7 +8,6 @@ import {
   AUTH_UNAVAILABLE_MESSAGE,
   fetchSession,
   getAuthService,
-  isMockAuth,
 } from "@/lib/services/auth";
 import {
   firstError,
@@ -22,7 +21,6 @@ import {
 import {
   AuthCard,
   AuthStatePanel,
-  DemoHintBox,
   FormErrorBanner,
 } from "@/components/auth/states";
 import { UnavailablePanel } from "@/components/states";
@@ -96,20 +94,6 @@ export function LoginForm({
   );
   const [notice] = useState(initialNotice ?? null);
   const [submitting, setSubmitting] = useState(false);
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(8);
-
-  // Successful auth redirect state: count down, then leave for the homepage
-  // (the dashboard route ships in a later phase — see DECISIONS.md).
-  useEffect(() => {
-    if (!sessionEmail) return;
-    if (countdown <= 0) {
-      window.location.assign("/");
-      return;
-    }
-    const timer = window.setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [sessionEmail, countdown]);
 
   if (!service) {
     return (
@@ -117,27 +101,6 @@ export function LoginForm({
         title="Authentication isn’t connected yet"
         message={AUTH_UNAVAILABLE_MESSAGE}
       />
-    );
-  }
-
-  if (sessionEmail) {
-    return (
-      <AuthStatePanel
-        tone="success"
-        title="You’re signed in (demo)"
-        message={
-          <>
-            The mock adapter issued a demo session for{" "}
-            <span className="font-semibold text-ink">{sessionEmail}</span>. The
-            creator dashboard ships in the next build phase, so we’re taking you
-            back to the homepage in {countdown}s.
-          </>
-        }
-      >
-        <Button href="/" variant="ink" className="w-full">
-          Continue to homepage now
-        </Button>
-      </AuthStatePanel>
     );
   }
 
@@ -164,27 +127,18 @@ export function LoginForm({
       });
       return;
     }
-    if (!isMockAuth()) {
-      // Real session cookie is set server-side; go straight to the destination.
-      // Platform admins land in the admin console instead of a creator studio
-      // they may not use.
-      const session = await fetchSession();
-      toast.push({ variant: "success", title: "Signed in", description: "Welcome back." });
-      window.location.assign(
-        next && next.startsWith("/")
-          ? next
-          : session.isAdmin
-            ? "/admin/dashboard"
-            : POST_AUTH_PATH,
-      );
-      return;
-    }
-    toast.push({
-      variant: "success",
-      title: "Signed in (demo)",
-      description: "The mock adapter issued a demo session.",
-    });
-    setSessionEmail(result.data.user.email);
+    // The real session cookie is set server-side; go straight to the
+    // destination. Platform admins land in the admin console instead of a
+    // creator studio they may not use.
+    const session = await fetchSession();
+    toast.push({ variant: "success", title: "Signed in", description: "Welcome back." });
+    window.location.assign(
+      next && next.startsWith("/")
+        ? next
+        : session.isAdmin
+          ? "/admin/dashboard"
+          : POST_AUTH_PATH,
+    );
   }
 
   return (
@@ -249,14 +203,6 @@ export function LoginForm({
           </Link>
         </p>
       </AuthCard>
-      {isMockAuth() ? (
-        <DemoHintBox
-          lines={[
-            "Any well-formed email + password signs in (demo session only).",
-            "Use anything@fail.demo to see the authentication error state.",
-          ]}
-        />
-      ) : null}
     </>
   );
 }
@@ -291,8 +237,8 @@ function VerifyPendingPanel({
     setCooldown(30);
     toast.push({
       variant: "info",
-      title: "Verification email re-sent (demo)",
-      description: "No real email is delivered in demo mode.",
+      title: "Verification email re-sent",
+      description: "Check your inbox for the new link.",
     });
   }
 
@@ -325,14 +271,6 @@ function VerifyPendingPanel({
       >
         Wrong email? Start over
       </button>
-      {isMockAuth() ? (
-        <DemoHintBox
-          lines={[
-            "Demo mode: no real email is sent or verified.",
-            "Supabase wires the real verification email in Phase 5.",
-          ]}
-        />
-      ) : null}
     </AuthStatePanel>
   );
 }
@@ -483,14 +421,6 @@ export function SignupForm() {
           </Link>
         </p>
       </AuthCard>
-      {isMockAuth() ? (
-        <DemoHintBox
-          lines={[
-            "Any valid input creates a demo account and shows the verification step.",
-            "Use taken@demo.test to see the “email already in use” error.",
-          ]}
-        />
-      ) : null}
     </>
   );
 }
@@ -539,23 +469,6 @@ export function ForgotPasswordForm() {
         <Button href="/login" variant="ink" className="w-full">
           Back to log in
         </Button>
-        {isMockAuth() ? (
-          <>
-            <Button
-              href="/forgot-password/reset?token=demo-token-123456"
-              variant="outline"
-              className="w-full"
-            >
-              Preview the reset screen (demo)
-            </Button>
-            <DemoHintBox
-              lines={[
-                "Demo mode: no real email is sent. The button above opens the password-reset completion screen.",
-                "A missing or short token shows the invalid-link error state.",
-              ]}
-            />
-          </>
-        ) : null}
       </AuthStatePanel>
     );
   }

@@ -9,7 +9,8 @@ import type { LearnerCourseView, LearnerLessonView } from "@/lib/learner-types";
 import { getLearnerService } from "@/lib/services/learner";
 import { CardListSkeleton, FailedState, Skeleton } from "@/components/creator/ui";
 import { CurriculumPanel, NotEnrolledPanel } from "@/components/learner/course-ui";
-import { CompletionToggle, DirectPlayer, ResourceDownloads, SimulatedPlayer } from "@/components/learner/player";
+import { BeevoPlayer } from "@/components/learner/beevo-player";
+import { CompletionToggle, ResourceDownloads } from "@/components/learner/player";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
@@ -116,7 +117,7 @@ export function LearnerLessonPage({ courseId, lessonId }: { courseId: string; le
       </div>
 
       {lessonView.lesson.type === "video" && lessonView.playback.mode === "direct" ? (
-        <DirectPlayer
+        <BeevoPlayer
           view={lessonView}
           onProgress={(seconds) => debouncedSavePosition.schedule(seconds)}
           onCompleted={(done) => void setCompletion(done)}
@@ -131,21 +132,18 @@ export function LearnerLessonPage({ courseId, lessonId }: { courseId: string; le
           }}
         />
       ) : lessonView.lesson.type === "video" ? (
-        <SimulatedPlayer
-          view={lessonView}
-          coverPreviewUrl={courseView.coverPreviewUrl}
-          onProgress={(seconds) => debouncedSavePosition.schedule(seconds)}
-          onCompleted={(done) => void setCompletion(done)}
-          onEnded={() => {
-            if (nextHref) {
-              toast.push({
-                variant: "info",
-                title: "Up next is ready",
-                description: "Jump to the next lesson below.",
-              });
-            }
-          }}
-        />
+        <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs">
+          <p className="text-xs font-bold tracking-[0.18em] text-accent uppercase">Video lesson</p>
+          <h1 className="mt-1 text-xl font-bold text-ink">{lessonView.lesson.title}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-smoke">
+            {lessonView.playback.mode === "unavailable"
+              ? lessonView.playback.note
+              : "This video isn’t available right now."}
+          </p>
+          {lessonView.lesson.description ? (
+            <p className="mt-3 text-sm leading-relaxed text-smoke">{lessonView.lesson.description}</p>
+          ) : null}
+        </div>
       ) : (
         <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs">
           <p className="text-xs font-bold tracking-[0.18em] text-accent uppercase">Resource bundle</p>

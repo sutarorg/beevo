@@ -12,7 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { formatINR } from "@/lib/domain";
+import { formatINR, priceLabel } from "@/lib/domain";
 import type { CourseEditor, CourseListItem, CourseStatus } from "@/lib/creator-types";
 import { useAsyncData } from "@/lib/hooks";
 import { getCourseService } from "@/lib/services/courses";
@@ -329,7 +329,7 @@ function CourseRow({
           </div>
           <h2 className="mt-1.5 truncate text-base font-bold text-ink sm:text-lg">{course.title}</h2>
           <p className="mt-0.5 text-xs text-smoke">
-            {course.priceInPaise !== null ? formatINR(course.priceInPaise) : "No price"} ·{" "}
+            {course.priceInPaise !== null ? priceLabel(course.priceInPaise) : "No price"} ·{" "}
             {course.lessonCount} lesson{course.lessonCount === 1 ? "" : "s"} · updated{" "}
             {formatDate(course.updatedAt)}
             {course.publishedAt ? ` · published ${formatDate(course.publishedAt)}` : ""}
