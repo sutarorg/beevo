@@ -33,13 +33,13 @@ const instrumentSerif = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   icons: {
-    icon: "/images/brand/beevo-logo.png",
-    shortcut: "/images/brand/beevo-logo.png",
-    apple: "/images/brand/beevo-logo.png",
+    icon: "/images/brand/beevo-mark.png",
+    shortcut: "/images/brand/beevo-mark.png",
+    apple: "/images/brand/beevo-mark.png",
   },
   openGraph: {
     siteName: APP_NAME,
-    images: ["/images/brand/beevo-logo.png"],
+    images: ["/images/brand/beevo-og.png"],
   },
   title: {
     default: `${APP_NAME} — ${APP_TAGLINE}`,

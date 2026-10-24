@@ -205,9 +205,20 @@ const EXTENSION_MIME_MAP: Record<string, string> = {
   csv: "text/csv",
 };
 
+/** Browsers occasionally report legacy/invented aliases — normalise them. */
+const MIME_ALIASES: Record<string, string> = {
+  "image/jpg": "image/jpeg",
+  "image/pjpeg": "image/jpeg",
+  "image/x-png": "image/png",
+  "image/x-webp": "image/webp",
+  "video/mov": "video/quicktime",
+  "video/mpeg4": "video/mp4",
+  "application/x-zip": "application/zip",
+};
+
 export function resolveUploadMimeType(fileName: string, browserType: string): string {
   const trimmed = browserType.trim().toLowerCase();
-  if (trimmed) return trimmed;
+  if (trimmed) return MIME_ALIASES[trimmed] ?? trimmed;
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
   return EXTENSION_MIME_MAP[ext] ?? "application/octet-stream";
 }
@@ -237,8 +248,10 @@ function xhrPut(
         });
       }
     };
+    // Status 0 / onerror = the request never reached storage (offline, blocked,
+    // or a CORS preflight the bucket refused). The caller retries via the app.
     xhr.onerror = () =>
-      resolve({ ok: false, error: { code: "upload_failed", message: "Network error during upload." } });
+      resolve({ ok: false, error: { code: "upload_network", message: "Network error during upload." } });
     if (callbacks.signal) {
       callbacks.signal.addEventListener("abort", () => {
         xhr.abort();
@@ -247,6 +260,33 @@ function xhrPut(
     }
     xhr.send(file);
   });
+}
+
+/**
+ * Direct PUT to storage, with one transparent retry through the app.
+ *
+ * Direct uploads are the fast path (and the only path for large videos), but
+ * they depend on the R2 bucket's CORS rules allowing this origin. When the
+ * browser cannot reach the bucket at all, the same bytes are relayed to
+ * /api/v1/uploads/put/:assetId, which writes them to the same R2 bucket
+ * server-side — the file still lands in the cloud bucket instead of failing.
+ */
+async function putWithRelay(
+  session: UploadSession,
+  file: File,
+  contentType: string,
+  callbacks: UploadCallbacks,
+): Promise<ApiResult<void>> {
+  const signedUrl = session.signedUrl ?? "";
+  const direct = await xhrPut(signedUrl, file, contentType, callbacks);
+  if (direct.ok) return direct;
+  const canRelay =
+    /^https?:\/\//i.test(signedUrl) &&
+    direct.error.code === "upload_network" &&
+    !callbacks.signal?.aborted;
+  if (!canRelay) return direct;
+  callbacks.onProgress(0);
+  return xhrPut(`/api/v1/uploads/put/${encodeURIComponent(session.id)}`, file, contentType, callbacks);
 }
 
 class ApiMediaService implements MediaService {
@@ -258,11 +298,17 @@ class ApiMediaService implements MediaService {
     mimeType: string;
   }): Promise<ApiResult<UploadSession>> {
     const mimeType = resolveUploadMimeType(input.fileName, input.mimeType);
+    // Account-level media (profile photos) has NO course. Sending courseId: ""
+    // used to fail the server's min(1) validation and surface as
+    // "Couldn't start the upload" — the field is omitted unless a real id exists.
+    const courseId = input.courseId.trim();
     const result = await apiPost<LiveSessionResponse>("uploads/session", {
-    ...input,
-    courseId: input.courseId,
-    mimeType,
-  });
+      ...(courseId ? { courseId } : {}),
+      kind: input.kind,
+      fileName: input.fileName,
+      sizeBytes: input.sizeBytes,
+      mimeType,
+    });
     if (!result.ok) return { ok: false, error: result.error };
     return {
       ok: true,
@@ -286,7 +332,7 @@ class ApiMediaService implements MediaService {
       };
     }
     const contentType = session.mimeType || resolveUploadMimeType(session.file.name, session.file.type);
-    const put = await xhrPut(session.signedUrl, session.file, contentType, callbacks);
+    const put = await putWithRelay(session, session.file, contentType, callbacks);
     if (!put.ok) return { ok: false, error: put.error };
     callbacks.onProgress(100);
     // Server independently verifies the object before issuing the media ref.

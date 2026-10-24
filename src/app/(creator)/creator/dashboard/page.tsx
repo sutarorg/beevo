@@ -199,19 +199,30 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Notifications */}
-        <section aria-labelledby="dash-ntf" className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
+        <section
+          aria-labelledby="dash-ntf"
+          className="min-w-0 rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs"
+        >
           <h2 id="dash-ntf" className="mb-4 flex items-center gap-2 text-base font-bold text-ink">
             Notifications
           </h2>
-          <NotificationsList
-            notifications={data.notifications}
-            onMarkAllRead={async () => {
-              const service = getCreatorDataService();
-              if (!service) return;
-              await service.markAllNotificationsRead();
-              reload();
-            }}
-          />
+          {/*
+            The list scrolls inside the card instead of growing past it: a long
+            notification feed used to push this card taller than its grid row,
+            letting it run under the next section and look like it overlapped
+            the header on short viewports.
+          */}
+          <div className="max-h-[24rem] overflow-y-auto pr-0.5">
+            <NotificationsList
+              notifications={data.notifications}
+              onMarkAllRead={async () => {
+                const service = getCreatorDataService();
+                if (!service) return;
+                await service.markAllNotificationsRead();
+                reload();
+              }}
+            />
+          </div>
         </section>
 
         {/* Earnings + performance mini */}

@@ -76,3 +76,53 @@ Chronological, opinionated record. New phases append — never rewrite history.
 - Auth, payments, email, storage are mock/absent; the "unavailable" panels make that explicit.
 - All business API routes, provider webhooks, and real authorization are Prompt 5.
 - Admin records are fictional and labelled; payout recordings simulate bookkeeping only — no transfer is triggered, no real bank data is ever collected.
+
+## D11 — 2026-10 · Live polish pass (storefront, uploads, editor, brand)
+
+- **Brand is the bolt, never a tile:** the logo asset had an opaque near-black
+  rounded square baked into the PNG, so every "logo" on the site was a black
+  block with a bolt inside. The source art was keyed to a transparent
+  `beevo-mark.png` (lime-only pixels, alpha preserved) and `LogoMark` dropped its
+  `bg-ink` frame, border and shadow. `beevo-logo.png` is gone; icons/emails/OG
+  art use the mark or a composed `beevo-og.png` on cream.
+- **Every account owns a live storefront address:** signup previously left
+  `users.handle` NULL forever, so the dashboard's "public URL" was empty and
+  `/@handle` 404'd for real creators. Handles are now generated at signup
+  (`src/server/handles.ts` — name → `meera-kapoor`, `-2`/`-3` on collision,
+  reserved words blocked), backfilled for legacy rows on sign-in, on
+  `GET /creator/profile`, and storefront resolution is case-insensitive end to
+  end (edge proxy → page → API). Share links are built from the serving origin
+  (`shareableOrigin()`), so a copied link always opens the live site.
+- **Uploads fail honestly, then recover:** the profile photo sent
+  `courseId: ""`, which the server schema rejected (`min(1)`) — that was the
+  "Couldn't start the upload" toast; the field is now omitted for account-level
+  media. When a browser cannot reach R2 directly (`Network error during
+  upload.` = a blocked/CORS-less PUT), the same bytes are relayed once through
+  `PUT /api/v1/uploads/put/:assetId`, which writes them to the **same R2
+  bucket** server-side (≤20 MB, owner-checked, size-checked, then verified by
+  `uploads/complete`). Large videos still require bucket CORS; `.env.example`
+  documents the exact CORS policy.
+- **No stock faces:** `users.avatar_url` no longer falls back to a bundled demo
+  portrait. Null means "show the user icon" (`ProfileAvatar`), including the
+  storefront hero and sales page, and legacy rows pointing at the old demo
+  photos are treated as null. Creators can also remove their photo.
+- **Delete is real, and bounded:** `DELETE /api/v1/courses/:id` permanently
+  removes a course with no orders and no enrolments (media objects cleaned up
+  best-effort) and refuses with `409 course_has_history` otherwise — archiving
+  stays the path for anything learners have bought. Exposed in the editor
+  header and per-row in My courses.
+- **Editor shows the signed-in creator:** `CourseEditor.creatorName` comes from
+  the creator row, replacing the hardcoded "Publishing as Meera Kapoor".
+- **Chart dots are HTML, not SVG:** `TrendLine` stretches its viewBox to the
+  card width, which turned `circle` markers into ellipses; the markers are now
+  absolutely-positioned 12px dots (percent coordinates) and the polyline uses
+  `vector-effect: non-scaling-stroke`.
+- **Dialogs render in a portal:** the notification bell lives in a
+  `backdrop-filter` header, which becomes the containing block for
+  `position: fixed`, trapping the notification dialog inside the 56px bar. All
+  `Modal`s now portal to `document.body`; the dashboard notification card also
+  scrolls internally so a long feed can't stretch its grid row.
+- **Timeline + image spacing:** the landing "Zero to first sale" connector is
+  drawn per step (icon right edge → next icon left edge at the 3.5rem icon
+  size/1.5rem gap, vertically centred), and the "You create" card is a flex
+  column that pushes its illustration down instead of butting against the list.

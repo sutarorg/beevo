@@ -31,10 +31,6 @@ const nextConfig: NextConfig = {
     ],
     remotePatterns,
   },
-  // Legacy clients still request /favicon.ico directly — serve the brand mark.
-  async rewrites() {
-    return [{ source: "/favicon.ico", destination: "/images/brand/beevo-logo.png" }];
-  },
 };
 
 export default nextConfig;

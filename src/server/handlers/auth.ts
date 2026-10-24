@@ -16,6 +16,7 @@ import {
   verifyPassword,
 } from "@/server/auth";
 import { emailShell, queueEmail } from "@/server/email";
+import { ensureHandleFor, suggestHandle } from "@/server/handles";
 import { resolveRequestBaseUrl } from "@/server/env";
 import { audit } from "@/server/audit";
 import {
@@ -109,6 +110,21 @@ route("POST", "auth/signup", async (req) => {
     throw error;
   }
 
+  // Every account gets a storefront address immediately, so /@handle is live
+  // from the first login instead of 404-ing on a NULL handle.
+  try {
+    const handle = await suggestHandle(user.name, user.email);
+    const [withHandle] = await db
+      .update(users)
+      .set({ handle, updatedAt: new Date() })
+      .where(eq(users.id, user.id))
+      .returning();
+    if (withHandle) user = withHandle;
+  } catch (error) {
+    // A handle is helpful, not essential to account creation — never fail signup.
+    console.error("[auth] handle assignment failed:", error);
+  }
+
   await audit({
     actorId: user.id,
     actorLabel: user.name,
@@ -153,6 +169,15 @@ route("POST", "auth/login", async (req) => {
   }
   if (user.suspendedAt) {
     return fail("account_suspended", "This account is suspended. Contact support.", 403);
+  }
+  // Legacy accounts created before handles existed get one on next sign-in.
+  if (!user.handle) {
+    try {
+      const handle = await ensureHandleFor(user);
+      if (handle) user.handle = handle;
+    } catch (error) {
+      console.error("[auth] handle backfill failed:", error);
+    }
   }
   const token = await createSession(user.id);
   await setSessionCookie(token);

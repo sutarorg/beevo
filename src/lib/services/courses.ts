@@ -59,6 +59,9 @@ export interface CourseService {
   deleteLesson(courseId: string, sectionId: string, lessonId: string): Promise<ApiResult<void>>;
   reorderLessons(courseId: string, sectionId: string, orderedLessonIds: string[]): Promise<ApiResult<void>>;
 
+  /** Permanently removes a course with no learners/orders (drafts etc.). */
+  deleteCourse(courseId: string): Promise<ApiResult<{ deleted: true; id: string }>>;
+
   /** Server-side readiness validation happens here; UI mirrors client-side. */
   publish(courseId: string): Promise<ApiResult<CourseEditor>>;
   unpublish(courseId: string): Promise<ApiResult<CourseEditor>>;
@@ -228,6 +231,7 @@ class MockCourseService implements CourseService {
     const draft: CourseEditor = {
       id: mockId("draft"),
       creatorHandle: "meera-shoots",
+      creatorName: "Meera Kapoor",
       status: "draft",
       slug: null,
       title: "",
@@ -500,6 +504,26 @@ class MockCourseService implements CourseService {
     return ok(structuredClone(course));
   }
 
+  async deleteCourse(courseId: string): Promise<ApiResult<{ deleted: true; id: string }>> {
+    await mockLatency(300, 200);
+    const forced = consumeForcedFailure<{ deleted: true; id: string }>();
+    if (forced) return forced;
+    const course = this.find(courseId);
+    if (!course) return err("not_found", "We couldn't find that course — it may already be deleted.");
+    const hasSales = seedOrders().some(
+      (order) => order.courseId === courseId && order.status === "paid",
+    );
+    if (hasSales) {
+      return err(
+        "course_has_history",
+        "This course already has learners or orders, so it can't be deleted. Archive it instead.",
+      );
+    }
+    this.courses = this.courses.filter((item) => item.id !== courseId);
+    persist(this.courses);
+    return ok({ deleted: true as const, id: courseId });
+  }
+
   async archive(courseId: string): Promise<ApiResult<CourseEditor>> {
     await mockLatency(300, 200);
     const forced = consumeForcedFailure<CourseEditor>();
@@ -593,6 +617,9 @@ class ApiCourseService implements CourseService {
   }
   reorderLessons(courseId: string, sectionId: string, orderedLessonIds: string[]) {
     return apiPut<void>(`courses/${courseId}/sections/${sectionId}/lessons/reorder`, { orderedLessonIds });
+  }
+  deleteCourse(courseId: string) {
+    return del<{ deleted: true; id: string }>(`courses/${courseId}`);
   }
   publish(courseId: string) {
     return apiPost<CourseEditor>(`courses/${courseId}/status`, { action: "publish" });

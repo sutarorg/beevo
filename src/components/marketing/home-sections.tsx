@@ -232,12 +232,20 @@ export function HowItWorksSection() {
         />
       </Reveal>
       <ol className="relative mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-        <div
-          aria-hidden="true"
-          className="ticket-divider absolute top-7 right-[12%] left-[12%] hidden lg:block"
-        />
         {HOW_IT_WORKS_STEPS.map((step, index) => (
           <li key={step.step} className="relative">
+            {/*
+              Connector runs from the right edge of this step's icon to the
+              left edge of the next one: icon is size-14 (3.5rem), so the line
+              starts at left-14 and bleeds exactly one grid gap (-right-6) into
+              the next column. Hidden on stacked/2-column layouts.
+            */}
+            {index < HOW_IT_WORKS_STEPS.length - 1 ? (
+              <div
+                aria-hidden="true"
+                className="ticket-divider absolute top-7 left-14 -right-6 hidden -translate-y-1/2 lg:block"
+              />
+            ) : null}
             <Reveal delay={index * 0.08}>
               <div className="mx-auto flex size-14 items-center justify-center rounded-full border-2 border-ink bg-accent text-cream shadow-hard-sm lg:mx-0">
                 <ContentIcon name={step.icon} className="size-6" />
@@ -356,7 +364,7 @@ export function CreateLearnSection() {
           <Reveal key={panel.eyebrow} delay={panelIndex * 0.08}>
             <div
               className={cn(
-                "h-full rounded-3xl border-2 border-ink p-6 shadow-hard-sm sm:p-8",
+                "flex h-full flex-col rounded-3xl border-2 border-ink p-6 shadow-hard-sm sm:p-8",
                 panelIndex === 0 ? "bg-white" : "bg-moss text-cream",
               )}
             >
@@ -391,7 +399,7 @@ export function CreateLearnSection() {
                 ))}
               </ul>
               {panelIndex === 0 ? (
-                <div className="mt-6">
+                <div className="mt-auto pt-10 sm:pt-12">
                   <div className="mx-auto max-w-xs -rotate-1 overflow-hidden rounded-2xl border-2 border-ink bg-cream shadow-hard-xs">
                     <div className="relative aspect-[4/3] border-b-2 border-ink">
                       <Image
@@ -411,7 +419,7 @@ export function CreateLearnSection() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-6">
+                <div className="mt-auto pt-6">
                   <CourseCard
                     course={MOCK_CREATORS[0].courses[0]}
                     className="mx-auto max-w-xs rotate-1 text-ink"

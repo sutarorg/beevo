@@ -1,4 +1,5 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, UserRound } from "lucide-react";
+import Image from "next/image";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -139,5 +140,53 @@ export function Input({ className, invalid, ...props }: InputProps) {
       )}
       {...props}
     />
+  );
+}
+
+/**
+ * Avatar for creators and learners.
+ *
+ * There is no stock "default profile photo" anywhere in the product: when a
+ * person hasn't uploaded one yet we show the standard user icon instead of
+ * someone else's face.
+ */
+export function ProfileAvatar({
+  src,
+  name,
+  sizePx = 64,
+  className,
+  priority = false,
+}: {
+  src?: string | null;
+  name?: string;
+  sizePx?: number;
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "relative grid shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ink bg-parchment",
+        className,
+      )}
+    >
+      {src ? (
+        <Image
+          src={src}
+          alt={name ? `${name} profile photo` : "Profile photo"}
+          fill
+          sizes={`${sizePx}px`}
+          className="object-cover"
+          priority={priority}
+        />
+      ) : (
+        <UserRound
+          aria-hidden="true"
+          className="text-smoke"
+          strokeWidth={2}
+          style={{ width: Math.round(sizePx * 0.55), height: Math.round(sizePx * 0.55) }}
+        />
+      )}
+    </span>
   );
 }

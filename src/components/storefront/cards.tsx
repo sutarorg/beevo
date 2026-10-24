@@ -4,23 +4,20 @@ import Link from "next/link";
 import { formatINR } from "@/lib/domain";
 import type { PublicCourseCard, PublicCreatorPage } from "@/lib/learner-types";
 import { Button } from "@/components/ui/button";
-import { Sticker } from "@/components/ui/primitives";
+import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 
 /** Public creator header — avatar, identity, bio, links. */
 export function CreatorHero({ creator }: { creator: PublicCreatorPage }) {
   return (
     <section className="border-b-2 border-ink bg-parchment">
       <div className="mx-auto max-w-4xl px-4 py-12 text-center sm:px-6 sm:py-16">
-        <div className="relative mx-auto size-28 overflow-hidden rounded-full border-2 border-ink shadow-hard-sm sm:size-32">
-          <Image
-            src={creator.avatarUrl}
-            alt={`${creator.displayName} profile photo`}
-            fill
-            sizes="128px"
-            className="object-cover"
-            priority
-          />
-        </div>
+        <ProfileAvatar
+          src={creator.avatarUrl}
+          name={creator.displayName}
+          sizePx={128}
+          priority
+          className="mx-auto size-28 shadow-hard-sm sm:size-32"
+        />
         <h1 className="mt-5 text-3xl font-bold tracking-tight text-ink sm:text-5xl">
           {creator.displayName}
         </h1>

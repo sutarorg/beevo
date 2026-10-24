@@ -3,10 +3,20 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-/** Shared modal shell: backdrop, escape close, mobile-sheet friendly. */
+/**
+ * Shared modal shell: backdrop, escape close, mobile-sheet friendly.
+ *
+ * Rendered in a portal on document.body. This matters: the notification bell
+ * (and therefore its dialog) is mounted inside the fixed app header, which
+ * uses backdrop-filter — a backdrop-filter ancestor becomes the containing
+ * block for `position: fixed`, so a non-portalled dialog was being trapped
+ * inside the 56px header and appeared to overlap it. Portalling to <body>
+ * keeps every dialog above the page, fully visible, wherever the trigger sits.
+ */
 export function Modal({
   open,
   onClose,
@@ -33,7 +43,7 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  return (
+  const dialog = (
     <AnimatePresence>
       {open ? (
         <>
@@ -76,6 +86,10 @@ export function Modal({
       ) : null}
     </AnimatePresence>
   );
+
+  // Server render has no portal target; the dialog is closed then anyway.
+  if (typeof document === "undefined") return null;
+  return createPortal(dialog, document.body);
 }
 
 export function ConfirmDialog({

@@ -19,6 +19,12 @@ import type {
   PublicSectionMeta,
 } from "@/lib/learner-types";
 
+const LEGACY_DEFAULT_AVATARS = new Set([
+  "/images/avatars/meera.jpg",
+  "/images/avatars/ayaan.jpg",
+  "/images/avatars/diya.jpg",
+]);
+
 /**
  * Public storefront — only intentionally public fields: creator profile card
  * + published courses. No media refs, no enrolments, no private data.
@@ -35,8 +41,10 @@ async function isMaintenanceMode(): Promise<boolean> {
 async function resolvePublicCreator(
   handle: string,
 ): Promise<{ row: typeof users.$inferSelect; info: PublicCreatorInfo } | null> {
+  // Handles are stored lowercase, but old rows and hand-typed links can differ
+  // in case — resolve case-insensitively so a live storefront never 404s.
   const creator = await db.query.users.findFirst({
-    where: and(eq(users.handle, handle.toLowerCase()), isNull(users.suspendedAt)),
+    where: and(sql`lower(${users.handle}) = ${handle.trim().toLowerCase()}`, isNull(users.suspendedAt)),
   });
   if (!creator || !creator.handle) return null;
   return {
@@ -44,7 +52,11 @@ async function resolvePublicCreator(
     info: {
       handle: creator.handle,
       displayName: creator.name,
-      avatarUrl: creator.avatarUrl || "/images/avatars/meera.jpg",
+      // No stock photo: null renders the generic user icon on the storefront.
+      avatarUrl:
+        creator.avatarUrl && !LEGACY_DEFAULT_AVATARS.has(creator.avatarUrl)
+          ? creator.avatarUrl
+          : null,
       tagline: creator.tagline,
       niche: creator.niche || "Creator",
       links: creator.links,

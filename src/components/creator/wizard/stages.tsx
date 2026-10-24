@@ -17,6 +17,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import type { CourseEditor } from "@/lib/creator-types";
+import { shareableOrigin } from "@/lib/config";
 import { commissionBreakdown, formatINR } from "@/lib/domain";
 import { readinessChecklist, type CourseService, type CourseStage } from "@/lib/services/courses";
 import { cn, formatDate } from "@/lib/utils";
@@ -28,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
 export function coursePublicUrl(course: CourseEditor): string {
-  return `https://beevo.in/@${course.creatorHandle}/${course.slug ?? "draft"}`;
+  return `${shareableOrigin()}/@${course.creatorHandle}/${course.slug ?? "draft"}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,8 +69,14 @@ export function DetailsStage({
           <UserRound className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-ink">Publishing as Meera Kapoor</p>
-          <p className="truncate text-xs text-smoke">@meera-shoots — the identity from your creator profile.</p>
+          <p className="truncate text-sm font-bold text-ink">
+            Publishing as {course.creatorName || "your profile"}
+          </p>
+          <p className="truncate text-xs text-smoke">
+            {course.creatorHandle
+              ? `@${course.creatorHandle} — the identity from your creator profile.`
+              : "Add a handle in your profile to activate your storefront link."}
+          </p>
         </div>
         <Link
           href="/creator/profile"

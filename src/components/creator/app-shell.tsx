@@ -153,7 +153,7 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <div className="fixed inset-x-0 top-0 z-40 border-b-2 border-ink bg-cream/95 backdrop-blur-sm lg:hidden">
+      <div className="fixed inset-x-0 top-0 z-50 border-b-2 border-ink bg-cream lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
           <Link
             href="/creator/dashboard"
@@ -168,7 +168,7 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Desktop top row (bell only) */}
-      <div className="fixed right-0 left-66 top-0 z-30 hidden h-14 items-center justify-end border-b border-ink/10 bg-cream/80 px-6 backdrop-blur-sm lg:flex">
+      <div className="fixed right-0 left-66 top-0 z-30 hidden h-14 items-center justify-end border-b-2 border-ink/10 bg-cream px-6 lg:flex">
         <NotificationBell />
       </div>
 

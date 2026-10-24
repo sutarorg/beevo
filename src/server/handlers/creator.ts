@@ -18,37 +18,65 @@ import { newId } from "@/server/auth";
 import type { CreatorProfile, CreatorSettings, PayoutDetails } from "@/lib/creator-types";
 import type { AnalyticsData, DashboardData } from "@/lib/services/creator-data";
 import type { CourseStatus, CreatorNotification, SupportTicket } from "@/lib/creator-types";
-import { APP_BASE_URL } from "@/server/env";
+import { APP_BASE_URL, resolveRequestBaseUrl } from "@/server/env";
+import { RESERVED_HANDLES, suggestHandle } from "@/server/handles";
 
 /** Creator profile + business data views (self-scoped, server-verified). */
 
-const DEFAULT_AVATAR_URL = "/images/avatars/meera.jpg";
+/**
+ * Legacy rows may still point at the bundled demo portraits that older builds
+ * used as a "default avatar". Those must never be shown as somebody's face —
+ * treat them as "no photo" so the UI falls back to the user icon.
+ */
+const LEGACY_DEFAULT_AVATARS = new Set([
+  "/images/avatars/meera.jpg",
+  "/images/avatars/ayaan.jpg",
+  "/images/avatars/diya.jpg",
+]);
 
-function profileOf(user: {
-  id: string;
-  name: string;
-  email: string;
-  handle: string | null;
-  tagline: string;
-  avatarUrl: string | null;
-  niche: string;
-  links: { label: string; url: string }[];
-}): CreatorProfile {
+function realAvatarUrl(value: string | null): string | null {
+  if (!value) return null;
+  if (LEGACY_DEFAULT_AVATARS.has(value)) return null;
+  return value;
+}
+
+function profileOf(
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    handle: string | null;
+    tagline: string;
+    avatarUrl: string | null;
+    niche: string;
+    links: { label: string; url: string }[];
+  },
+  baseUrl: string = APP_BASE_URL,
+): CreatorProfile {
   return {
     handle: user.handle ?? "",
     displayName: user.name,
     tagline: user.tagline,
-    avatarUrl: user.avatarUrl || DEFAULT_AVATAR_URL,
+    avatarUrl: realAvatarUrl(user.avatarUrl),
     niche: user.niche,
     links: user.links,
-    publicUrl: user.handle ? `${APP_BASE_URL}/@${user.handle}` : "",
+    // The URL is built from the host that actually served the request, so the
+    // shareable storefront link is always the live site.
+    publicUrl: user.handle ? `${baseUrl}/@${user.handle}` : "",
   };
 }
 
-route("GET", "creator/profile", async (_req, ctx) => {
+route("GET", "creator/profile", async (req, ctx) => {
   const user = requireUser(ctx);
   if (user instanceof Response) return user;
-  return ok(profileOf(user));
+  const baseUrl = resolveRequestBaseUrl(req);
+  if (!user.handle) {
+    // Never leave a creator without a live storefront address.
+    const handle = await suggestHandle(user.name, user.email);
+    await db.update(users).set({ handle, updatedAt: new Date() }).where(eq(users.id, user.id));
+    return ok(profileOf({ ...user, handle }, baseUrl));
+  }
+  return ok(profileOf(user, baseUrl));
 });
 
 const profilePatchSchema = z.object({
@@ -94,19 +122,7 @@ route("PATCH", "creator/profile", async (req, ctx) => {
 
   if (parsed.values.handle) {
     const handle = parsed.values.handle.toLowerCase();
-    const reserved = [
-      "admin",
-      "support",
-      "beevo",
-      "help",
-      "pricing",
-      "api",
-      "learn",
-      "creator",
-      "login",
-      "signup",
-    ];
-    if (reserved.includes(handle)) {
+    if (RESERVED_HANDLES.has(handle)) {
       return fail("handle_taken", `“${handle}” isn't available. Try another handle.`, 409, {
         handle: ["This handle is taken."],
       });
@@ -131,7 +147,7 @@ route("PATCH", "creator/profile", async (req, ctx) => {
     })
     .where(eq(users.id, me.id));
   const fresh = await db.query.users.findFirst({ where: eq(users.id, me.id) });
-  return ok(profileOf(fresh!));
+  return ok(profileOf(fresh!, resolveRequestBaseUrl(req)));
 });
 
 const payoutDetailsSchema = z.object({
@@ -231,19 +247,7 @@ route("GET", "creator/username-check", async (req, ctx) => {
   if (me instanceof Response) return me;
   const handle = (new URL(req.url).searchParams.get("handle") ?? "").toLowerCase();
   if (!/^[a-z0-9-]{3,30}$/.test(handle)) return ok({ available: false, reason: "invalid" });
-  const reserved = [
-    "admin",
-    "support",
-    "beevo",
-    "help",
-    "pricing",
-    "api",
-    "learn",
-    "creator",
-    "login",
-    "signup",
-  ];
-  if (reserved.includes(handle)) return ok({ available: false, reason: "reserved" });
+  if (RESERVED_HANDLES.has(handle)) return ok({ available: false, reason: "reserved" });
   const taken = await db.query.users.findFirst({ where: eq(users.handle, handle) });
   return ok({ available: !taken || taken.id === me.id });
 });
@@ -271,7 +275,7 @@ async function creatorFinance(courseIds: string[]) {
   };
 }
 
-route("GET", "creator/dashboard", async (_req, ctx) => {
+route("GET", "creator/dashboard", async (req, ctx) => {
   const user = requireUser(ctx);
   if (user instanceof Response) return user;
   const creatorCourses = await myCourses(user.id);
@@ -318,7 +322,7 @@ route("GET", "creator/dashboard", async (_req, ctx) => {
     })),
     performance: await coursePerformance(creatorCourses),
     notifications: notificationRows.slice(0, 10).map((row) => toNotification(row)),
-    profile: profileOf(user),
+    profile: profileOf(user, resolveRequestBaseUrl(req)),
   };
   return ok(data);
 });

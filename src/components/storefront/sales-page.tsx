@@ -26,7 +26,7 @@ import { CardListSkeleton, FailedState, Skeleton } from "@/components/creator/ui
 import { CourseNotFound, PoweredByBanner } from "@/components/storefront/cards";
 import { CheckoutSheet } from "@/components/storefront/checkout";
 import { Button } from "@/components/ui/button";
-import { Sticker } from "@/components/ui/primitives";
+import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 
 const INCLUDED = [
   { icon: Video, label: "Streamed video lessons" },
@@ -101,15 +101,12 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
               href={`/@${course.creator.handle}`}
               className="mt-6 flex items-center gap-3 rounded-2xl border-2 border-ink bg-white p-3 transition-transform hover:-translate-y-0.5"
             >
-              <span className="relative size-11 shrink-0 overflow-hidden rounded-full border-2 border-ink">
-                <Image
-                  src={course.creator.avatarUrl}
-                  alt={`${course.creator.displayName} profile photo`}
-                  fill
-                  sizes="44px"
-                  className="object-cover"
-                />
-              </span>
+              <ProfileAvatar
+                src={course.creator.avatarUrl}
+                name={course.creator.displayName}
+                sizePx={44}
+                className="size-11"
+              />
               <span>
                 <span className="block text-sm font-bold text-ink">{course.creator.displayName}</span>
                 <span className="block text-xs text-accent">@{course.creator.handle} · view all courses</span>

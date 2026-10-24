@@ -2,9 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CreatorStorefront } from "@/components/storefront/storefront-page";
 
+/**
+ * Storefront segments are `@handle`. Handles are stored lowercase, but links
+ * get typed and re-shared in every case — normalise instead of 404-ing.
+ */
 function parseHandle(raw: string): string {
-  if (!raw.startsWith("@")) notFound();
-  const username = decodeURIComponent(raw.slice(1));
+  const decoded = decodeURIComponent(raw);
+  if (!decoded.startsWith("@")) notFound();
+  const username = decoded.slice(1).trim().toLowerCase();
   if (!/^[a-z0-9-]{1,40}$/.test(username)) notFound();
   return username;
 }
