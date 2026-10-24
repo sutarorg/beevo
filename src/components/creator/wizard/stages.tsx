@@ -403,7 +403,6 @@ export function ReviewStage({
   const [justPublished, setJustPublished] = useState(false);
 
   const checklist = readinessChecklist(course);
-  const ready = checklist.every((item) => item.ok);
   const publicUrl = coursePublicUrl(course);
 
   const saveDraft = async () => {
@@ -615,7 +614,7 @@ export function ReviewStage({
             {course.status !== "published" ? (
               <Button type="button" variant="accent" onClick={publish} loading={publishing}>
                 <BadgeIndianRupee className="size-4" aria-hidden="true" />
-                {ready ? "Publish course" : "Publish course — check what's missing"}
+                Publish course
               </Button>
             ) : null}
           </>

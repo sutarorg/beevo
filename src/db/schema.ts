@@ -103,6 +103,8 @@ export const lessons = pgTable("lessons", {
   type: text("type").notNull(), // video | resources
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
+  /** Video lessons only: watchable on the public storefront before purchase. */
+  isPreview: boolean("is_preview").notNull().default(false),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

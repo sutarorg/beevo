@@ -7,8 +7,10 @@ import type {
   PublicCreatorInfo,
   PublicCreatorPage,
   PublicLessonMeta,
+  PublicPreviewPlayback,
   PublicSectionMeta,
 } from "@/lib/learner-types";
+import { parseDurationLabel } from "@/lib/utils";
 import { MOCK_CURRENT_CREATOR } from "@/lib/mocks/creator-app";
 import { readMockCourses } from "@/lib/services/courses";
 import { consumeForcedFailure, mockLatency } from "@/lib/services/mock-utils";
@@ -26,6 +28,12 @@ import { consumeForcedFailure, mockLatency } from "@/lib/services/mock-utils";
 export interface StorefrontService {
   getCreator(handle: string): Promise<ApiResult<PublicCreatorPage>>;
   getCourse(handle: string, slug: string): Promise<ApiResult<PublicCoursePage>>;
+  /** Short-lived playback session for a creator-marked free preview lesson. */
+  getPreviewPlayback(
+    handle: string,
+    slug: string,
+    lessonId: string,
+  ): Promise<ApiResult<PublicPreviewPlayback>>;
 }
 
 const CREATORS: Record<string, PublicCreatorInfo> = {
@@ -63,15 +71,13 @@ function toCard(course: CourseEditor): PublicCourseCard {
   };
 }
 
-/** The first video lesson is the free preview; everything else stays locked. */
+/** Preview access is the creator's explicit per-lesson choice. */
 function toPublicSections(sections: CourseSection[]): PublicSectionMeta[] {
-  let previewMarked = false;
   return sections.map((section) => ({
     id: section.id,
     title: section.title,
     lessons: section.lessons.map((lesson): PublicLessonMeta => {
-      const isPreview = !previewMarked && lesson.type === "video";
-      if (isPreview) previewMarked = true;
+      const isPreview = lesson.isPreview === true && lesson.type === "video";
       return {
         id: lesson.id,
         title: lesson.title,
@@ -92,13 +98,30 @@ function countByType(course: CourseEditor, type: "video" | "resources"): number 
   );
 }
 
-function estimateDurationLabel(course: CourseEditor): string {
-  const minutes = course.sections.reduce(
-    (sum, section) => sum + section.lessons.length * 8,
+/** Real runtime from measured video durations; estimate only as a fallback. */
+function courseDurationLabel(course: CourseEditor): string {
+  const measured = course.sections.reduce(
+    (total, section) =>
+      total +
+      section.lessons.reduce(
+        (inner, lesson) =>
+          lesson.type === "video"
+            ? inner + parseDurationLabel(lesson.media[0]?.durationLabel)
+            : inner,
+        0,
+      ),
     0,
   );
+  const videoCount = course.sections.reduce(
+    (sum, section) => sum + section.lessons.filter((lesson) => lesson.type === "video").length,
+    0,
+  );
+  const seconds = measured > 0 ? measured : Math.max(videoCount, 1) * 8 * 60;
+  const minutes = Math.max(1, Math.round(seconds / 60));
   if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
 }
 
 class MockStorefrontService implements StorefrontService {
@@ -152,8 +175,36 @@ class MockStorefrontService implements StorefrontService {
             .reduce((inner, l) => inner + l.media.length, 0),
         0,
       ),
-      durationLabel: estimateDurationLabel(course),
+      durationLabel: courseDurationLabel(course),
       creator,
+    });
+  }
+
+  async getPreviewPlayback(
+    handle: string,
+    slug: string,
+    lessonId: string,
+  ): Promise<ApiResult<PublicPreviewPlayback>> {
+    await mockLatency(180, 120);
+    const course = publishedCourses().find(
+      (item) => item.creatorHandle === handle && item.slug === slug,
+    );
+    if (!course) return err("not_found", "This course isn't available right now.");
+    const lesson = course.sections
+      .flatMap((section) => section.lessons)
+      .find((item) => item.id === lessonId);
+    if (!lesson || lesson.type !== "video" || lesson.isPreview !== true) {
+      return err("not_a_preview", "This lesson isn't a free preview.");
+    }
+    const durationLabel = lesson.media[0]?.durationLabel;
+    return ok({
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      durationLabel,
+      durationSeconds: parseDurationLabel(durationLabel),
+      url: lesson.media[0]?.previewUrl ?? "",
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      note: "Demo preview — connect storage to stream real video.",
     });
   }
 }
@@ -173,6 +224,11 @@ class ApiStorefrontService implements StorefrontService {
   getCourse(handle: string, slug: string) {
     return apiGet<PublicCoursePage>(
       `storefront/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`,
+    );
+  }
+  getPreviewPlayback(handle: string, slug: string, lessonId: string) {
+    return apiGet<PublicPreviewPlayback>(
+      `storefront/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}/lessons/${encodeURIComponent(lessonId)}/preview`,
     );
   }
 }

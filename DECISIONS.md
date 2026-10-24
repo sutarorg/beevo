@@ -145,3 +145,41 @@ Chronological, opinionated record. New phases append — never rewrite history.
   destructive row action. Edit Course keeps the existing confirmation flow but
   its trigger is an accessible icon-only button. Add lesson no longer repeats
   the video/resources type toggle; the section-level action chooses the type.
+
+## D13 — 2026-10 · Real durations, creator-chosen free previews, clean storefront, working checkout
+
+- **Durations are measured, never invented.** The lesson dialog used to send a
+  hardcoded `durationLabel: "0:00"` with every video upload, so both the studio
+  and the storefront curriculum printed `0:00`. The browser now reads the real
+  duration from the selected file's metadata (`src/lib/video.ts`) before the
+  upload starts and stores `m:ss` / `h:mm:ss`. If a codec can't be decoded the
+  label is omitted instead of faking zero. Course runtime on the storefront is
+  the sum of the measured video durations (estimate only when nothing has been
+  measured yet), and a stored `0:00` is treated as "unknown", never displayed.
+- **Existing courses self-heal.** Opening a course's curriculum measures any
+  video asset that has no duration yet and writes it back through the new
+  owner-only `PATCH /api/v1/uploads/:assetId` (video assets only). No re-upload
+  is required for courses created before this fix.
+- **Free preview is an explicit per-lesson flag.** `lessons.is_preview` (migration
+  `0003_lesson_free_preview.sql`) is toggled in the video lesson card. The old
+  "first video lesson is the preview" heuristic is gone from both the live and
+  mock storefront services: a lesson is previewable only when the creator said
+  so, the media is verified, and the course is published. Resource lessons can
+  never be previews.
+- **Preview playback is server-authorized.** `GET /api/v1/storefront/:handle/:slug/lessons/:lessonId/preview`
+  returns a same-origin delivery URL for a preview lesson only; `/api/v1/media/access`
+  independently allows just the flagged preview assets of a published course.
+  The storefront Play icon (and the sidebar card) opens a notification-card-style
+  popup player. No storage key, bucket path, or long-lived URL reaches the buyer.
+- **Storefronts are the creator's page, not the marketing site.** Storefront
+  routes moved to their own route group (`src/app/(storefront)`) with a minimal
+  layout, so `/@handle` and `/@handle/course` no longer render the Beevo product
+  header or the Beevo footer. Marketing pages keep both.
+- **Checkout failure is now diagnosable and unblocked.** Buying requires a
+  signed-in account, not a verified inbox: email verification gates creator
+  actions (uploads, publishing) and depends on transactional email that may not
+  be configured, which silently blocked purchases. `GET /api/v1/checkout/status`
+  reports provider readiness without secrets, and the sheet shows the exact
+  reason (missing keys, key/secret mix-up, live mode not enabled) with a retry,
+  instead of only a transient "Couldn't start checkout" toast. `already_enrolled`
+  now becomes a "you already own this course" panel linking to the library.

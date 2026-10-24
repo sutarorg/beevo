@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { POST_AUTH_PATH } from "@/lib/config";
 import {
   AUTH_UNAVAILABLE_MESSAGE,
+  fetchSession,
   getAuthService,
   isMockAuth,
 } from "@/lib/services/auth";
@@ -165,8 +166,17 @@ export function LoginForm({
     }
     if (!isMockAuth()) {
       // Real session cookie is set server-side; go straight to the destination.
+      // Platform admins land in the admin console instead of a creator studio
+      // they may not use.
+      const session = await fetchSession();
       toast.push({ variant: "success", title: "Signed in", description: "Welcome back." });
-      window.location.assign(next && next.startsWith("/") ? next : POST_AUTH_PATH);
+      window.location.assign(
+        next && next.startsWith("/")
+          ? next
+          : session.isAdmin
+            ? "/admin/dashboard"
+            : POST_AUTH_PATH,
+      );
       return;
     }
     toast.push({

@@ -16,8 +16,19 @@ import type {
   PublicCoursePage,
   PublicCreatorInfo,
   PublicCreatorPage,
+  PublicPreviewPlayback,
   PublicSectionMeta,
 } from "@/lib/learner-types";
+import { isMissingDuration, parseDurationLabel } from "@/lib/utils";
+
+/** Course runtime label from measured seconds: 3723 -> "1h 2m". */
+function formatCourseDuration(totalSeconds: number): string {
+  const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
 
 const LEGACY_DEFAULT_AVATARS = new Set([
   "/images/avatars/meera.jpg",
@@ -169,7 +180,6 @@ route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
         )
         .orderBy(asc(lessonMedia.position))
     : [];
-  let previewMarked = false;
   const publicSections: PublicSectionMeta[] = sectionRows.map((section) => ({
     id: section.id,
     title: section.title,
@@ -177,14 +187,19 @@ route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
       .filter((lesson) => lesson.sectionId === section.id)
       .map((lesson) => {
         const links = mediaLinks.filter((link) => link.lessonId === lesson.id);
-        const isPreview = !previewMarked && lesson.type === "video" && links.length > 0;
-        if (isPreview) previewMarked = true;
+        // Preview access is an explicit creator choice on the lesson itself —
+        // never inferred from position ("first video"). A preview needs real
+        // playable media, so an empty video lesson stays locked.
+        const isPreview = lesson.isPreview === true && lesson.type === "video" && links.length > 0;
         return {
           id: lesson.id,
           title: lesson.title,
           description: lesson.description,
           type: lesson.type as "video" | "resources",
-          durationLabel: links[0]?.duration ?? undefined,
+          // A stored "0:00" is a placeholder, not a fact — never show it.
+          durationLabel: isMissingDuration(links[0]?.duration)
+            ? undefined
+            : (links[0]?.duration ?? undefined),
           resourceCount: lesson.type === "resources" ? links.length : 0,
           isPreview,
         };
@@ -195,7 +210,17 @@ route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
     const lesson = lessonRows.find((row) => row.id === link.lessonId);
     return lesson?.type === "resources";
   }).length;
-  const minutes = Math.max(lessonRows.length * 8, 5);
+  // Real total runtime: sum of the measured video durations. Only when no
+  // video has a duration yet do we fall back to an estimate.
+  const measuredSeconds = mediaLinks.reduce((total, link) => {
+    const lesson = lessonRows.find((row) => row.id === link.lessonId);
+    if (lesson?.type !== "video") return total;
+    return total + parseDurationLabel(link.duration);
+  }, 0);
+  const totalSeconds =
+    measuredSeconds > 0
+      ? measuredSeconds
+      : Math.max(lessonRows.filter((lesson) => lesson.type === "video").length, 1) * 8 * 60;
   const page: PublicCoursePage = {
     id: course.id,
     slug: course.slug ?? course.id,
@@ -208,9 +233,76 @@ route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
     lessonCount: lessonRows.length,
     videoCount,
     resourceCount,
-    durationLabel:
-      minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
+    durationLabel: formatCourseDuration(totalSeconds),
     creator: resolved.info,
   };
   return ok(page);
+});
+
+/**
+ * Free preview playback.
+ *
+ * Only a video lesson the creator explicitly marked as a preview on a
+ * PUBLISHED course resolves. The response is a same-origin delivery URL that
+ * the media route re-authorizes (short-lived R2 signature or local stream), so
+ * no storage key, bucket path, or long-lived URL ever reaches the browser.
+ */
+route("GET", "storefront/:handle/:slug/lessons/:lessonId/preview", async (_req, _ctx, params) => {
+  if (await isMaintenanceMode()) {
+    return fail(
+      "maintenance",
+      "Storefronts are temporarily undergoing scheduled maintenance. Please check back shortly.",
+      503,
+    );
+  }
+  const resolved = await resolvePublicCreator(params.handle);
+  if (!resolved) {
+    return fail("not_found", "This creator page doesn't exist or isn't public anymore.", 404);
+  }
+  const course = await db.query.courses.findFirst({
+    where: and(
+      eq(courses.creatorId, resolved.row.id),
+      eq(courses.slug, params.slug),
+      eq(courses.status, "published"),
+    ),
+  });
+  if (!course) {
+    return fail("not_found", "This course isn't available right now.", 404);
+  }
+  const lesson = await db
+    .select({ id: lessons.id, title: lessons.title, type: lessons.type, isPreview: lessons.isPreview })
+    .from(lessons)
+    .innerJoin(sections, eq(sections.id, lessons.sectionId))
+    .where(and(eq(lessons.id, params.lessonId), eq(sections.courseId, course.id)))
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (!lesson || lesson.type !== "video" || lesson.isPreview !== true) {
+    return fail(
+      "not_a_preview",
+      "This lesson isn't a free preview. Enrol in the course to watch it.",
+      403,
+    );
+  }
+  const asset = await db
+    .select({ asset: mediaAssets })
+    .from(lessonMedia)
+    .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
+    .where(and(eq(lessonMedia.lessonId, lesson.id), eq(mediaAssets.status, "verified")))
+    .orderBy(asc(lessonMedia.position))
+    .limit(1)
+    .then((rows) => rows[0]?.asset ?? null);
+  if (!asset) {
+    return fail("preview_unavailable", "The preview video isn't ready yet — try again shortly.", 409);
+  }
+  const durationSeconds = parseDurationLabel(asset.durationLabel);
+  const playback: PublicPreviewPlayback = {
+    lessonId: lesson.id,
+    lessonTitle: lesson.title,
+    durationLabel: isMissingDuration(asset.durationLabel) ? undefined : (asset.durationLabel ?? undefined),
+    durationSeconds,
+    url: `/api/v1/media/access?assetId=${asset.id}`,
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    note: "Free preview · access is re-checked by the server on every playback.",
+  };
+  return ok(playback);
 });

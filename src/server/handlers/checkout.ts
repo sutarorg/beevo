@@ -12,7 +12,7 @@ import {
   webhookEvents,
 } from "@/db/schema";
 import { route } from "@/server/router";
-import { clientIp, fail, ok, parseBody, rateLimit, requireUser, requireVerifiedUser } from "@/server/http";
+import { clientIp, fail, ok, parseBody, rateLimit, requireUser } from "@/server/http";
 import { newId } from "@/server/auth";
 import { audit } from "@/server/audit";
 import { emailShell, notifyInApp, queueEmail } from "@/server/email";
@@ -24,6 +24,7 @@ import {
   payoutRecordingAllowed,
   RAZORPAY_KEY_ID,
   razorpayConfigured,
+  razorpayIsTestKeys,
   razorpaySecretMatchesKeyId,
 } from "@/server/env";
 import {
@@ -49,7 +50,12 @@ function feeOf(grossInPaise: number): number {
 }
 
 route("POST", "checkout", async (req, ctx) => {
-  const me = requireVerifiedUser(ctx);
+  // Purchasing needs a signed-in *account*, not a verified inbox: verification
+  // gates creator actions (uploads/publishing) and is a separate, email-
+  // dependent step. Requiring it here silently blocked checkout for anyone who
+  // hadn't clicked the verification link yet (and permanently for accounts
+  // created before transactional email was configured).
+  const me = requireUser(ctx);
   if (me instanceof Response) return me;
   if (!rateLimit(`checkout:${me.id}:${clientIp(req)}`, 10, 60_000)) {
     return fail("rate_limited", "Slow down — too many checkout attempts.", 429);
@@ -163,6 +169,52 @@ route("POST", "checkout", async (req, ctx) => {
     },
     { status: 201 },
   );
+});
+
+/**
+ * Payment readiness, public-safe (no secrets, no provider calls).
+ *
+ * The checkout sheet asks this before the buyer clicks, so a deployment whose
+ * gateway is not configured shows one honest, actionable notice instead of a
+ * generic "Couldn't start checkout" toast after a failed attempt.
+ */
+route("GET", "checkout/status", async () => {
+  if (razorpaySecretMatchesKeyId) {
+    return ok({
+      ready: false,
+      code: "provider_misconfigured",
+      message:
+        "Payments are misconfigured: RAZORPAY_KEY_SECRET must be the secret key that belongs to RAZORPAY_KEY_ID (it can never equal the Key ID).",
+      mode: "unconfigured" as const,
+    });
+  }
+  if (!razorpayConfigured) {
+    return ok({
+      ready: false,
+      code: "provider_not_configured",
+      message:
+        "Payments aren't configured on this deployment yet. Add NEXT_PUBLIC_RAZORPAY_KEY_ID (or RAZORPAY_KEY_ID) and RAZORPAY_KEY_SECRET to the environment, then redeploy.",
+      mode: "unconfigured" as const,
+    });
+  }
+  if (!collectionsAllowed) {
+    return ok({
+      ready: false,
+      code: "payments_live_disabled",
+      message:
+        "Live payments are disabled: this deployment holds live Razorpay keys but PAYMENTS_LIVE_ENABLED is not \"true\". Set PAYMENTS_LIVE_ENABLED=true once live collections are approved, then redeploy.",
+      mode: "live" as const,
+    });
+  }
+  return ok({
+    ready: true,
+    code: "ready",
+    message:
+      razorpayIsTestKeys
+        ? "Test-mode payments are active — use Razorpay test cards/UPI, no real money moves."
+        : "Payments are active.",
+    mode: razorpayIsTestKeys ? ("test" as const) : ("live" as const),
+  });
 });
 
 /**

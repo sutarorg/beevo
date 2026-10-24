@@ -65,8 +65,11 @@ function toMediaRef(asset: typeof mediaAssets.$inferSelect): MediaRef {
     kind: asset.kind as MediaRef["kind"],
     fileName: asset.fileName,
     sizeBytes: Number(asset.verifiedSizeBytes ?? asset.declaredSizeBytes),
+    // Cover/avatar render directly; videos carry the same owner-authorized
+    // access URL so the studio can measure a real duration for assets that
+    // were uploaded before durations were captured.
     previewUrl:
-      asset.kind === "cover" || asset.kind === "avatar"
+      asset.kind === "cover" || asset.kind === "avatar" || asset.kind === "video"
         ? `/api/v1/media/access?assetId=${asset.id}`
         : undefined,
     durationLabel: asset.durationLabel ?? undefined,
@@ -129,6 +132,7 @@ async function editorFor(courseId: string): Promise<CourseEditor | null> {
         type: lesson.type as Lesson["type"],
         title: lesson.title,
         description: lesson.description,
+        isPreview: lesson.isPreview,
         media: mediaByLesson.get(lesson.id) ?? [],
       })),
   }));
@@ -548,6 +552,8 @@ const lessonSchema = z.object({
   title: z.string().trim().min(1, "Give the lesson a title.").max(140),
   description: z.string().trim().max(1000).default(""),
   mediaIds: z.array(z.string()).max(5),
+  /** Free preview is a video-only affordance; resource lessons always lock. */
+  isPreview: z.boolean().optional(),
 });
 
 async function assertMediaUsable(
@@ -611,6 +617,7 @@ route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params
       type: parsed.values.type,
       title: parsed.values.title,
       description: parsed.values.description,
+      isPreview: parsed.values.type === "video" ? parsed.values.isPreview === true : false,
       position: max + 1,
     })
     .returning();
@@ -671,6 +678,7 @@ route("PATCH", "courses/:id/sections/:sectionId/lessons/:lessonId", async (req, 
         type: parsed.values.type,
         title: parsed.values.title,
         description: parsed.values.description,
+        isPreview: parsed.values.type === "video" ? parsed.values.isPreview === true : false,
         updatedAt: new Date(),
       })
       .where(eq(lessons.id, target.id));
@@ -1047,6 +1055,42 @@ route("DELETE", "uploads/:assetId", async (_req, ctx, params) => {
   return ok({ deleted: true as const });
 });
 
+/**
+ * Backfill/refresh a media asset's duration label (owner only).
+ *
+ * Durations are measured in the creator's browser from the real file, so this
+ * endpoint exists for two legitimate cases: assets uploaded before duration
+ * capture shipped, and a re-measured file that replaced a placeholder. It can
+ * never be used to touch another creator's asset or a non-video file.
+ */
+route("PATCH", "uploads/:assetId", async (req, ctx, params) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  const parsed = parseBody(
+    z.object({
+      durationLabel: z
+        .string()
+        .trim()
+        .regex(/^\d{1,3}:[0-5]\d(:[0-5]\d)?$/, "Send a duration like 4:12 or 1:02:03."),
+    }),
+    await req.json().catch(() => ({})),
+  );
+  if ("response" in parsed) return parsed.response;
+  const asset = await db.query.mediaAssets.findFirst({
+    where: and(eq(mediaAssets.id, params.assetId), eq(mediaAssets.uploaderId, user.id)),
+  });
+  if (!asset) return fail("not_found", "Upload not found.", 404);
+  if (asset.kind !== "video") {
+    return fail("validation_failed", "Only video uploads carry a duration.", 422);
+  }
+  const [updated] = await db
+    .update(mediaAssets)
+    .set({ durationLabel: parsed.values.durationLabel })
+    .where(eq(mediaAssets.id, asset.id))
+    .returning();
+  return ok(toMediaRef(updated));
+});
+
 route("POST", "uploads/complete", async (req, ctx) => {
   const user = requireVerifiedUser(ctx);
   if (user instanceof Response) return user;
@@ -1126,18 +1170,24 @@ route("GET", "media/access", async (req, ctx) => {
       }
     }
     if (!allowed && asset.kind === "video") {
-      // Public preview rule: the FIRST video lesson of a published course.
+      // Public preview rule: any video lesson the creator explicitly marked as
+      // a free preview ("is_preview") on a published course. Nothing else is
+      // playable without a verified enrolment.
       const course = await db.query.courses.findFirst({ where: eq(courses.id, asset.courseId) });
       if (course?.status === "published") {
-        const firstVideo = await db
+        const previewAssets = await db
           .select({ assetId: lessonMedia.assetId })
           .from(lessonMedia)
           .innerJoin(lessons, eq(lessons.id, lessonMedia.lessonId))
           .innerJoin(sections, eq(sections.id, lessons.sectionId))
-          .where(and(eq(sections.courseId, asset.courseId), eq(lessons.type, "video")))
-          .orderBy(asc(sections.position), asc(lessons.position))
-          .limit(1);
-        if (firstVideo[0]?.assetId === asset.id) allowed = true;
+          .where(
+            and(
+              eq(sections.courseId, asset.courseId),
+              eq(lessons.type, "video"),
+              eq(lessons.isPreview, true),
+            ),
+          );
+        if (previewAssets.some((row) => row.assetId === asset.id)) allowed = true;
       }
     }
   }

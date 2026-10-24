@@ -22,6 +22,13 @@
       "when": 1792743175616,
       "tag": "0002_learner_notification_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792836227376,
+      "tag": "0003_lesson_free_preview",
+      "breakpoints": true
     }
   ]
 }

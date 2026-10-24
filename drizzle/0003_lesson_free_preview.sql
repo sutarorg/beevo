@@ -1,0 +1,1 @@
+ALTER TABLE "lessons" ADD COLUMN "is_preview" boolean DEFAULT false NOT NULL;
