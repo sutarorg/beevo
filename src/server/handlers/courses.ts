@@ -16,9 +16,14 @@ import { route } from "@/server/router";
 import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/http";
 import { newId } from "@/server/auth";
 import {
+  abortMultipartUpload,
   buildStorageKey,
-  deleteObject,
+  completeMultipartUpload,
+  createMultipartUpload,
+  formatUploadLimit,
   LOCAL_UPLOADS_ENABLED,
+  MULTIPART_PART_SIZE_BYTES,
+  presignMultipartPart,
   presignUrl,
   putObject,
   readLocalObject,
@@ -27,6 +32,7 @@ import {
   verifyObjectExists,
   writeLocalObject,
 } from "@/server/storage";
+import { cleanupMediaAssets } from "@/server/media-cleanup";
 import { R2 } from "@/server/env";
 import type { CourseEditor, CourseListItem, CourseSection, Lesson, MediaRef } from "@/lib/creator-types";
 import { readinessChecklist } from "@/lib/services/courses";
@@ -275,6 +281,7 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
       where: and(
         eq(mediaAssets.id, patch.coverAssetId),
         eq(mediaAssets.uploaderId, user.id),
+        eq(mediaAssets.courseId, course.id),
         eq(mediaAssets.status, "verified"),
         eq(mediaAssets.kind, "cover"),
       ),
@@ -298,6 +305,21 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
       updatedAt: new Date(),
     })
     .where(eq(courses.id, course.id));
+
+  if (
+    nextCoverAssetId !== undefined &&
+    course.coverAssetId &&
+    course.coverAssetId !== nextCoverAssetId
+  ) {
+    const previousCover = await db.query.mediaAssets.findFirst({
+      where: and(
+        eq(mediaAssets.id, course.coverAssetId!),
+        eq(mediaAssets.uploaderId, user.id),
+      ),
+    });
+    if (previousCover) await cleanupMediaAssets([previousCover]);
+  }
+
   return ok(await editorFor(course.id));
 });
 
@@ -418,10 +440,9 @@ route("DELETE", "courses/:id", async (_req, ctx, params) => {
 
   await db.delete(courses).where(eq(courses.id, course.id));
 
-  // Storage cleanup never blocks the delete; orphans are harmless.
-  for (const asset of assets) {
-    await deleteObject(asset.storageKey).catch(() => {});
-  }
+  // The database cascade removes the rows; this also removes the underlying
+  // R2/local objects, including pending or previously detached course media.
+  await cleanupMediaAssets(assets);
 
   await audit({
     actorId: user.id,
@@ -482,10 +503,21 @@ route("DELETE", "courses/:id/sections/:sectionId", async (_req, ctx, params) => 
   const user = requireVerifiedUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
-  await db
-    .delete(sections)
-    .where(and(eq(sections.id, params.sectionId), eq(sections.courseId, params.id)));
+  const section = await db.query.sections.findFirst({
+    where: and(eq(sections.id, params.sectionId), eq(sections.courseId, params.id)),
+  });
+  if (!section) return fail("not_found", "Section not found.", 404);
+  const assets = await db
+    .select({ asset: mediaAssets })
+    .from(lessonMedia)
+    .innerJoin(lessons, eq(lessons.id, lessonMedia.lessonId))
+    .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
+    .where(eq(lessons.sectionId, section.id))
+    .then((rows) => rows.map((row) => row.asset));
+
+  await db.delete(sections).where(eq(sections.id, section.id));
   await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, params.id));
+  await cleanupMediaAssets(assets);
   return ok(undefined);
 });
 
@@ -600,6 +632,20 @@ route("PATCH", "courses/:id/sections/:sectionId/lessons/:lessonId", async (req, 
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
+  const [target] = await db
+    .select({ id: lessons.id })
+    .from(lessons)
+    .innerJoin(sections, eq(sections.id, lessons.sectionId))
+    .where(
+      and(
+        eq(lessons.id, params.lessonId),
+        eq(lessons.sectionId, params.sectionId),
+        eq(sections.courseId, course.id),
+      ),
+    )
+    .limit(1);
+  if (!target) return fail("not_found", "Lesson not found — reload the editor.", 404);
+
   const parsed = parseBody(lessonSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
   const media = await assertMediaUsable(
@@ -611,26 +657,37 @@ route("PATCH", "courses/:id/sections/:sectionId/lessons/:lessonId", async (req, 
   if ("error" in media) {
     return fail("validation_failed", media.error!, 422, { media: [media.error!] });
   }
-  await db
-    .update(lessons)
-    .set({
-      type: parsed.values.type,
-      title: parsed.values.title,
-      description: parsed.values.description,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(lessons.id, params.lessonId), eq(lessons.sectionId, params.sectionId)));
-  await db.delete(lessonMedia).where(eq(lessonMedia.lessonId, params.lessonId));
-  await db.insert(lessonMedia).values(
-    parsed.values.mediaIds.map((assetId, position) => ({
-      lessonId: params.lessonId,
-      assetId,
-      position,
-    })),
-  );
-  await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, course.id));
+  const previousAssets = await db
+    .select({ asset: mediaAssets })
+    .from(lessonMedia)
+    .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
+    .where(eq(lessonMedia.lessonId, target.id))
+    .then((rows) => rows.map((row) => row.asset));
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(lessons)
+      .set({
+        type: parsed.values.type,
+        title: parsed.values.title,
+        description: parsed.values.description,
+        updatedAt: new Date(),
+      })
+      .where(eq(lessons.id, target.id));
+    await tx.delete(lessonMedia).where(eq(lessonMedia.lessonId, target.id));
+    await tx.insert(lessonMedia).values(
+      parsed.values.mediaIds.map((assetId, position) => ({
+        lessonId: target.id,
+        assetId,
+        position,
+      })),
+    );
+    await tx.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, course.id));
+  });
+  await cleanupMediaAssets(previousAssets);
+
   const editor = await editorFor(course.id);
-  const updated = editor?.sections.flatMap((s) => s.lessons).find((l) => l.id === params.lessonId);
+  const updated = editor?.sections.flatMap((s) => s.lessons).find((l) => l.id === target.id);
   return ok(updated);
 });
 
@@ -638,10 +695,29 @@ route("DELETE", "courses/:id/sections/:sectionId/lessons/:lessonId", async (_req
   const user = requireVerifiedUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
-  await db
-    .delete(lessons)
-    .where(and(eq(lessons.id, params.lessonId), eq(lessons.sectionId, params.sectionId)));
+  const [target] = await db
+    .select({ id: lessons.id })
+    .from(lessons)
+    .innerJoin(sections, eq(sections.id, lessons.sectionId))
+    .where(
+      and(
+        eq(lessons.id, params.lessonId),
+        eq(lessons.sectionId, params.sectionId),
+        eq(sections.courseId, params.id),
+      ),
+    )
+    .limit(1);
+  if (!target) return fail("not_found", "Lesson not found.", 404);
+  const assets = await db
+    .select({ asset: mediaAssets })
+    .from(lessonMedia)
+    .innerJoin(mediaAssets, eq(mediaAssets.id, lessonMedia.assetId))
+    .where(eq(lessonMedia.lessonId, target.id))
+    .then((rows) => rows.map((row) => row.asset));
+
+  await db.delete(lessons).where(eq(lessons.id, target.id));
   await db.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, params.id));
+  await cleanupMediaAssets(assets);
   return ok(undefined);
 });
 
@@ -690,7 +766,7 @@ route("POST", "uploads/session", async (req, ctx) => {
   }
   if (input.sizeBytes > limits.maxBytes) {
     return fail("validation_failed", "File is too large for this upload type.", 422, {
-      media: [`Keep it under ${Math.round(limits.maxBytes / (1024 * 1024))} MB.`],
+      media: [`Keep it under ${formatUploadLimit(limits.maxBytes)}.`],
     });
   }
   if (input.kind === "avatar") {
@@ -774,8 +850,8 @@ route("POST", "uploads/session", async (req, ctx) => {
  *     written to the same R2 bucket server-side, so the media still ends up in
  *     the cloud bucket instead of failing the upload.
  *
- * Large videos should always use the presigned direct PUT: serverless request
- * bodies are capped well below the 500 MB video limit.
+ * Large videos/resources use direct R2 multipart uploads instead: serverless
+ * request bodies are capped well below the 1 GB video limit.
  */
 const MAX_RELAY_BYTES = 20 * 1024 * 1024;
 
@@ -830,6 +906,147 @@ route("PUT", "uploads/put/:assetId", async (req, ctx, params) => {
   return ok({ uploaded: true, storage: "local" as const });
 });
 
+const multipartAssetSchema = z.object({
+  assetId: z.string().min(1),
+});
+const multipartUploadSchema = multipartAssetSchema.extend({
+  uploadId: z.string().min(1).max(2048),
+});
+
+async function pendingUploadAsset(assetId: string, userId: string) {
+  const asset = await db.query.mediaAssets.findFirst({
+    where: and(
+      eq(mediaAssets.id, assetId),
+      eq(mediaAssets.uploaderId, userId),
+      eq(mediaAssets.status, "pending"),
+    ),
+  });
+  return asset ?? null;
+}
+
+function multipartUnavailable() {
+  return fail(
+    "provider_not_configured",
+    "Multipart uploads need Cloudflare R2 to be configured.",
+    503,
+  );
+}
+
+route("POST", "uploads/multipart/start", async (req, ctx) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  if (!R2.configured) return multipartUnavailable();
+  const parsed = parseBody(multipartAssetSchema, await req.json().catch(() => ({})));
+  if ("response" in parsed) return parsed.response;
+  const asset = await pendingUploadAsset(parsed.values.assetId, user.id);
+  if (!asset) return fail("not_found", "Upload session not found.", 404);
+  const uploadId = await createMultipartUpload(asset.storageKey, asset.mimeType);
+  if (!uploadId) {
+    return fail("upload_failed", "We couldn't start the multipart upload in storage. Try again.", 502);
+  }
+  return ok({ uploadId, partSize: MULTIPART_PART_SIZE_BYTES }, { status: 201 });
+});
+
+route("POST", "uploads/multipart/sign-part", async (req, ctx) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  if (!R2.configured) return multipartUnavailable();
+  const parsed = parseBody(
+    multipartUploadSchema.extend({
+      partNumber: z.number().int().min(1).max(10_000),
+    }),
+    await req.json().catch(() => ({})),
+  );
+  if ("response" in parsed) return parsed.response;
+  const asset = await pendingUploadAsset(parsed.values.assetId, user.id);
+  if (!asset) return fail("not_found", "Upload session not found.", 404);
+  const partCount = Math.ceil(Number(asset.declaredSizeBytes) / MULTIPART_PART_SIZE_BYTES);
+  if (parsed.values.partNumber > partCount) {
+    return fail("validation_failed", "That upload part is outside the declared file size.", 422);
+  }
+  const signed = presignMultipartPart({
+    key: asset.storageKey,
+    uploadId: parsed.values.uploadId,
+    partNumber: parsed.values.partNumber,
+    contentType: asset.mimeType,
+  });
+  return ok({ signedUrl: signed.url, expiresAt: signed.expiresAt });
+});
+
+route("POST", "uploads/multipart/complete", async (req, ctx) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  if (!R2.configured) return multipartUnavailable();
+  const parsed = parseBody(
+    multipartUploadSchema.extend({
+      parts: z
+        .array(
+          z.object({
+            partNumber: z.number().int().min(1).max(10_000),
+            etag: z.string().trim().min(1).max(2048),
+          }),
+        )
+        .min(1)
+        .max(10_000),
+    }),
+    await req.json().catch(() => ({})),
+  );
+  if ("response" in parsed) return parsed.response;
+  const asset = await pendingUploadAsset(parsed.values.assetId, user.id);
+  if (!asset) return fail("not_found", "Upload session not found.", 404);
+  const partCount = Math.ceil(Number(asset.declaredSizeBytes) / MULTIPART_PART_SIZE_BYTES);
+  const parts = [...parsed.values.parts].sort((a, b) => a.partNumber - b.partNumber);
+  if (
+    parts.length !== partCount ||
+    parts.some((part, index) => part.partNumber !== index + 1)
+  ) {
+    return fail("validation_failed", "The multipart upload is missing one or more parts.", 422);
+  }
+  const completed = await completeMultipartUpload({
+    key: asset.storageKey,
+    uploadId: parsed.values.uploadId,
+    parts,
+  });
+  if (!completed) {
+    return fail("upload_failed", "We couldn't finish the multipart upload in storage. Try again.", 502);
+  }
+  return ok({ completed: true as const });
+});
+
+route("POST", "uploads/multipart/abort", async (req, ctx) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  if (!R2.configured) return multipartUnavailable();
+  const parsed = parseBody(multipartUploadSchema, await req.json().catch(() => ({})));
+  if ("response" in parsed) return parsed.response;
+  const asset = await pendingUploadAsset(parsed.values.assetId, user.id);
+  if (!asset) return fail("not_found", "Upload session not found.", 404);
+  try {
+    await abortMultipartUpload(asset.storageKey, parsed.values.uploadId);
+    return ok({ aborted: true as const });
+  } catch {
+    return fail("upload_failed", "We couldn't abort the multipart upload. Try again.", 502);
+  }
+});
+
+/** Delete an uploaded but no-longer-wanted asset and its stored bytes. */
+route("DELETE", "uploads/:assetId", async (_req, ctx, params) => {
+  const user = requireVerifiedUser(ctx);
+  if (user instanceof Response) return user;
+  const asset = await db.query.mediaAssets.findFirst({
+    where: and(eq(mediaAssets.id, params.assetId), eq(mediaAssets.uploaderId, user.id)),
+  });
+  if (!asset) return ok({ deleted: true as const });
+  const cleaned = await cleanupMediaAssets([asset]);
+  if (cleaned.skippedIds.includes(asset.id)) {
+    return fail("media_in_use", "This file is still attached. Remove it from the lesson or profile first.", 409);
+  }
+  if (cleaned.failedIds.includes(asset.id)) {
+    return fail("storage_delete_failed", "We couldn't delete the file from storage. Try again.", 502);
+  }
+  return ok({ deleted: true as const });
+});
+
 route("POST", "uploads/complete", async (req, ctx) => {
   const user = requireVerifiedUser(ctx);
   if (user instanceof Response) return user;
@@ -861,7 +1078,7 @@ route("POST", "uploads/complete", async (req, ctx) => {
   }
   const drift = Math.abs(head.sizeBytes - Number(asset.declaredSizeBytes));
   if (drift > Math.max(1024, Number(asset.declaredSizeBytes) * 0.02)) {
-    await db.delete(mediaAssets).where(eq(mediaAssets.id, asset.id));
+    await cleanupMediaAssets([asset]);
     return fail(
       "upload_size_mismatch",
       "The uploaded file doesn't match the declared size. Upload it again.",

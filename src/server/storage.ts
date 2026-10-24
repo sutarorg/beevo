@@ -1,5 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { IS_PROD, R2 } from "@/server/env";
 
@@ -16,7 +16,8 @@ import { IS_PROD, R2 } from "@/server/env";
  *  - videos/resources are always private; presigned GET + range support is
  *    provided by R2 directly (direct MP4 delivery; no transcoding on R2, and
  *    no HLS pipeline is required for the initial product);
- *  - bucket CORS must allow the app origin for PUT/GET/HEAD with content-type.
+ *  - bucket CORS must allow PUT/POST/GET/HEAD/DELETE with content-type and
+ *    x-amz-content-sha256, and expose ETag for direct multipart uploads.
  */
 
 const SERVICE = "s3";
@@ -68,10 +69,11 @@ function buildCanonicalQueryString(entries: [string, string][]): string {
 }
 
 export function presignUrl(input: {
-  method: "PUT" | "GET" | "HEAD" | "DELETE";
+  method: "PUT" | "POST" | "GET" | "HEAD" | "DELETE";
   key: string;
   expiresSeconds: number;
   contentType?: string;
+  query?: Record<string, string | number>;
   responseContentDisposition?: string;
 }): { url: string; expiresAt: string } {
   const now = new Date();
@@ -89,6 +91,9 @@ export function presignUrl(input: {
     ["X-Amz-Expires", String(input.expiresSeconds)],
     ["X-Amz-SignedHeaders", signedHeaders],
   ];
+  for (const [key, value] of Object.entries(input.query ?? {})) {
+    queryEntries.push([key, String(value)]);
+  }
   if (input.responseContentDisposition) {
     queryEntries.push(["response-content-disposition", input.responseContentDisposition]);
   }
@@ -121,8 +126,8 @@ export function presignUrl(input: {
 /**
  * Server-side object write (fallback path only).
  *
- * Browsers normally PUT straight to a presigned R2 URL — fastest, and the only
- * option for large videos. When that direct PUT is impossible (bucket CORS not
+ * Browsers normally PUT straight to a presigned R2 URL. Large files use the
+ * multipart path below. When a small direct PUT is impossible (bucket CORS not
  * yet configured, a network middlebox stripping the request, …) the client can
  * relay the bytes through the app instead; this performs the actual R2 write.
  */
@@ -145,6 +150,117 @@ export async function putObject(
   }
 }
 
+/**
+ * Multipart uploads keep every browser request small enough to avoid CDN and
+ * serverless request-body limits. Only the tiny signing/completion requests
+ * pass through the app; file bytes always go directly between the browser and
+ * the same R2 bucket.
+ */
+export const MULTIPART_PART_SIZE_BYTES = 16 * 1024 * 1024;
+
+function decodeXmlValue(value: string): string {
+  return value
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function escapeXmlValue(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+export async function createMultipartUpload(
+  key: string,
+  contentType: string,
+): Promise<string | null> {
+  if (!R2.configured) return null;
+  const { url } = presignUrl({
+    method: "POST",
+    key,
+    expiresSeconds: 300,
+    contentType,
+    query: { uploads: "" },
+  });
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": contentType } });
+    const xml = await res.text();
+    if (!res.ok) return null;
+    const uploadId = xml.match(/<UploadId>([\s\S]*?)<\/UploadId>/i)?.[1]?.trim();
+    return uploadId ? decodeXmlValue(uploadId) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function presignMultipartPart(input: {
+  key: string;
+  uploadId: string;
+  partNumber: number;
+  contentType: string;
+}): { url: string; expiresAt: string } {
+  return presignUrl({
+    method: "PUT",
+    key: input.key,
+    expiresSeconds: 900,
+    contentType: input.contentType,
+    query: { partNumber: input.partNumber, uploadId: input.uploadId },
+  });
+}
+
+export async function completeMultipartUpload(input: {
+  key: string;
+  uploadId: string;
+  parts: { partNumber: number; etag: string }[];
+}): Promise<boolean> {
+  if (!R2.configured || input.parts.length === 0) return false;
+  const xml = `<CompleteMultipartUpload>${input.parts
+    .map(
+      (part) =>
+        `<Part><PartNumber>${part.partNumber}</PartNumber><ETag>${escapeXmlValue(part.etag)}</ETag></Part>`,
+    )
+    .join("")}</CompleteMultipartUpload>`;
+  const { url } = presignUrl({
+    method: "POST",
+    key: input.key,
+    expiresSeconds: 300,
+    contentType: "application/xml",
+    query: { uploadId: input.uploadId },
+  });
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/xml" },
+      body: xml,
+    });
+    const responseXml = await res.text();
+    // S3 can return HTTP 200 with an XML error while completing multipart.
+    return res.ok && !/<Error(?:\s|\/|>)/i.test(responseXml);
+  } catch {
+    return false;
+  }
+}
+
+export async function abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+  if (!R2.configured) return;
+  const { url } = presignUrl({
+    method: "DELETE",
+    key,
+    expiresSeconds: 300,
+    query: { uploadId },
+  });
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`R2 multipart abort failed with HTTP ${res.status}.`);
+  }
+}
+
 /** Server-side object verification (never trust the client's claim). */
 export async function verifyObjectExists(
   key: string,
@@ -162,14 +278,13 @@ export async function verifyObjectExists(
   }
 }
 
-/** Cleanup for failed/abandoned uploads — best-effort delete. */
+/** Delete an R2 object. Missing objects are already in the desired state. */
 export async function deleteObject(key: string): Promise<void> {
   if (!R2.configured) return;
   const { url } = presignUrl({ method: "DELETE", key, expiresSeconds: 60 });
-  try {
-    await fetch(url, { method: "DELETE" }).catch(() => {});
-  } catch {
-    // ignored — cleanup is best-effort
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`R2 object deletion failed with HTTP ${res.status}.`);
   }
 }
 
@@ -214,12 +329,29 @@ export async function readLocalObject(key: string): Promise<Buffer | null> {
   }
 }
 
+export async function deleteLocalObject(key: string): Promise<void> {
+  try {
+    await unlink(localPath(key));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+/** Delete from whichever backend owns the object's bytes. */
+export async function deleteStoredObject(key: string): Promise<void> {
+  if (R2.configured) {
+    await deleteObject(key);
+  } else if (LOCAL_UPLOADS_ENABLED) {
+    await deleteLocalObject(key);
+  }
+}
+
 export const UPLOAD_LIMITS = {
   cover: { maxBytes: 5 * 1024 * 1024, mimeTypes: ["image/jpeg", "image/png", "image/webp"] },
   avatar: { maxBytes: 5 * 1024 * 1024, mimeTypes: ["image/jpeg", "image/png", "image/webp"] },
-  video: { maxBytes: 500 * 1024 * 1024, mimeTypes: ["video/mp4", "video/quicktime", "video/webm"] },
+  video: { maxBytes: 1024 * 1024 * 1024, mimeTypes: ["video/mp4", "video/quicktime", "video/webm"] },
   resource: {
-    maxBytes: 50 * 1024 * 1024,
+    maxBytes: 500 * 1024 * 1024,
     mimeTypes: [
       "application/pdf",
       "application/zip",
@@ -230,6 +362,13 @@ export const UPLOAD_LIMITS = {
     ],
   },
 } as const;
+
+export function formatUploadLimit(maxBytes: number): string {
+  const gib = maxBytes / (1024 * 1024 * 1024);
+  return Number.isInteger(gib)
+    ? `${gib} GB`
+    : `${Math.round(maxBytes / (1024 * 1024))} MB`;
+}
 
 export function buildStorageKey(input: {
   courseId?: string | null;

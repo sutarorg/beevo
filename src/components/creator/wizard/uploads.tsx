@@ -106,7 +106,17 @@ export function useMediaUpload(kind: UploadKind, courseId: string) {
     setState({ phase: "idle" });
   };
 
-  return { state, start, cancel, retry, reset };
+  const discard = async (assetId: string): Promise<ApiResult<{ deleted: true }>> => {
+    if (!service) {
+      return {
+        ok: false,
+        error: { code: "unavailable", message: "Media uploads are not available in this environment." },
+      };
+    }
+    return service.deleteUpload(assetId);
+  };
+
+  return { state, start, cancel, retry, reset, discard };
 }
 
 export function UploadProgressRow({
@@ -180,7 +190,10 @@ export function CoverUpload({
     const result = await upload.start(file, { previewUrl: dataUrl });
     if (result.ok) {
       const saved = await onSave(result.data);
-      if (!saved.ok) setSaveError(saved.error.message);
+      if (!saved.ok) {
+        setSaveError(saved.error.message);
+        await upload.discard(result.data.id);
+      }
     }
   };
 

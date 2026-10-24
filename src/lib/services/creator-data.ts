@@ -350,7 +350,7 @@ class MockCreatorDataService implements CreatorDataService {
     if (patch.tagline !== undefined) this.profile.tagline = patch.tagline.trim();
     if (patch.niche !== undefined) this.profile.niche = patch.niche.trim();
     if (patch.links) this.profile.links = patch.links;
-    if (patch.avatarAssetId) this.profile.avatarUrl = patch.avatarAssetId;
+    if (patch.avatarAssetId !== undefined) this.profile.avatarUrl = patch.avatarAssetId;
     return { ok: true, data: { ...this.profile } };
   }
 

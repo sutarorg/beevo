@@ -20,6 +20,11 @@ import type { AnalyticsData, DashboardData } from "@/lib/services/creator-data";
 import type { CourseStatus, CreatorNotification, SupportTicket } from "@/lib/creator-types";
 import { APP_BASE_URL, resolveRequestBaseUrl } from "@/server/env";
 import { RESERVED_HANDLES, suggestHandle } from "@/server/handles";
+import {
+  cleanupMediaAssets,
+  mediaAccessPath,
+  mediaAssetIdFromAccessUrl,
+} from "@/server/media-cleanup";
 
 /** Creator profile + business data views (self-scoped, server-verified). */
 
@@ -117,7 +122,7 @@ route("PATCH", "creator/profile", async (req, ctx) => {
         avatar: ["Upload the photo again."],
       });
     }
-    nextAvatarUrl = `/api/v1/media/access?assetId=${asset.id}`;
+    nextAvatarUrl = mediaAccessPath(asset.id);
   }
 
   if (parsed.values.handle) {
@@ -146,6 +151,23 @@ route("PATCH", "creator/profile", async (req, ctx) => {
       updatedAt: new Date(),
     })
     .where(eq(users.id, me.id));
+
+  const previousAvatarAssetId = mediaAssetIdFromAccessUrl(me.avatarUrl);
+  if (
+    nextAvatarUrl !== undefined &&
+    previousAvatarAssetId &&
+    mediaAccessPath(previousAvatarAssetId) !== nextAvatarUrl
+  ) {
+    const previousAvatar = await db.query.mediaAssets.findFirst({
+      where: and(
+        eq(mediaAssets.id, previousAvatarAssetId),
+        eq(mediaAssets.uploaderId, me.id),
+        eq(mediaAssets.kind, "avatar"),
+      ),
+    });
+    if (previousAvatar) await cleanupMediaAssets([previousAvatar]);
+  }
+
   const fresh = await db.query.users.findFirst({ where: eq(users.id, me.id) });
   return ok(profileOf(fresh!, resolveRequestBaseUrl(req)));
 });

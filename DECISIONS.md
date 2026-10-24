@@ -126,3 +126,22 @@ Chronological, opinionated record. New phases append — never rewrite history.
   drawn per step (icon right edge → next icon left edge at the 3.5rem icon
   size/1.5rem gap, vertically centred), and the "You create" card is a flex
   column that pushes its illustration down instead of butting against the list.
+
+## D12 — 2026-10 · Large uploads and complete media lifecycle
+
+- **Large media never needs a large app request:** videos can be 1 GB and each
+  resource can be 500 MB. Files at least 32 MiB use direct R2 multipart upload
+  with 16 MiB parts, three concurrent part uploads, just-in-time signing, ETag
+  completion, and abort-on-failure/cancel. A single-PUT HTTP 413 also switches
+  to multipart; the 20 MB same-origin relay remains only a small-file fallback.
+- **Detach means storage deletion:** after a successful database mutation,
+  replaced/removed covers, videos, resources, and avatars are checked for any
+  remaining references and then deleted from R2 (or the local development
+  store). Lesson/section/course deletion uses the same cleanup path. Newly
+  uploaded but unsaved files have an owner-checked delete endpoint, including
+  dialog-cancel cleanup. Shared assets are retained until their last reference
+  disappears; courses with learner/order history remain non-deletable.
+- **Studio deletion is deliberately located:** My courses no longer offers a
+  destructive row action. Edit Course keeps the existing confirmation flow but
+  its trigger is an accessible icon-only button. Add lesson no longer repeats
+  the video/resources type toggle; the section-level action chooses the type.

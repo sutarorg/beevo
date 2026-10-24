@@ -112,6 +112,7 @@ export default function CreatorProfilePage() {
     const saved = await service.updateProfile({ avatarAssetId: uploaded.data.id });
     setAvatarBusy(false);
     if (!saved.ok) {
+      await media.deleteUpload(uploaded.data.id);
       toast.push({ variant: "error", title: "Photo not saved", description: saved.error.message });
       return;
     }

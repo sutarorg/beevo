@@ -163,10 +163,11 @@ export function CourseWizard({
             variant="outline"
             size="sm"
             onClick={() => setConfirmDelete(true)}
-            className="border-accent-deep text-accent-deep hover:bg-accent-deep hover:text-cream"
+            aria-label="Delete course"
+            title="Delete course"
+            className="w-9 border-accent-deep px-0 text-accent-deep hover:bg-accent-deep hover:text-cream"
           >
             <Trash2 className="size-4" aria-hidden="true" />
-            Delete
           </Button>
         </div>
       </div>

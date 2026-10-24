@@ -23,7 +23,7 @@ import type {
 } from "@/lib/creator-types";
 import type { CourseService } from "@/lib/services/courses";
 import { UPLOAD_RULES } from "@/lib/services/media";
-import { formatBytes, cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/utils";
 import { ConfirmDialog, Modal } from "@/components/creator/dialogs";
 import { useMediaUpload, UploadProgressRow } from "@/components/creator/wizard/uploads";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,7 @@ function LessonDialog({
   const [titleError, setTitleError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [removingMediaId, setRemovingMediaId] = useState<string | null>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const upload = useMediaUpload(type === "video" ? "video" : "resource", courseId);
@@ -86,12 +87,58 @@ function LessonDialog({
     setTitleError(null);
     setMediaError(null);
     setSaving(false);
+    setRemovingMediaId(null);
     upload.reset();
   }
 
   const uploadKind = type === "video" ? "video" : "resource";
   const uploadBusy = upload.state.phase === "readying" || upload.state.phase === "uploading";
   const hasMedia = media.length > 0;
+
+  const removeMedia = async (ref: MediaRef) => {
+    const wasAlreadyAttached = lesson?.media.some((item) => item.id === ref.id) ?? false;
+    if (wasAlreadyAttached) {
+      // Existing lesson media is detached (and deleted server-side) when the
+      // lesson is saved, so cancelling the dialog leaves it untouched.
+      setMedia((current) => current.filter((item) => item.id !== ref.id));
+      return;
+    }
+
+    // A newly uploaded file is not part of the lesson yet, so discard it now
+    // rather than leaving an orphan in PostgreSQL and R2.
+    setRemovingMediaId(ref.id);
+    const result = await upload.discard(ref.id);
+    setRemovingMediaId(null);
+    if (!result.ok) {
+      toast.push({ variant: "error", title: "File not removed", description: result.error.message });
+      return;
+    }
+    setMedia((current) => current.filter((item) => item.id !== ref.id));
+    setMediaError(null);
+  };
+
+  const requestClose = async () => {
+    if (saving || removingMediaId) return;
+    if (uploadBusy) upload.cancel();
+    const unsaved = media.filter(
+      (ref) => !(lesson?.media.some((item) => item.id === ref.id) ?? false),
+    );
+    if (unsaved.length > 0) {
+      setRemovingMediaId("dialog");
+      const results = await Promise.all(unsaved.map((ref) => upload.discard(ref.id)));
+      setRemovingMediaId(null);
+      const failed = results.find((result) => !result.ok);
+      if (failed && !failed.ok) {
+        toast.push({
+          variant: "error",
+          title: "Uploads not discarded",
+          description: failed.error.message,
+        });
+        return;
+      }
+    }
+    onClose();
+  };
 
   const save = async () => {
     const cleanTitle = title.trim();
@@ -125,37 +172,8 @@ function LessonDialog({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={lesson ? "Edit lesson" : "Add lesson"} wide>
+    <Modal open={open} onClose={() => void requestClose()} title={lesson ? "Edit lesson" : "Add lesson"} wide>
       <div className="space-y-4">
-        {!lesson ? (
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                { value: "video", label: "Video lesson", Icon: Video },
-                { value: "resources", label: "Resources", Icon: FileText },
-              ] as const
-            ).map(({ value, label, Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setType(value);
-                  setMediaError(null);
-                  upload.reset();
-                }}
-                aria-pressed={type === value}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-xl border-2 px-3.5 py-3 text-sm font-bold transition-colors",
-                  type === value ? "border-ink bg-ink text-cream" : "border-ink bg-white text-ink hover:bg-parchment",
-                )}
-              >
-                <Icon className="size-4.5" aria-hidden="true" />
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <Field id="lesson-title" label="Lesson title" error={titleError ?? undefined}>
           <Input
             id="lesson-title"
@@ -206,9 +224,9 @@ function LessonDialog({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setMedia(media.filter((item) => item.id !== ref.id))}
+                  onClick={() => void removeMedia(ref)}
                   aria-label={`Remove ${ref.fileName}`}
-                  disabled={saving}
+                  disabled={saving || removingMediaId !== null}
                   className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-ink/30 text-smoke transition-colors hover:border-accent hover:text-accent disabled:opacity-40"
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -288,7 +306,12 @@ function LessonDialog({
         ) : null}
 
         <div className="flex flex-col-reverse gap-2.5 border-t-2 border-ink/10 pt-4 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void requestClose()}
+            disabled={saving || removingMediaId !== null}
+          >
             Cancel
           </Button>
           <Button
