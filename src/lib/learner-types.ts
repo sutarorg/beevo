@@ -98,6 +98,25 @@ export type CheckoutStage =
   | "cancelled"
   | "pending";
 
+/**
+ * The learner account a purchase belongs to. Created on first purchase when
+ * the buyer verifies their email; the dashboard password is generated after a
+ * successful payment and emailed to this address.
+ */
+export interface CheckoutAccountInfo {
+  email: string;
+  /** True when this purchase created the Beevo account. */
+  created: boolean;
+  /** True when the provider accepted the receipt/credentials email. */
+  emailed: boolean;
+  /**
+   * Only returned in non-production environments when no email provider is
+   * configured — lets the buyer read the password they would otherwise receive
+   * by email.
+   */
+  password?: string;
+}
+
 export interface CheckoutOrder {
   orderId: string;
   courseId: string;
@@ -105,20 +124,25 @@ export interface CheckoutOrder {
   amountInPaise: number;
   platformFeeInPaise: number;
   currency: "INR";
-  /** "razorpay-simulated" (mock) or "razorpay" (real checkout). */
-  gateway: "razorpay-simulated" | "razorpay";
+  gateway: "razorpay";
   keyId: string;
   /** Present for real Razorpay checkout (server-created order id). */
   razorpayOrderId?: string;
   buyer?: { name: string; email: string };
+  /** True when the course is free and access was granted without a gateway. */
+  free?: boolean;
+  enrolled?: boolean;
+  account?: CheckoutAccountInfo;
 }
 
 export interface PaymentReceipt {
   paymentId: string;
   orderId: string;
   amountInPaise: number;
-  /** Honesty marker — always present on mock receipts. */
+  /** Human-readable result shown in the success state. */
   note: string;
+  enrolled?: boolean;
+  account?: CheckoutAccountInfo;
 }
 
 /** Email notification preferences for a learner account. */
@@ -206,13 +230,13 @@ export interface LearnerLessonView {
   prevLessonId: string | null;
   nextLessonId: string | null;
   /**
-   * Playback session: `simulated` (mock/player-less) or `direct` — a
-   * server-authorized, short-lived presigned R2 URL with range support.
-   * Never a storage key; the URL embeds its own expiry.
+   * Playback session: `direct` — a same-origin, server-authorized streaming
+   * URL with range support (never a storage key) — or `unavailable` when the
+   * creator hasn't uploaded the lesson video yet.
    */
   playback:
     | {
-        mode: "simulated";
+        mode: "unavailable";
         durationSeconds: number;
         resumeAtSeconds: number;
         note: string;

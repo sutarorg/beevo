@@ -13,10 +13,11 @@ import {
   ShieldCheck,
   Video,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { formatINR } from "@/lib/domain";
+import { formatINR, priceLabel } from "@/lib/domain";
 import type { PublicCoursePage, PublicLessonMeta } from "@/lib/learner-types";
 import { useAsyncData } from "@/lib/hooks";
 import { getLearnerService } from "@/lib/services/learner";
@@ -24,8 +25,16 @@ import { getStorefrontService } from "@/lib/services/storefront";
 import { cn } from "@/lib/utils";
 import { CardListSkeleton, FailedState, Skeleton } from "@/components/creator/ui";
 import { CourseNotFound, PoweredByBanner } from "@/components/storefront/cards";
-import { CheckoutSheet } from "@/components/storefront/checkout";
-import { PreviewPlayerModal } from "@/components/storefront/preview-player";
+// Loaded on demand: checkout and the video preview are only needed after the
+// buyer clicks, so their JavaScript stays out of the first paint.
+const CheckoutSheet = dynamic(
+  () => import("@/components/storefront/checkout").then((module) => module.CheckoutSheet),
+  { ssr: false },
+);
+const PreviewPlayerModal = dynamic(
+  () => import("@/components/storefront/preview-player").then((module) => module.PreviewPlayerModal),
+  { ssr: false },
+);
 import { Button } from "@/components/ui/button";
 import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 
@@ -48,7 +57,7 @@ export function CourseSalesPage({ handle, slug }: { handle: string; slug: string
 
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <div className="mx-auto max-w-5xl space-y-4 px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-6xl space-y-4 px-4 py-12 sm:px-6">
         <Skeleton className="h-72" />
         <CardListSkeleton count={3} />
       </div>
@@ -145,10 +154,10 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 <div className="flex items-end justify-between gap-2">
                   <div>
                     <p className="font-editorial text-5xl leading-none text-ink italic">
-                      {formatINR(course.priceInPaise)}
+                      {priceLabel(course.priceInPaise)}
                     </p>
                     <p className="mt-1 text-[11px] font-bold tracking-[0.14em] text-smoke uppercase">
-                      one time · INR
+                      {course.priceInPaise === 0 ? "free · enrol instantly" : "one time · INR"}
                     </p>
                   </div>
                   <ShieldCheck className="size-8 text-moss" aria-hidden="true" />
@@ -166,7 +175,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     onClick={() => setCheckoutOpen(true)}
                   >
                     <BadgeIndianRupee className="size-5" aria-hidden="true" />
-                    Enrol now
+                    {course.priceInPaise === 0 ? "Enrol free" : "Enrol now"}
                   </Button>
                 )}
                 <ul className="mt-4 space-y-2">
@@ -191,7 +200,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
       </section>
 
       {/* Body */}
-      <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
         <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
           <div className="space-y-8">
             {course.outcomes.length > 0 ? (
@@ -339,10 +348,14 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
             <div className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
               <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">Purchase terms</h3>
               <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-smoke">
-                <li>· One-time payment in INR via UPI, cards, net-banking, or wallets.</li>
+                <li>
+                  {course.priceInPaise === 0
+                    ? "· Free enrolment — no payment details needed."
+                    : "· One-time payment in INR via UPI, cards, net-banking, or wallets."}
+                </li>
                 <li>· Access through your learner dashboard while the course is published.</li>
                 <li>· Course purchases are non-refundable except where required by applicable law.</li>
-                <li>· Receipts are emailed instantly after a successful payment.</li>
+                <li>· Your receipt and dashboard login are emailed right after checkout.</li>
               </ul>
               <Button
                 variant="accent"
@@ -350,7 +363,11 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 onClick={() => setCheckoutOpen(true)}
                 disabled={purchased}
               >
-                {purchased ? "Already in your library" : `Enrol for ${formatINR(course.priceInPaise)}`}
+                {purchased
+                  ? "Already in your library"
+                  : course.priceInPaise === 0
+                    ? "Enrol free"
+                    : `Enrol for ${formatINR(course.priceInPaise)}`}
               </Button>
             </div>
           </aside>
@@ -364,8 +381,10 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-cream/95 px-4 py-3 backdrop-blur-sm lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-lg font-bold text-ink tabular-nums">{formatINR(course.priceInPaise)}</p>
-            <p className="text-[10px] font-bold tracking-wider text-smoke uppercase">one time</p>
+            <p className="text-lg font-bold text-ink tabular-nums">{priceLabel(course.priceInPaise)}</p>
+            <p className="text-[10px] font-bold tracking-wider text-smoke uppercase">
+              {course.priceInPaise === 0 ? "free access" : "one time"}
+            </p>
           </div>
           {purchased ? (
             <Button href="/learn/courses" variant="lime" size="sm">
@@ -373,7 +392,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
             </Button>
           ) : (
             <Button variant="accent" size="sm" onClick={() => setCheckoutOpen(true)}>
-              Enrol now
+              {course.priceInPaise === 0 ? "Enrol free" : "Enrol now"}
             </Button>
           )}
         </div>

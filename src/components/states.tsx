@@ -2,14 +2,13 @@
 
 import {
   Construction,
-  FlaskConical,
   House,
   LifeBuoy,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SUPPORT_EMAIL, USE_MOCK_SERVICES } from "@/lib/config";
+import { SUPPORT_EMAIL } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/primitives";
@@ -97,5 +96,3 @@ export function UnavailablePanel({
     </div>
   );
 }
-
-/** Fixed badge making demo/mock mode visually explicit. */

@@ -166,6 +166,46 @@ body {
   height: 1.5px;
 }
 
+/* ---------- Beevo lesson player watermark ---------- */
+.beevo-watermark {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(246, 240, 226, 0.22);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  will-change: transform, opacity;
+}
+.beevo-watermark-a {
+  top: 18%;
+  left: 12%;
+  animation: beevo-drift-a 26s ease-in-out infinite;
+}
+.beevo-watermark-b {
+  top: 52%;
+  right: 10%;
+  animation: beevo-drift-b 34s ease-in-out infinite;
+}
+.beevo-watermark-c {
+  bottom: 24%;
+  left: 38%;
+  animation: beevo-drift-a 44s ease-in-out infinite reverse;
+}
+@keyframes beevo-drift-a {
+  0%, 100% { transform: translate(0, 0); opacity: 0.16; }
+  25% { transform: translate(6%, 12%); opacity: 0.26; }
+  50% { transform: translate(-4%, 22%); opacity: 0.16; }
+  75% { transform: translate(10%, 6%); opacity: 0.24; }
+}
+@keyframes beevo-drift-b {
+  0%, 100% { transform: translate(0, 0); opacity: 0.2; }
+  33% { transform: translate(-10%, -14%); opacity: 0.12; }
+  66% { transform: translate(-2%, 10%); opacity: 0.24; }
+}
+
 /* Range slider (commission calculator) */
 .slider-accent {
   accent-color: var(--color-accent);

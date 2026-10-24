@@ -2,7 +2,6 @@ import { USE_MOCK_SERVICES } from "@/lib/config";
 import type { ApiResult } from "@/lib/domain";
 import type { CourseEditor } from "@/lib/creator-types";
 import type {
-  CheckoutOrder,
   LearnerCourseCard,
   LearnerCourseView,
   LearnerLessonMeta,
@@ -43,8 +42,6 @@ export interface LearnerService {
   listPurchases(): Promise<ApiResult<PurchaseRecord[]>>;
   getSettings(): Promise<ApiResult<LearnerSettings>>;
   updateSettings(patch: Partial<Omit<LearnerSettings, "email">>): Promise<ApiResult<LearnerSettings>>;
-  /** Called by the checkout success state — simulates enrolment creation. */
-  recordDemoPurchase(order: CheckoutOrder): Promise<ApiResult<PurchaseRecord>>;
 }
 
 const STORAGE_KEY = "beevo_mock_learner_v1";
@@ -285,10 +282,10 @@ class MockLearnerService implements LearnerService {
       prevLessonId: index > 0 ? flat[index - 1].lesson.id : null,
       nextLessonId: index < flat.length - 1 ? flat[index + 1].lesson.id : null,
       playback: {
-        mode: "simulated",
+        mode: "unavailable",
         durationSeconds,
         resumeAtSeconds: Math.min(saved?.positionSeconds ?? 0, Math.max(durationSeconds - 10, 0)),
-        note: "Simulated playback — secure video delivery arrives in Prompt 5.",
+        note: "Demo data has no video file — connect media storage to stream lessons.",
       },
     });
   }
@@ -341,28 +338,6 @@ class MockLearnerService implements LearnerService {
     return this.getSettings();
   }
 
-  async recordDemoPurchase(order: CheckoutOrder): Promise<ApiResult<PurchaseRecord>> {
-    await mockLatency(300, 200);
-    const forced = consumeForcedFailure<PurchaseRecord>();
-    if (forced) return forced;
-    const gate = this.requireAuth();
-    if (gate) return gate as ApiResult<PurchaseRecord>;
-    const existing = this.db.purchases.find((purchase) => purchase.orderId === order.orderId);
-    if (existing) return ok(existing); // idempotent — safe to re-enter from pending/success states
-    const record: PurchaseRecord = {
-      id: `lpur_${order.orderId}`,
-      orderId: order.orderId,
-      courseId: order.courseId,
-      courseTitle: order.courseTitle,
-      amountInPaise: order.amountInPaise,
-      status: "paid",
-      placedAt: new Date().toISOString(),
-      demo: true,
-    };
-    this.db.purchases = [record, ...this.db.purchases];
-    this.save();
-    return ok(record);
-  }
 }
 
 let instance: MockLearnerService | null = null;
@@ -423,24 +398,6 @@ class ApiLearnerService implements LearnerService {
   }
   updateSettings(patch: Partial<Omit<LearnerSettings, "email">>) {
     return apiPatch<LearnerSettings>("learn/settings", patch);
-  }
-
-  /**
-   * Live enrolment is created server-side during verified checkout — this is
-   * only called after a successful server verification, so there's nothing
-   * to record here.
-   */
-  async recordDemoPurchase(order: CheckoutOrder) {
-    return ok<PurchaseRecord>({
-      id: `lpur_${order.orderId}`,
-      orderId: order.orderId,
-      courseId: order.courseId,
-      courseTitle: order.courseTitle,
-      amountInPaise: order.amountInPaise,
-      status: "paid",
-      placedAt: new Date().toISOString(),
-      demo: false,
-    });
   }
 }
 

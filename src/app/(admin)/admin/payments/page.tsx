@@ -160,7 +160,7 @@ export default function AdminPaymentsPage() {
               <DetailRow label="Time">{formatDateTime(selected.at)}</DetailRow>
             </div>
             <p className="rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
-              Every event here comes from the payment provider's webhook. Signature verification
+              Every event here comes from the payment provider&apos;s webhook. Signature verification
               runs on each delivery, so unverified events never appear.
             </p>
           </div>

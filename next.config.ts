@@ -24,6 +24,14 @@ if (r2PublicBase) {
 const nextConfig: NextConfig = {
   // Dev-only: allow the proxied preview host to load dev assets/HMR.
   allowedDevOrigins: ["*.e2b.app", "localhost:3000"],
+  // The local development database is a WebAssembly build of PostgreSQL — keep
+  // it external to the server bundle so its WASM assets resolve at runtime.
+  serverExternalPackages: ["@electric-sql/pglite"],
+  experimental: {
+    // Keep recently visited routes in the client router cache so switching
+    // between tabs/pages is instant instead of refetching every time.
+    staleTimes: { dynamic: 30, static: 300 },
+  },
   images: {
     localPatterns: [
       { pathname: "/images/**" },

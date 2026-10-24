@@ -298,7 +298,7 @@ export async function deleteObject(key: string): Promise<void> {
  */
 export const LOCAL_UPLOADS_ENABLED = !R2.configured && !IS_PROD;
 
-const LOCAL_ROOT = path.join(process.cwd(), ".uploads");
+const LOCAL_ROOT = path.join(/* turbopackIgnore: true */ process.cwd(), ".uploads");
 
 function localPath(key: string): string {
   // Keys are server-generated; still normalize to keep writes inside LOCAL_ROOT.

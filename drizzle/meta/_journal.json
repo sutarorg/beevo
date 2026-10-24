@@ -29,6 +29,13 @@
       "when": 1792836227376,
       "tag": "0003_lesson_free_preview",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792847495487,
+      "tag": "0004_smart_jocasta",
+      "breakpoints": true
     }
   ]
 }

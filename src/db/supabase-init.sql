@@ -265,6 +265,7 @@ CREATE TABLE IF NOT EXISTS "users" (
 	"notify_product_tips" boolean DEFAULT false NOT NULL,
 	"notify_lesson_emails" boolean DEFAULT true NOT NULL,
 	"notify_receipt_emails" boolean DEFAULT true NOT NULL,
+	"provisioned_via_checkout" boolean DEFAULT false NOT NULL,
 	"suspended_at" timestamp with time zone,
 	"suspended_reason" text,
 	"email_verified_at" timestamp with time zone,
@@ -273,6 +274,20 @@ CREATE TABLE IF NOT EXISTS "users" (
 	CONSTRAINT "users_email_unique" UNIQUE("email"),
 	CONSTRAINT "users_handle_unique" UNIQUE("handle")
 );
+
+CREATE TABLE IF NOT EXISTS "checkout_verifications" (
+	"id" text PRIMARY KEY NOT NULL,
+	"email" text NOT NULL,
+	"code_hash" text NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"verified_at" timestamp with time zone,
+	"token_hash" text,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS "checkout_verifications_email_idx" ON "checkout_verifications" USING btree ("email","created_at");
+CREATE INDEX IF NOT EXISTS "checkout_verifications_token_idx" ON "checkout_verifications" USING btree ("token_hash");
 
 CREATE TABLE IF NOT EXISTS "webhook_events" (
 	"id" text PRIMARY KEY NOT NULL,
@@ -430,3 +445,6 @@ ALTER TABLE "public"."sessions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."support_tickets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."webhook_events" ENABLE ROW LEVEL SECURITY;
+
+-- Upgrade path for databases created before checkout email verification shipped.
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "provisioned_via_checkout" boolean DEFAULT false NOT NULL;

@@ -24,7 +24,7 @@ import type {
   LearnerSettings,
   PurchaseRecord,
 } from "@/lib/learner-types";
-import { presignUrl } from "@/server/storage";
+import { LOCAL_UPLOADS_ENABLED } from "@/server/storage";
 import { R2 } from "@/server/env";
 
 /** Learner surface — every read checks enrolment server-side. */
@@ -230,42 +230,48 @@ route("GET", "learn/courses/:courseId/lessons/:lessonId", async (_req, ctx, para
 
   const isVideo = current.lesson.type === "video";
   const videoAsset = isVideo ? links[0]?.asset : null;
-  let playback: LearnerLessonView["playback"] = {
-    mode: "simulated",
-    durationSeconds: 0,
-    resumeAtSeconds: 0,
-    note: "",
-  };
-  if (isVideo && videoAsset) {
-    if (R2.configured) {
-      const signed = presignUrl({
-        method: "GET",
-        key: videoAsset.storageKey,
-        expiresSeconds: 900,
-      });
-      const durationLabel = videoAsset.durationLabel ?? "8:00";
-      const parsedSeconds = durationLabel
-        .split(":")
-        .map(Number)
-        .reduce((acc, part) => (Number.isFinite(part) ? acc * 60 + part : acc), 0);
-      const durationSeconds = parsedSeconds > 0 ? parsedSeconds : 480;
-      playback = {
-        mode: "direct",
-        deliveryUrl: `/api/v1/media/access?assetId=${videoAsset.id}`,
-        url: signed.url,
-        expiresAt: signed.expiresAt,
-        durationSeconds,
-        resumeAtSeconds: Math.min(saved?.positionSeconds ?? 0, Math.max(durationSeconds - 10, 0)),
-        note: "Secure short-lived delivery URL.",
-      };
-    } else {
-      playback = {
-        mode: "simulated",
-        durationSeconds: 480,
-        resumeAtSeconds: Math.min(saved?.positionSeconds ?? 0, 470),
-        note: "Media storage isn't configured — playback is simulated until it is.",
-      };
-    }
+  const durationSeconds = (() => {
+    const label = videoAsset?.durationLabel;
+    if (!label) return 0;
+    const parsed = label
+      .split(":")
+      .map(Number)
+      .reduce((acc, part) => (Number.isFinite(part) ? acc * 60 + part : acc), 0);
+    return parsed > 0 ? parsed : 0;
+  })();
+  let playback: LearnerLessonView["playback"];
+  if (isVideo && videoAsset && (R2.configured || LOCAL_UPLOADS_ENABLED)) {
+    // Same-origin, enrolment-checked delivery. The media route re-authorizes
+    // every request and streams the bytes inline (no attachment, no direct
+    // object URL the browser could save).
+    playback = {
+      mode: "direct",
+      deliveryUrl: `/api/v1/media/access?assetId=${videoAsset.id}`,
+      url: `/api/v1/media/access?assetId=${videoAsset.id}`,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      durationSeconds,
+      resumeAtSeconds: Math.min(
+        saved?.positionSeconds ?? 0,
+        Math.max(durationSeconds - 10, 0),
+      ),
+      note: "Secure streaming — access is re-checked by the server on every request.",
+    };
+  } else if (isVideo) {
+    playback = {
+      mode: "unavailable",
+      durationSeconds,
+      resumeAtSeconds: saved?.positionSeconds ?? 0,
+      note: videoAsset
+        ? "Video delivery isn't configured on this deployment yet."
+        : "The creator hasn't uploaded this lesson's video yet.",
+    };
+  } else {
+    playback = {
+      mode: "unavailable",
+      durationSeconds: 0,
+      resumeAtSeconds: 0,
+      note: "This is a resource lesson.",
+    };
   }
 
   const meta: LearnerLessonMeta = {

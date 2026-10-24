@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DATABASE_URL } from "@/server/env";
+import { DATABASE_AVAILABLE, ensureDatabaseReady } from "@/db";
 import { buildCtx, fail, type Ctx } from "@/server/http";
 
 /**
@@ -72,7 +72,7 @@ export async function dispatch(req: Request, segments: string[]): Promise<NextRe
       continue;
     }
     const hasInjectedDb = Boolean((globalThis as { __ckTestDb?: boolean }).__ckTestDb);
-    if (!DATABASE_URL && !hasInjectedDb) {
+    if (!DATABASE_AVAILABLE && !hasInjectedDb) {
       console.error(`[api] ${method} /api/v1/${segments.join("/")}: DATABASE_URL is not set.`);
       return fail(
         "service_unavailable",
@@ -81,6 +81,9 @@ export async function dispatch(req: Request, segments: string[]): Promise<NextRe
       );
     }
     try {
+      // No-op in production; waits for the local development database seed on
+      // the very first request so the UI never sees a half-seeded storefront.
+      await ensureDatabaseReady();
       const ctx = await buildCtx();
       const response = await candidate.handler(req, ctx, params);
       return response ?? fail("internal_error", "Handler produced no response.", 500);

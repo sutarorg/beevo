@@ -142,13 +142,12 @@ export function PreviewPlayerModal({
                       autoPlay
                       playsInline
                       preload="metadata"
+                      controlsList="nodownload noplaybackrate noremoteplayback"
+                      disablePictureInPicture
+                      onContextMenu={(event) => event.preventDefault()}
                       className="size-full bg-ink object-contain"
                     >
-                      Your browser can&apos;t play this video.{" "}
-                      <a href={playback.url} className="underline">
-                        Download it instead
-                      </a>
-                      .
+                      Your browser can&apos;t play this video.
                     </video>
                   ) : (
                     <div className="grid h-full place-items-center px-6 text-center">

@@ -25,7 +25,6 @@ import type { CourseService } from "@/lib/services/courses";
 import { getMediaService, UPLOAD_RULES } from "@/lib/services/media";
 import { formatBytes, formatDurationLabel, isMissingDuration } from "@/lib/utils";
 import { readRemoteVideoDurationSeconds, readVideoDurationSeconds } from "@/lib/video";
-import { USE_MOCK_SERVICES } from "@/lib/config";
 import { ConfirmDialog, Modal } from "@/components/creator/dialogs";
 import { useMediaUpload, UploadProgressRow } from "@/components/creator/wizard/uploads";
 import { Button } from "@/components/ui/button";
@@ -475,7 +474,6 @@ export function CurriculumStage({
    */
   const repairedCourseRef = useRef<string | null>(null);
   useEffect(() => {
-    if (USE_MOCK_SERVICES) return;
     if (repairedCourseRef.current === course.id) return;
     repairedCourseRef.current = course.id;
     const mediaService = getMediaService();
