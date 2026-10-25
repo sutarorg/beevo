@@ -24,8 +24,11 @@ export function PreviewPlayerModal({
   slug,
   courseTitle,
   posterUrl,
+  isFreeCourse = false,
   onClose,
 }: {
+  /** ₹0 course: label it "Preview" (the whole course is free already). */
+  isFreeCourse?: boolean;
   open: boolean;
   lesson: PublicLessonMeta | null;
   handle: string;
@@ -108,14 +111,14 @@ export function PreviewPlayerModal({
               transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               role="dialog"
               aria-modal="true"
-              aria-label={`Free preview: ${lesson.title}`}
+              aria-label={`${isFreeCourse ? "Preview" : "Free preview"}: ${lesson.title}`}
               className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl border-2 border-ink bg-cream shadow-hard sm:max-w-2xl sm:rounded-3xl"
             >
               <div className="flex items-center justify-between gap-3 border-b-2 border-ink bg-white px-5 py-3.5">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] text-accent uppercase">
                     <Play className="size-3 fill-current" aria-hidden="true" />
-                    Free preview
+                    {isFreeCourse ? "Preview" : "Free preview"}
                   </p>
                   <h2 className="mt-0.5 truncate text-sm font-bold text-ink sm:text-base">
                     {lesson.title}
@@ -179,13 +182,15 @@ export function PreviewPlayerModal({
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-lime px-3 py-1 text-[11px] font-bold text-ink">
                       <ShieldCheck className="size-3.5" aria-hidden="true" />
-                      Preview lesson · no payment needed
+                      {isFreeCourse ? "Preview lesson" : "Preview lesson · no payment needed"}
                     </span>
                   </div>
                   <p className="rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
                     You&apos;re watching one lesson from{" "}
-                    <span className="font-semibold text-ink">{courseTitle}</span>. The rest of the
-                    curriculum unlocks after purchase.
+                    <span className="font-semibold text-ink">{courseTitle}</span>.{" "}
+                    {isFreeCourse
+                      ? "Enrol free to watch the whole course."
+                      : "The rest of the curriculum unlocks after purchase."}
                   </p>
                   <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-between">
                     <Button type="button" variant="outline" size="sm" onClick={onClose}>
@@ -205,7 +210,7 @@ export function PreviewPlayerModal({
                         });
                       }}
                     >
-                      Enrol to watch everything
+                      {isFreeCourse ? "Enrol free — watch everything" : "Enrol to watch everything"}
                     </Button>
                   </div>
                 </div>

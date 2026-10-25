@@ -40,10 +40,10 @@ import { Button } from "@/components/ui/button";
 import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 
 const INCLUDED = [
-  { icon: Video, label: "Streamed video lessons" },
-  { icon: Download, label: "Downloadable resources" },
-  { icon: GraduationCap, label: "Learner dashboard access" },
-  { icon: InfinityIcon, label: "Ongoing access while published" },
+  { icon: Video, label: "Video lessons" },
+  { icon: Download, label: "Resources" },
+  { icon: GraduationCap, label: "Learner dashboard" },
+  { icon: InfinityIcon, label: "Access while published" },
 ];
 
 /**
@@ -191,6 +191,11 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
   });
   const [previewLesson, setPreviewLesson] = useState<PublicLessonMeta | null>(null);
 
+  const isFreeCourse = course.priceInPaise === 0;
+  // On a ₹0 course the whole course is free, so preview lessons are simply
+  // "Preview"; "Free preview" is only meaningful on a paid course.
+  const previewNoun = isFreeCourse ? "preview" : "free preview";
+  const previewNounPlural = isFreeCourse ? "previews" : "free previews";
   const freePreviewLesson = course.sections
     .flatMap((section) => section.lessons)
     .find((lesson) => lesson.isPreview);
@@ -279,7 +284,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
               </Sticker>
               {previewCount > 0 ? (
                 <Sticker color="ink">
-                  {previewCount} free {previewCount === 1 ? "preview" : "previews"}
+                  {previewCount} {previewCount === 1 ? previewNoun : previewNounPlural}
                 </Sticker>
               ) : null}
             </div>
@@ -340,7 +345,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     className="absolute right-3 bottom-3 inline-flex items-center gap-2 rounded-full border-2 border-ink bg-lime px-3.5 py-1.5 text-xs font-bold text-ink shadow-hard-xs transition-transform hover:-translate-y-0.5"
                   >
                     <Play className="size-3.5 fill-current" aria-hidden="true" />
-                    Watch free preview
+                    Watch {previewNoun}
                   </button>
                 ) : null}
               </div>
@@ -400,14 +405,13 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 </div>
 
                 <p className="mt-5 rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
-                  Course purchases are non-refundable except where required by applicable law.{" "}
+                  Non-refundable ·{" "}
                   <Link
                     href="/refund-policy"
                     className="font-semibold text-accent underline underline-offset-2"
                   >
-                    Read the purchase policy
+                    Purchase policy
                   </Link>
-                  .
                 </p>
               </div>
             </div>
@@ -449,7 +453,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                   <div className="min-w-0">
                     <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
-                      Free preview lesson
+                      {isFreeCourse ? "Preview lesson" : "Free preview lesson"}
                     </p>
                     <h3 className="mt-1.5 text-lg font-bold leading-snug sm:text-xl">
                       {freePreviewLesson.title}
@@ -487,7 +491,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     {course.videoCount} {course.videoCount === 1 ? "video" : "videos"} ·{" "}
                     {course.resourceCount} {course.resourceCount === 1 ? "file" : "files"}
                     {previewCount > 0
-                      ? ` · ${previewCount} free preview${previewCount === 1 ? "" : "s"}`
+                      ? ` · ${previewCount} ${previewCount === 1 ? previewNoun : previewNounPlural}`
                       : ""}
                   </p>
                 </div>
@@ -541,8 +545,8 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                 <button
                                   type="button"
                                   onClick={() => setPreviewLesson(lesson)}
-                                  aria-label={`Play free preview: ${lesson.title}`}
-                                  title="Watch the free preview"
+                                  aria-label={`Play ${previewNoun}: ${lesson.title}`}
+                                  title={`Watch the ${previewNoun}`}
                                   className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-lime transition-transform hover:-translate-y-0.5 hover:shadow-hard-xs"
                                 >
                                   <Play className="size-3.5 fill-current" aria-hidden="true" />
@@ -589,7 +593,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                       onClick={() => setPreviewLesson(lesson)}
                                       className="font-bold text-accent underline underline-offset-2"
                                     >
-                                      Watch free preview
+                                      Watch {previewNoun}
                                     </button>
                                   ) : null}
                                 </p>
@@ -671,6 +675,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
       />
 
       <PreviewPlayerModal
+        isFreeCourse={isFreeCourse}
         open={previewLesson !== null}
         lesson={previewLesson}
         handle={course.creator.handle}

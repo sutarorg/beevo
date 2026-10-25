@@ -50,6 +50,8 @@ async function upsertUser(input: {
       tagline: input.tagline ?? "",
       niche: input.niche ?? "",
       emailVerifiedAt: input.verified ? new Date() : null,
+      // Seeded with a storefront handle = seeded as a creator.
+      creatorTermsAcceptedAt: input.handle ? new Date() : null,
     })
     .returning();
   console.log(`created: ${input.email}`);

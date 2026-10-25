@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Logo } from "@/components/site/chrome";
+import { Logo } from "@/components/site/logo";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (

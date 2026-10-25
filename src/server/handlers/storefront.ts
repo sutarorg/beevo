@@ -113,7 +113,12 @@ route("GET", "storefront/:handle", async (_req, _ctx, params) => {
     });
   }
   const page: PublicCreatorPage = { ...resolved.info, courses: cards };
-  return ok(page);
+  // Fully public, published-only data: safe for shared/browser caches.
+  // A creator's publish/edit becomes visible within a minute, and stale
+  // copies may be served while revalidating instead of blocking buyers.
+  return ok(page, {
+    headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
+  });
 });
 
 route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
@@ -236,7 +241,9 @@ route("GET", "storefront/:handle/:slug", async (_req, _ctx, params) => {
     durationLabel: formatCourseDuration(totalSeconds),
     creator: resolved.info,
   };
-  return ok(page);
+  return ok(page, {
+    headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
+  });
 });
 
 /**

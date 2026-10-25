@@ -43,6 +43,18 @@ export const users = pgTable("users", {
   notifyReceiptEmails: boolean("notify_receipt_emails").notNull().default(true),
   /** True while an account was created during checkout and hasn't received its dashboard credentials yet. */
   provisionedViaCheckout: boolean("provisioned_via_checkout").notNull().default(false),
+  /**
+   * Account kinds for a single email. One user row can hold a learner
+   * account, a creator account, or both:
+   *  - creator account exists once the creator terms are accepted (website
+   *    signup, or "Start teaching" → I agree in the learner dashboard);
+   *  - learner account exists once the email receives learner access
+   *    (checkout provisioning / first enrolment).
+   * The session payload derives isCreator/isLearner/hasBothAccounts from
+   * these two timestamps (learner also counts any existing enrolment).
+   */
+  creatorTermsAcceptedAt: timestamp("creator_terms_accepted_at", { withTimezone: true }),
+  learnerEnabledAt: timestamp("learner_enabled_at", { withTimezone: true }),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   suspendedReason: text("suspended_reason"),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),

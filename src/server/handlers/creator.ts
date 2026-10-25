@@ -13,7 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { route } from "@/server/router";
-import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/http";
+import { fail, ok, parseBody, requireCreatorUser, requireVerifiedCreatorUser } from "@/server/http";
 import { newId } from "@/server/auth";
 import type { CreatorProfile, CreatorSettings, PayoutDetails } from "@/lib/creator-types";
 import type { AnalyticsData, DashboardData } from "@/lib/services/creator-data";
@@ -72,7 +72,7 @@ function profileOf(
 }
 
 route("GET", "creator/profile", async (req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const baseUrl = resolveRequestBaseUrl(req);
   if (!user.handle) {
@@ -100,7 +100,7 @@ const profilePatchSchema = z.object({
 });
 
 route("PATCH", "creator/profile", async (req, ctx) => {
-  const me = requireVerifiedUser(ctx);
+  const me = requireVerifiedCreatorUser(ctx);
   if (me instanceof Response) return me;
   const parsed = parseBody(profilePatchSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
@@ -201,13 +201,13 @@ function payoutDetailsOf(user: {
 }
 
 route("GET", "creator/payout-details", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   return ok(payoutDetailsOf(user));
 });
 
 route("PUT", "creator/payout-details", async (req, ctx) => {
-  const me = requireVerifiedUser(ctx);
+  const me = requireVerifiedCreatorUser(ctx);
   if (me instanceof Response) return me;
   const parsed = parseBody(payoutDetailsSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
@@ -239,13 +239,13 @@ function settingsOf(user: {
 }
 
 route("GET", "creator/settings", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   return ok(settingsOf(user));
 });
 
 route("PATCH", "creator/settings", async (req, ctx) => {
-  const me = requireUser(ctx);
+  const me = requireCreatorUser(ctx);
   if (me instanceof Response) return me;
   const parsed = parseBody(
     z.object({
@@ -265,7 +265,7 @@ route("PATCH", "creator/settings", async (req, ctx) => {
 });
 
 route("GET", "creator/username-check", async (req, ctx) => {
-  const me = requireUser(ctx);
+  const me = requireCreatorUser(ctx);
   if (me instanceof Response) return me;
   const handle = (new URL(req.url).searchParams.get("handle") ?? "").toLowerCase();
   if (!/^[a-z0-9-]{3,30}$/.test(handle)) return ok({ available: false, reason: "invalid" });
@@ -298,7 +298,7 @@ async function creatorFinance(courseIds: string[]) {
 }
 
 route("GET", "creator/dashboard", async (req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const creatorCourses = await myCourses(user.id);
   const courseIds = creatorCourses.map((row) => row.id);
@@ -386,7 +386,7 @@ async function creatorPayoutTotals(creatorId: string) {
 }
 
 route("GET", "creator/analytics", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const creatorCourses = await myCourses(user.id);
   const courseIds = creatorCourses.map((row) => row.id);
@@ -424,7 +424,7 @@ route("GET", "creator/analytics", async (_req, ctx) => {
 });
 
 route("GET", "creator/students", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const courseIds = (await myCourses(user.id)).map((row) => row.id);
   if (courseIds.length === 0) return ok([]);
@@ -449,7 +449,7 @@ route("GET", "creator/students", async (_req, ctx) => {
 });
 
 route("GET", "creator/orders", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const courseIds = (await myCourses(user.id)).map((row) => row.id);
   if (courseIds.length === 0) return ok([]);
@@ -478,7 +478,7 @@ route("GET", "creator/orders", async (_req, ctx) => {
 });
 
 route("GET", "creator/earnings", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const ledgerRows = await db.query.commissionLedger.findMany({
     where: and(eq(commissionLedger.creatorId, user.id), eq(commissionLedger.status, "accrued")),
@@ -523,7 +523,7 @@ function toNotification(row: typeof notifications.$inferSelect): CreatorNotifica
 }
 
 route("GET", "creator/notifications", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const rows = await db.query.notifications.findMany({
     where: and(eq(notifications.userId, user.id), eq(notifications.channel, "in_app")),
@@ -533,7 +533,7 @@ route("GET", "creator/notifications", async (_req, ctx) => {
 });
 
 route("POST", "creator/notifications/read-all", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   await db
     .update(notifications)

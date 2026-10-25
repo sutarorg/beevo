@@ -31,13 +31,44 @@ const nextConfig: NextConfig = {
     // Keep recently visited routes in the client router cache so switching
     // between tabs/pages is instant instead of refetching every time.
     staleTimes: { dynamic: 30, static: 300 },
+    // Tree-shake the two big icon/animation packages down to what's used.
+    optimizePackageImports: ["lucide-react", "framer-motion"],
   },
   images: {
+    // Modern formats first: AVIF/WebP are dramatically smaller than the
+    // source JPEG/PNG files on slow mobile connections.
+    formats: ["image/avif", "image/webp"],
+    // Optimized variants may be reused for a month (covers/avatars change
+    // rarely; the optimizer still revalidates the source afterwards).
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     localPatterns: [
       { pathname: "/images/**" },
       { pathname: "/api/v1/media/access" },
     ],
     remotePatterns,
+  },
+  async headers() {
+    return [
+      {
+        // Bundled brand/course imagery: cache hard, revalidate in background.
+        source: "/images/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000, stale-while-revalidate=86400",
+          },
+        ],
+      },
+      {
+        source: "/favicon.ico",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
   },
 };
 

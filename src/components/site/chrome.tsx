@@ -1,70 +1,82 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Menu, X } from "lucide-react";
-import Image from "next/image";
+import { ArrowRight, LayoutDashboard, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { APP_TAGLINE, SUPPORT_EMAIL } from "@/lib/config";
-import { PLATFORM_COMMISSION_LABEL } from "@/lib/domain";
 import { NAV_LINKS } from "@/lib/content";
+import { PLATFORM_COMMISSION_LABEL } from "@/lib/domain";
+import {
+  dashboardPathFor,
+  fetchSession,
+  getCachedSession,
+  subscribeSessionCache,
+  type SessionSnapshot,
+} from "@/lib/services/auth";
+
+const noSession = (): SessionSnapshot | null => null;
 import { cn } from "@/lib/utils";
+import { AccountModeToggle } from "@/components/account-mode-toggle";
+import { Logo } from "@/components/site/logo";
 import { Button } from "@/components/ui/button";
 import { Sticker } from "@/components/ui/primitives";
 
-/**
- * Square Beevo brand tile, shared by the header, footer and app shells.
- * Keep the image square at every size so its rounded corners stay proportional.
- */
-export function LogoMark({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "relative inline-flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-[22%] transition-transform duration-200 group-hover:-rotate-6",
-        className,
-      )}
-    >
-      <Image
-        src="/images/brand/beevo-mark.png"
-        alt=""
-        width={500}
-        height={500}
-        sizes="36px"
-        className="block size-full object-contain"
-        priority
-      />
-    </span>
-  );
-}
+export { Logo, LogoMark } from "@/components/site/logo";
 
-export function Logo({ dark = false }: { dark?: boolean }) {
-  return (
-    <Link
-      href="/"
-      aria-label="Beevo home"
-      className="group inline-flex items-center gap-2.5"
-    >
-      <LogoMark />
-      <span
-        className={cn(
-          "text-xl font-bold tracking-tight",
-          dark ? "text-cream" : "text-ink",
-        )}
-      >
-        Beevo
-      </span>
-    </Link>
-  );
+/**
+ * Reads the stay-signed-in session for header chrome.
+ *
+ * The server session cookie persists across tabs and browser restarts, so
+ * the header must reflect it: a signed-in visitor sees "Dashboard" (never
+ * "Log in") on every marketing page, including right after "Back to
+ * website". The check is client-side so marketing pages stay fully static;
+ * a persisted hint paints the signed-in state instantly and the server
+ * response then confirms it. Re-checked whenever the user returns to the
+ * tab, so sign-in/out in another tab shows up without a reload.
+ */
+function useHeaderSession(): SessionSnapshot | null | undefined {
+  const cached = useSyncExternalStore(subscribeSessionCache, getCachedSession, noSession);
+  const [verified, setVerified] = useState<SessionSnapshot | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = (force = false) => {
+      void fetchSession({ force }).then((snapshot) => {
+        if (!cancelled) setVerified(snapshot);
+      });
+    };
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
+
+  // undefined = not known yet (render the neutral placeholder, not "Log in").
+  return verified ?? cached ?? undefined;
 }
 
 export function Header() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const session = useHeaderSession();
+  const signedIn = Boolean(session?.user);
+  const dashboardHref = dashboardPathFor(session ?? null);
 
-  useEffect(() => {
+  // Close the mobile menu whenever the route changes (state reset during
+  // render — the React-endorsed alternative to an effect for this).
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
     setMenuOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -93,16 +105,36 @@ export function Header() {
             ))}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/login"
-              className="link-underline hidden text-sm font-semibold text-ink hover:text-accent sm:block"
-            >
-              Log in
-            </Link>
-            <Button href="/signup" size="sm" className="hidden sm:inline-flex">
-              Start free
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Button>
+            {session === undefined ? (
+              // Session unknown yet (first paint): hold the space instead of
+              // flashing "Log in" at someone who is already signed in.
+              <span
+                aria-hidden="true"
+                className="hidden h-9 w-36 animate-pulse rounded-full bg-ink/10 sm:block"
+              />
+            ) : signedIn ? (
+              <>
+                {/* Both accounts on this email → Learner/Creator switch. */}
+                <AccountModeToggle className="hidden lg:inline-flex" />
+                <Button href={dashboardHref} size="sm" className="hidden sm:inline-flex">
+                  <LayoutDashboard className="size-4" aria-hidden="true" />
+                  Dashboard
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="link-underline hidden text-sm font-semibold text-ink hover:text-accent sm:block"
+                >
+                  Log in
+                </Link>
+                <Button href="/signup" size="sm" className="hidden sm:inline-flex">
+                  Start free
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
@@ -116,74 +148,78 @@ export function Header() {
         </div>
       </header>
 
-      <AnimatePresence>
-        {menuOpen ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[80] flex flex-col bg-ink text-cream md:hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu"
-          >
-            <div className="flex h-16 items-center justify-between border-b-2 border-cream/20 px-4">
-              <Logo dark />
-              <button
-                type="button"
-                onClick={() => setMenuOpen(false)}
-                aria-label="Close menu"
-                className="grid size-10 place-items-center rounded-xl border-2 border-cream/40"
+      {menuOpen ? (
+        <div
+          className="anim-fade-in fixed inset-0 z-[80] flex flex-col bg-ink text-cream md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          <div className="flex h-16 items-center justify-between border-b-2 border-cream/20 px-4">
+            <Logo dark />
+            <button
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              aria-label="Close menu"
+              className="grid size-10 place-items-center rounded-xl border-2 border-cream/40"
+            >
+              <X className="size-5" aria-hidden="true" />
+            </button>
+          </div>
+          <nav aria-label="Mobile" className="flex flex-1 flex-col justify-center gap-1 px-6">
+            {NAV_LINKS.map((link, index) => (
+              <div
+                key={link.href}
+                className="anim-slide-in-left"
+                style={{ animationDelay: `${80 + index * 60}ms` }}
               >
-                <X className="size-5" aria-hidden="true" />
-              </button>
-            </div>
-            <nav
-              aria-label="Mobile"
-              className="flex flex-1 flex-col justify-center gap-1 px-6"
-            >
-              {NAV_LINKS.map((link, index) => (
-                <motion.div
-                  key={link.href}
-                  initial={{ opacity: 0, x: -24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.08 + index * 0.06, duration: 0.35 }}
+                <Link
+                  href={link.href}
+                  className="group flex items-center justify-between border-b border-cream/15 py-4"
                 >
-                  <Link
-                    href={link.href}
-                    className="group flex items-center justify-between border-b border-cream/15 py-4"
-                  >
-                    <span className="font-editorial text-4xl italic">
-                      {link.label}
-                    </span>
-                    <ArrowRight
-                      className="size-6 text-lime transition-transform group-hover:translate-x-1"
-                      aria-hidden="true"
-                    />
-                  </Link>
-                </motion.div>
-              ))}
-            </nav>
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.32, duration: 0.35 }}
-              className="space-y-4 px-6 pb-8"
-            >
-              <Button href="/signup" variant="lime" size="lg" className="w-full">
-                Start free — ₹0/month
-              </Button>
-              <p className="text-center text-sm text-cream/60">
-                Already creating?{" "}
-                <Link href="/login" className="font-semibold text-lime underline underline-offset-4">
-                  Log in
+                  <span className="font-editorial text-4xl italic">{link.label}</span>
+                  <ArrowRight
+                    className="size-6 text-lime transition-transform group-hover:translate-x-1"
+                    aria-hidden="true"
+                  />
                 </Link>
-              </p>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+              </div>
+            ))}
+          </nav>
+          <div
+            className="anim-rise-in space-y-4 px-6 pb-8"
+            style={{ animationDelay: "320ms" }}
+          >
+            {signedIn ? (
+              <>
+                <div className="flex justify-center">
+                  <AccountModeToggle />
+                </div>
+                <Button href={dashboardHref} variant="lime" size="lg" className="w-full">
+                  <LayoutDashboard className="size-5" aria-hidden="true" />
+                  Dashboard
+                </Button>
+                <p className="text-center text-sm text-cream/60">
+                  Signed in as{" "}
+                  <span className="font-semibold text-cream">{session?.user?.fullName}</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <Button href="/signup" variant="lime" size="lg" className="w-full">
+                  Start free — ₹0/month
+                </Button>
+                <p className="text-center text-sm text-cream/60">
+                  Already creating?{" "}
+                  <Link href="/login" className="font-semibold text-lime underline underline-offset-4">
+                    Log in
+                  </Link>
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -223,9 +259,7 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <Logo dark />
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-cream/60">
-              {APP_TAGLINE}
-            </p>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-cream/60">{APP_TAGLINE}</p>
             <div className="mt-5">
               <Sticker color="lime" className="border-lime shadow-none">
                 Not a marketplace
@@ -233,8 +267,8 @@ export function Footer() {
             </div>
             <div className="mt-5 rounded-2xl border-2 border-cream/20 bg-cream/5 p-4 text-xs leading-relaxed text-cream/70">
               <p>
-                Free plan · ₹0/month · {PLATFORM_COMMISSION_LABEL} commission per
-                successful eligible course sale. No Pro plan.
+                Free plan · ₹0/month · {PLATFORM_COMMISSION_LABEL} commission per successful
+                eligible course sale. No Pro plan.
               </p>
             </div>
           </div>

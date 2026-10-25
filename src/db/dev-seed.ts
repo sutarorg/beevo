@@ -104,6 +104,7 @@ export async function seedDevelopmentDatabase(db: Db): Promise<void> {
       niche: "Photography",
       links: [{ label: "Instagram", url: "https://instagram.com" }],
       emailVerifiedAt: now,
+      creatorTermsAcceptedAt: now,
     },
     {
       id: "usr_dev_learner",
@@ -111,6 +112,7 @@ export async function seedDevelopmentDatabase(db: Db): Promise<void> {
       name: "Kavya Raghavan",
       passwordHash: hashPassword(SEED_PASSWORD),
       emailVerifiedAt: now,
+      learnerEnabledAt: now,
     },
     {
       id: adminId,

@@ -1,14 +1,19 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Asterisk, Plus } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { FaqItem } from "@/lib/content";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
-/** Fade-and-rise scroll reveal. */
+/**
+ * Fade-and-rise scroll reveal.
+ *
+ * IntersectionObserver + a CSS transition (see `.reveal` in globals.css) —
+ * the same visual result as the previous JS animation library, but with no
+ * library in the bundle of every marketing page. Falls back to visible when
+ * IntersectionObserver is missing, and a safety timer guarantees content is
+ * never stuck invisible.
+ */
 export function Reveal({
   children,
   delay = 0,
@@ -20,16 +25,46 @@ export function Reveal({
   y?: number;
   className?: string;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    if (typeof IntersectionObserver === "undefined") {
+      const frame = window.requestAnimationFrame(() => setVisible(true));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -60px 0px" },
+    );
+    observer.observe(element);
+    const safety = window.setTimeout(() => setVisible(true), 1600);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(safety);
+    };
+  }, []);
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.7, delay, ease: EASE }}
-      className={className}
+    <div
+      ref={ref}
+      className={cn("reveal", visible && "is-visible", className)}
+      style={
+        {
+          "--reveal-y": `${y}px`,
+          transitionDelay: delay ? `${Math.round(delay * 1000)}ms` : undefined,
+        } as CSSProperties
+      }
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 

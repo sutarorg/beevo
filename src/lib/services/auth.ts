@@ -170,6 +170,10 @@ interface SessionResponse {
   emailVerifiedAt?: string | null;
   isCreatorWithHandle?: boolean;
   isAdmin?: boolean;
+  isCreator?: boolean;
+  isLearner?: boolean;
+  hasBothAccounts?: boolean;
+  handle?: string | null;
 }
 
 class ApiAuthService implements AuthService {
@@ -195,10 +199,11 @@ class ApiAuthService implements AuthService {
         ? err<AuthSession>("invalid_credentials", "Incorrect email or password.")
         : { ok: false as const, error: { code: result.error.code as AuthErrorCode, message: result.error.message } };
     }
+    rememberSession(toSnapshot(result.data));
     return ok<AuthSession>({
       user: result.data.user,
       accessToken: result.data.accessToken ?? "session-cookie",
-      expiresAt: result.data.expiresAt ?? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      expiresAt: result.data.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
   }
 
@@ -212,6 +217,7 @@ class ApiAuthService implements AuthService {
 
   async signOut() {
     invalidateSessionCache();
+    forgetSession();
     return api<{ success: true }>("auth/logout", { method: "POST" });
   }
 }
@@ -222,6 +228,38 @@ export interface SessionSnapshot {
   user: { id: string; email: string; fullName: string } | null;
   isAdmin: boolean;
   emailVerifiedAt: string | null;
+  /** This email holds a creator account (creator terms accepted). */
+  isCreator: boolean;
+  /** This email holds a learner account (checkout access / enrolment). */
+  isLearner: boolean;
+  /** Both accounts on one email — the only case the Learner/Creator toggle shows. */
+  hasBothAccounts: boolean;
+  handle: string | null;
+}
+
+export const ANONYMOUS_SESSION: SessionSnapshot = {
+  user: null,
+  isAdmin: false,
+  emailVerifiedAt: null,
+  isCreator: false,
+  isLearner: false,
+  hasBothAccounts: false,
+  handle: null,
+};
+
+function toSnapshot(data: SessionResponse): SessionSnapshot {
+  if (!data.user) return ANONYMOUS_SESSION;
+  const isCreator = Boolean(data.isCreator);
+  const isLearner = Boolean(data.isLearner);
+  return {
+    user: data.user,
+    isAdmin: Boolean(data.isAdmin),
+    emailVerifiedAt: data.emailVerifiedAt ?? null,
+    isCreator,
+    isLearner,
+    hasBothAccounts: data.hasBothAccounts ?? (isCreator && isLearner),
+    handle: data.handle ?? null,
+  };
 }
 
 /**
@@ -229,30 +267,176 @@ export interface SessionSnapshot {
  * used to re-hit the server. A short TTL keeps navigation instant while still
  * reflecting sign-in/out almost immediately; mutations invalidate it.
  */
-const SESSION_TTL_MS = 5_000;
+const SESSION_TTL_MS = 15_000;
 let sessionCache: { at: number; promise: Promise<SessionSnapshot> } | null = null;
+let lastResolvedSession: SessionSnapshot | null = null;
 
 export function invalidateSessionCache(): void {
   sessionCache = null;
 }
 
+/** Local sign-out bookkeeping (cache + hint) for non-auth-service callers. */
+export function clearLocalSession(): void {
+  invalidateSessionCache();
+  forgetSession();
+}
+
+// ---------------------------------------------------------------------------
+// "Stay signed in" hint (non-sensitive chrome state only)
+//
+// The real credential is the httpOnly, 30-day sliding session cookie set by
+// the server. This hint (name/email/account kinds — no token, no secret)
+// only lets headers and shells paint the signed-in chrome instantly when a
+// tab is reopened or revisited, instead of flashing "Log in" while the
+// session check runs. It is verified against the server on every mount and
+// cleared the moment the server says there is no session. It never grants
+// access to data: every API call is authorized server-side.
+// ---------------------------------------------------------------------------
+
+const HINT_KEY = "beevo:session-hint:v1";
+const ACCOUNT_MODE_KEY = "beevo:account-mode:v1";
+
+// Tiny external store over the cached snapshot, so React components can
+// read it with useSyncExternalStore (referentially stable between changes).
+const sessionListeners = new Set<() => void>();
+
+export function subscribeSessionCache(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
+
+function notifySessionCache(): void {
+  for (const listener of sessionListeners) listener();
+}
+
+let hintRaw: string | null | undefined;
+let hintParsed: SessionSnapshot | null = null;
+
+function readHint(): SessionSnapshot | null {
+  try {
+    const raw = localStorage.getItem(HINT_KEY);
+    if (raw === hintRaw) return hintParsed;
+    hintRaw = raw;
+    if (!raw) {
+      hintParsed = null;
+      return null;
+    }
+    const parsed = JSON.parse(raw) as SessionSnapshot;
+    hintParsed =
+      parsed && typeof parsed === "object" && parsed.user?.id
+        ? { ...ANONYMOUS_SESSION, ...parsed }
+        : null;
+    return hintParsed;
+  } catch {
+    return null;
+  }
+}
+
+function rememberSession(snapshot: SessionSnapshot): void {
+  lastResolvedSession = snapshot;
+  try {
+    if (snapshot.user) {
+      localStorage.setItem(HINT_KEY, JSON.stringify(snapshot));
+    } else {
+      localStorage.removeItem(HINT_KEY);
+    }
+  } catch {
+    // Private browsing / storage unavailable: the in-memory cache still works.
+  }
+  hintRaw = undefined;
+  notifySessionCache();
+}
+
+function forgetSession(): void {
+  lastResolvedSession = null;
+  try {
+    localStorage.removeItem(HINT_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+  hintRaw = undefined;
+  notifySessionCache();
+}
+
+/**
+ * Synchronous best-known session (last verified value, else the persisted
+ * hint, else null = unknown). Used to render shells/headers instantly;
+ * callers must still confirm with fetchSession().
+ */
+export function getCachedSession(): SessionSnapshot | null {
+  return lastResolvedSession ?? readHint();
+}
+
+/** The account mode the user last used ("learner" | "creator"), if any. */
+export function getAccountModePref(): "learner" | "creator" | null {
+  try {
+    const value = localStorage.getItem(ACCOUNT_MODE_KEY);
+    return value === "learner" || value === "creator" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAccountModePref(mode: "learner" | "creator"): void {
+  try {
+    localStorage.setItem(ACCOUNT_MODE_KEY, mode);
+  } catch {
+    // Preference only — navigation still works without storage.
+  }
+  notifySessionCache();
+}
+
+export const LEARNER_DASHBOARD_PATH = "/learn/courses";
+export const CREATOR_DASHBOARD_PATH = "/creator/dashboard";
+
+/**
+ * Where "Dashboard" (and post-login) should land for this session:
+ * the last-used mode when the email holds both accounts, otherwise the one
+ * dashboard the account actually has.
+ */
+export function dashboardPathFor(snapshot: SessionSnapshot | null): string {
+  if (!snapshot?.user) return "/login";
+  if (snapshot.hasBothAccounts) {
+    return getAccountModePref() === "learner" ? LEARNER_DASHBOARD_PATH : CREATOR_DASHBOARD_PATH;
+  }
+  if (snapshot.isLearner && !snapshot.isCreator) return LEARNER_DASHBOARD_PATH;
+  if (snapshot.isCreator) return CREATOR_DASHBOARD_PATH;
+  if (snapshot.isAdmin) return "/admin/dashboard";
+  return CREATOR_DASHBOARD_PATH;
+}
+
 /** Fetch the current live session (used by app shells). */
-export function fetchSession(): Promise<SessionSnapshot> {
-  if (sessionCache && Date.now() - sessionCache.at < SESSION_TTL_MS) {
+export function fetchSession(options?: { force?: boolean }): Promise<SessionSnapshot> {
+  if (!options?.force && sessionCache && Date.now() - sessionCache.at < SESSION_TTL_MS) {
     return sessionCache.promise;
   }
   const promise = api<SessionResponse>("auth/session").then((result) => {
-    if (!result.ok || !result.data.user) {
-      return { user: null, isAdmin: false, emailVerifiedAt: null } satisfies SessionSnapshot;
-    }
-    return {
-      user: result.data.user,
-      isAdmin: Boolean(result.data.isAdmin),
-      emailVerifiedAt: result.data.emailVerifiedAt ?? null,
-    } satisfies SessionSnapshot;
+    const snapshot = result.ok ? toSnapshot(result.data) : ANONYMOUS_SESSION;
+    rememberSession(snapshot);
+    return snapshot;
   });
   sessionCache = { at: Date.now(), promise };
   return promise;
+}
+
+/**
+ * "Start teaching" — accepts the creator terms and enables the creator
+ * account on the same email (the learner account is untouched, so the email
+ * ends up holding both and the Learner/Creator toggle appears).
+ */
+export async function startTeaching(): Promise<ApiResult<SessionSnapshot>> {
+  invalidateSessionCache();
+  const result = await api<SessionResponse>("auth/start-teaching", {
+    method: "POST",
+    body: { agreed: true },
+  });
+  if (!result.ok) return result;
+  const snapshot = toSnapshot(result.data);
+  rememberSession(snapshot);
+  setAccountModePref("creator");
+  return { ok: true, data: snapshot };
 }
 
 /** True when auth forms should render instead of the unavailable state. */

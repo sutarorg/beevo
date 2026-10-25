@@ -400,9 +400,9 @@ export function CheckoutSheet({
                   <MailCheck className="size-5" aria-hidden="true" />
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-ink">Where should we send your access?</h3>
+                  <h3 className="text-sm font-bold text-ink">Your email</h3>
                   <p className="mt-0.5 text-xs leading-relaxed text-smoke">
-                    We’ll email a 6-digit code to confirm it’s yours.
+                    We’ll email you a 6-digit code.
                   </p>
                 </div>
               </div>
@@ -432,9 +432,6 @@ export function CheckoutSheet({
                     }}
                   />
                 </Field>
-                <p className="mt-2 text-[11px] leading-relaxed text-smoke">
-                  Access to this purchase will be sent to this account.
-                </p>
                 <Button
                   type="submit"
                   variant="accent"
@@ -447,8 +444,7 @@ export function CheckoutSheet({
                 </Button>
               </form>
               <p className="mt-3 text-center text-[10px] leading-relaxed text-smoke">
-                No account needed yet. We create or reuse the learner account for this email at
-                payment.
+                Your learner account is created for this email at payment.
               </p>
             </div>
           )}
@@ -556,9 +552,6 @@ export function CheckoutSheet({
                       Email verified
                     </p>
                     <p className="mt-1 text-xs text-smoke">{email}</p>
-                    <p className="mt-2 text-[11px] leading-relaxed text-smoke">
-                      Access to this purchase will be sent to this account.
-                    </p>
                   </div>
 
                   {!isFree && readiness && !readiness.ready ? (
@@ -583,7 +576,7 @@ export function CheckoutSheet({
                       <div className="rounded-2xl border-2 border-ink bg-lime p-4">
                         <p className="text-lg font-bold text-ink">Free course</p>
                         <p className="mt-1 text-xs leading-relaxed text-ink/80">
-                          No payment needed. Enrol now and it’s added to your library immediately.
+                          No payment needed — added to your library instantly.
                         </p>
                       </div>
                       <Button
@@ -745,8 +738,7 @@ export function CheckoutSheet({
 
         <div className="border-t-2 border-ink bg-white px-5 py-3">
           <p className="text-center text-[10px] leading-relaxed text-smoke">
-            Payments are processed securely by Razorpay. Course purchases are non-refundable except
-            where required by applicable law.
+            Secure payments by Razorpay · Non-refundable
           </p>
         </div>
       </div>

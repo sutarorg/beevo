@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import {
   createContext,
@@ -65,41 +64,34 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
         className="pointer-events-none fixed inset-x-4 bottom-4 z-[90] flex flex-col gap-2 sm:left-auto sm:w-96"
       >
-        <AnimatePresence initial={false}>
-          {toasts.map((toast) => {
-            const { classes, Icon } = VARIANT_STYLES[toast.variant];
-            return (
-              <motion.div
-                key={toast.id}
-                layout
-                initial={{ opacity: 0, y: 24, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 12, scale: 0.96 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                className={cn(
-                  "pointer-events-auto flex items-start gap-3 rounded-2xl border-2 p-4 shadow-hard-sm",
-                  classes,
-                )}
+        {toasts.map((toast) => {
+          const { classes, Icon } = VARIANT_STYLES[toast.variant];
+          return (
+            <div
+              key={toast.id}
+              className={cn(
+                "anim-rise-in pointer-events-auto flex items-start gap-3 rounded-2xl border-2 p-4 shadow-hard-sm",
+                classes,
+              )}
+            >
+              <Icon className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">{toast.title}</p>
+                {toast.description ? (
+                  <p className="mt-0.5 text-sm opacity-80">{toast.description}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => dismiss(toast.id)}
+                aria-label="Dismiss notification"
+                className="shrink-0 rounded-full p-1 transition-colors hover:bg-black/10"
               >
-                <Icon className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold">{toast.title}</p>
-                  {toast.description ? (
-                    <p className="mt-0.5 text-sm opacity-80">{toast.description}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => dismiss(toast.id)}
-                  aria-label="Dismiss notification"
-                  className="shrink-0 rounded-full p-1 transition-colors hover:bg-black/10"
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </button>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );
