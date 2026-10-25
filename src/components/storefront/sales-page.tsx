@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  ArrowLeft,
+  ArrowUpRight,
   BadgeIndianRupee,
   Check,
+  ChevronDown,
   Clock3,
   Download,
   FileText,
@@ -20,7 +23,6 @@ import { useState } from "react";
 import { formatINR, priceLabel } from "@/lib/domain";
 import type { PublicCoursePage, PublicLessonMeta } from "@/lib/learner-types";
 import { useAsyncData } from "@/lib/hooks";
-import { getLearnerService } from "@/lib/services/learner";
 import { getStorefrontService } from "@/lib/services/storefront";
 import { cn } from "@/lib/utils";
 import { CardListSkeleton, FailedState, Skeleton } from "@/components/creator/ui";
@@ -45,20 +47,124 @@ const INCLUDED = [
   { icon: InfinityIcon, label: "Ongoing access while published" },
 ];
 
+/**
+ * Low-brightness "Secure checkout" label above a horizontal line of 4 monochrome
+ * grey payment logos (UPI, Visa, Mastercard, RuPay) with no background block.
+ */
+function SecureCheckoutLogos() {
+  return (
+    <div className="mt-3.5 flex flex-col items-center">
+      <p className="text-center text-[11px] font-medium tracking-wide text-neutral-400">
+        Secure checkout
+      </p>
+      <div
+        className="mt-2 flex flex-wrap items-center justify-center gap-5 text-neutral-400 sm:gap-6"
+        aria-label="Accepted payment methods: UPI, Visa, Mastercard, and RuPay"
+      >
+        {/* UPI */}
+        <svg
+          viewBox="0 0 54 20"
+          className="h-3.5 w-auto shrink-0"
+          role="img"
+          aria-label="UPI"
+        >
+          <path
+            d="M4.2 3.5H7.4L5.5 13.3H9.5L8.9 16.5H3.5C1.9 16.5 1.3 15.4 1.7 13.6L4.2 3.5ZM11.8 3.5H15L12.4 16.5H9.2L11.8 3.5ZM17.6 3.5H25.6C28.5 3.5 29.7 5.1 29.1 7.8C28.5 10.6 26.5 12 23.5 12H19.1L18.2 16.5H15L17.6 3.5ZM20.3 6.2L19.6 9.4H23.3C24.8 9.4 25.6 8.8 25.9 7.8C26.1 6.8 25.5 6.2 24 6.2H20.3ZM31.8 3.5H35L32.4 16.5H29.2L31.8 3.5Z"
+            fill="currentColor"
+            fillRule="evenodd"
+          />
+          <polygon points="37.5,3.5 44.5,10 35.5,16.5 39.2,10" fill="currentColor" />
+          <polygon
+            points="43,3.5 50,10 41,16.5 44.7,10"
+            fill="currentColor"
+            fillOpacity="0.6"
+          />
+        </svg>
+
+        {/* Visa */}
+        <svg
+          viewBox="0 0 56 20"
+          className="h-3.5 w-auto shrink-0"
+          role="img"
+          aria-label="Visa"
+        >
+          <text
+            x="1"
+            y="15.5"
+            fill="currentColor"
+            fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif"
+            fontSize="15.5"
+            fontWeight="900"
+            fontStyle="italic"
+            letterSpacing="0.8"
+          >
+            VISA
+          </text>
+        </svg>
+
+        {/* Mastercard */}
+        <svg
+          viewBox="0 0 36 22"
+          className="h-4 w-auto shrink-0"
+          role="img"
+          aria-label="Mastercard"
+        >
+          <circle cx="13" cy="11" r="7.5" fill="currentColor" fillOpacity="0.75" />
+          <circle cx="23" cy="11" r="7.5" fill="currentColor" fillOpacity="0.5" />
+          <path
+            d="M18 5.45A7.5 7.5 0 0 1 20.5 11A7.5 7.5 0 0 1 18 16.55A7.5 7.5 0 0 1 15.5 11A7.5 7.5 0 0 1 18 5.45Z"
+            fill="currentColor"
+          />
+        </svg>
+
+        {/* RuPay */}
+        <svg
+          viewBox="0 0 72 20"
+          className="h-3.5 w-auto shrink-0"
+          role="img"
+          aria-label="RuPay"
+        >
+          <text
+            x="1"
+            y="15"
+            fill="currentColor"
+            fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif"
+            fontSize="14"
+            fontWeight="800"
+            fontStyle="italic"
+            letterSpacing="0.2"
+          >
+            RuPay
+          </text>
+          <polygon points="53,3.5 60,10 53,16.5 56,10" fill="currentColor" />
+          <polygon
+            points="58,3.5 65,10 58,16.5 61,10"
+            fill="currentColor"
+            fillOpacity="0.6"
+          />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export function CourseSalesPage({ handle, slug }: { handle: string; slug: string }) {
   const service = getStorefrontService();
   const { state, reload } = useAsyncData(
     () =>
       service
         ? service.getCourse(handle, slug)
-        : Promise.resolve({ ok: false as const, error: { code: "unavailable", message: "Storefront service unavailable" } }),
+        : Promise.resolve({
+            ok: false as const,
+            error: { code: "unavailable", message: "Storefront service unavailable" },
+          }),
     [handle, slug],
   );
 
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 px-4 py-12 sm:px-6">
-        <Skeleton className="h-72" />
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-12 sm:px-6">
+        <Skeleton className="h-64" />
         <CardListSkeleton count={3} />
       </div>
     );
@@ -79,7 +185,11 @@ export function CourseSalesPage({ handle, slug }: { handle: string; slug: string
 function SalesBody({ course }: { course: PublicCoursePage }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [purchased, setPurchased] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(course.sections[0]?.id ?? null);
+  const [openSections, setOpenSections] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    if (course.sections[0]?.id) initial.add(course.sections[0].id);
+    return initial;
+  });
   const [previewLesson, setPreviewLesson] = useState<PublicLessonMeta | null>(null);
 
   const freePreviewLesson = course.sections
@@ -90,57 +200,128 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
     0,
   );
 
+  const allSectionsOpen =
+    course.sections.length > 0 &&
+    course.sections.every((section) => openSections.has(section.id));
+
+  const toggleSection = (sectionId: string) => {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  };
+
+  const toggleAllSections = () => {
+    if (allSectionsOpen) {
+      setOpenSections(new Set());
+    } else {
+      setOpenSections(new Set(course.sections.map((section) => section.id)));
+    }
+  };
+
   return (
     <>
-      {/* Hero */}
-      <section className="border-b-2 border-ink bg-parchment">
-        <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:py-16">
-          <div>
-            <nav aria-label="Breadcrumb" className="text-xs font-semibold text-smoke">
-              <Link href={`/@${course.creator.handle}`} className="hover:text-accent">
+      {/*
+        Unified responsive 2-column course detail layout:
+        - Row 1 has a full-bleed parchment backdrop (`border-b-2 border-ink bg-parchment`).
+        - On desktop (`lg`), the Hero header sits in Row 1 Left, the Body sections sit in
+          Row 2 Left directly below the Hero border (with zero dead space), and the
+          Buy Card (`#course-enrol-card`) spans Rows 1–2 on the Right as a sticky sidebar.
+        - On mobile (`< lg`), the Hero header and Buy Card sit inside the parchment top
+          section, followed by the Body cards below.
+      */}
+      <div className="overflow-x-clip">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_25rem] lg:grid-rows-[auto_1fr] lg:gap-x-10">
+          {/* Full-bleed Hero background */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none relative left-1/2 col-span-full row-start-1 row-end-3 -ml-[50vw] w-screen border-b-2 border-ink bg-parchment lg:row-end-2"
+          />
+
+          {/* Hero Left — Course Identity & Creator */}
+          <header className="relative z-10 pt-8 pb-6 sm:pt-12 lg:col-start-1 lg:row-start-1 lg:py-14">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex flex-wrap items-center gap-2 text-xs font-semibold text-smoke"
+            >
+              <Link
+                href={`/@${course.creator.handle}`}
+                className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-white px-3 py-1 text-[11px] font-bold text-ink shadow-hard-xs transition-transform hover:-translate-y-0.5 hover:text-accent"
+              >
+                <ArrowLeft className="size-3" aria-hidden="true" />
                 @{course.creator.handle}
               </Link>
-              <span aria-hidden="true"> / </span>
-              <span className="text-ink">{course.title}</span>
+              <span aria-hidden="true" className="text-smoke/60">
+                /
+              </span>
+              <span className="truncate font-bold text-ink">{course.title}</span>
             </nav>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-balance text-ink sm:text-5xl">
+
+            <h1 className="mt-4 text-3xl font-bold tracking-tight text-balance text-ink sm:text-5xl lg:leading-[1.08]">
               {course.title}
             </h1>
+
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-pretty text-smoke sm:text-base">
               {course.shortDescription}
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Sticker color="lime">{course.lessonCount} lessons</Sticker>
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Sticker color="lime">
+                {course.lessonCount} {course.lessonCount === 1 ? "lesson" : "lessons"}
+              </Sticker>
               <Sticker color="cream">{course.durationLabel}</Sticker>
-              <Sticker color="cream">{course.resourceCount} downloads</Sticker>
+              <Sticker color="cream">
+                {course.resourceCount} {course.resourceCount === 1 ? "download" : "downloads"}
+              </Sticker>
+              {previewCount > 0 ? (
+                <Sticker color="ink">
+                  {previewCount} free {previewCount === 1 ? "preview" : "previews"}
+                </Sticker>
+              ) : null}
             </div>
+
             <Link
               href={`/@${course.creator.handle}`}
-              className="mt-6 flex items-center gap-3 rounded-2xl border-2 border-ink bg-white p-3 transition-transform hover:-translate-y-0.5"
+              className="group mt-6 flex items-center justify-between gap-3 rounded-2xl border-2 border-ink bg-white p-3.5 shadow-hard-xs transition-transform hover:-translate-y-0.5 sm:p-4"
             >
-              <ProfileAvatar
-                src={course.creator.avatarUrl}
-                name={course.creator.displayName}
-                sizePx={44}
-                className="size-11"
-              />
-              <span>
-                <span className="block text-sm font-bold text-ink">{course.creator.displayName}</span>
-                <span className="block text-xs text-accent">@{course.creator.handle} · view all courses</span>
+              <span className="flex min-w-0 items-center gap-3">
+                <ProfileAvatar
+                  src={course.creator.avatarUrl}
+                  name={course.creator.displayName}
+                  sizePx={48}
+                  className="size-12"
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-ink sm:text-base">
+                    {course.creator.displayName}
+                  </span>
+                  <span className="block truncate text-xs font-semibold text-accent">
+                    @{course.creator.handle} · {course.creator.niche || "Creator"}
+                  </span>
+                </span>
+              </span>
+              <span className="hidden shrink-0 items-center gap-1 rounded-full border-2 border-ink bg-cream px-3 py-1 text-[11px] font-bold text-ink transition-colors group-hover:bg-lime sm:inline-flex">
+                View storefront
+                <ArrowUpRight className="size-3.5" aria-hidden="true" />
               </span>
             </Link>
-          </div>
+          </header>
 
-          {/* Buy card */}
-          <div className="lg:pt-8" id="course-enrol-card">
+          {/* Right Column — Sticky Course Enrol Card */}
+          <aside
+            id="course-enrol-card"
+            className="relative z-10 pb-10 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-start lg:py-12 lg:sticky lg:top-6"
+          >
             <div className="overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard">
-              <div className="relative aspect-[4/3] border-b-2 border-ink bg-parchment">
+              <div className="relative aspect-[16/10] border-b-2 border-ink bg-parchment sm:aspect-[4/3]">
                 {course.coverPreviewUrl ? (
                   <Image
                     src={course.coverPreviewUrl}
                     alt={`${course.title} course cover`}
                     fill
-                    sizes="(max-width: 1024px) 100vw, 40vw"
+                    sizes="(max-width: 1024px) 100vw, 400px"
                     className="object-cover"
                     priority
                   />
@@ -149,21 +330,35 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     {course.title.slice(0, 1)}
                   </div>
                 )}
+                {freePreviewLesson ? (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewLesson(freePreviewLesson)}
+                    className="absolute right-3 bottom-3 inline-flex items-center gap-2 rounded-full border-2 border-ink bg-lime px-3.5 py-1.5 text-xs font-bold text-ink shadow-hard-xs transition-transform hover:-translate-y-0.5"
+                  >
+                    <Play className="size-3.5 fill-current" aria-hidden="true" />
+                    Watch free preview
+                  </button>
+                ) : null}
               </div>
-              <div className="p-5">
+
+              <div className="p-5 sm:p-6">
                 <div className="flex items-end justify-between gap-2">
                   <div>
                     <p className="font-editorial text-5xl leading-none text-ink italic">
                       {priceLabel(course.priceInPaise)}
                     </p>
-                    <p className="mt-1 text-[11px] font-bold tracking-[0.14em] text-smoke uppercase">
+                    <p className="mt-1.5 text-[11px] font-bold tracking-[0.14em] text-smoke uppercase">
                       {course.priceInPaise === 0 ? "free · enrol instantly" : "one time · INR"}
                     </p>
                   </div>
-                  <ShieldCheck className="size-8 text-moss" aria-hidden="true" />
+                  <span className="grid size-10 place-items-center rounded-2xl border-2 border-ink bg-lime/40">
+                    <ShieldCheck className="size-5 text-moss" aria-hidden="true" />
+                  </span>
                 </div>
+
                 {purchased ? (
-                  <Button href="/learn/courses" variant="lime" size="lg" className="mt-4 w-full">
+                  <Button href="/learn/courses" variant="lime" size="lg" className="mt-5 w-full">
                     <GraduationCap className="size-5" aria-hidden="true" />
                     In your library — start learning
                   </Button>
@@ -171,90 +366,171 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                   <Button
                     variant="accent"
                     size="lg"
-                    className="mt-4 w-full"
+                    className="mt-5 w-full"
                     onClick={() => setCheckoutOpen(true)}
                   >
                     <BadgeIndianRupee className="size-5" aria-hidden="true" />
-                    {course.priceInPaise === 0 ? "Enrol free" : "Enrol now"}
+                    {course.priceInPaise === 0 ? "Enroll free" : "Enroll now"}
                   </Button>
                 )}
-                <ul className="mt-4 space-y-2">
-                  {INCLUDED.map((item) => (
-                    <li key={item.label} className="flex items-center gap-2.5 text-xs text-smoke">
-                      <item.icon className="size-4 shrink-0 text-ink" aria-hidden="true" />
-                      {item.label}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-4 rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
+
+                {/* Small low-brightness "Secure checkout" label + 4 grey payment logos in a horizontal line */}
+                <SecureCheckoutLogos />
+
+                <div className="mt-5 border-t-2 border-dashed border-ink/15 pt-4">
+                  <p className="text-[11px] font-bold tracking-[0.14em] text-smoke uppercase">
+                    This course includes
+                  </p>
+                  <ul className="mt-3 space-y-2.5">
+                    {INCLUDED.map((item) => (
+                      <li
+                        key={item.label}
+                        className="flex items-center gap-2.5 text-xs font-medium text-smoke"
+                      >
+                        <span className="grid size-6 shrink-0 place-items-center rounded-lg border border-ink/20 bg-cream">
+                          <item.icon className="size-3.5 text-ink" aria-hidden="true" />
+                        </span>
+                        {item.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <p className="mt-5 rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
                   Course purchases are non-refundable except where required by applicable law.{" "}
-                  <Link href="/refund-policy" className="font-semibold text-accent underline underline-offset-2">
+                  <Link
+                    href="/refund-policy"
+                    className="font-semibold text-accent underline underline-offset-2"
+                  >
                     Read the purchase policy
                   </Link>
                   .
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </aside>
 
-      {/* Body */}
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-        <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
-          <div className="space-y-8">
+          {/* Body Left — Outcomes, Free Preview, Curriculum & Purchase Terms */}
+          <div className="relative z-10 space-y-8 py-10 sm:py-12 lg:col-start-1 lg:row-start-2 lg:py-12">
             {course.outcomes.length > 0 ? (
               <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
-                <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                  What you’ll walk away with
-                </h2>
-                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
+                    What you’ll walk away with
+                  </h2>
+                  <span className="text-xs font-semibold text-smoke">
+                    {course.outcomes.length} key {course.outcomes.length === 1 ? "outcome" : "outcomes"}
+                  </span>
+                </div>
+                <ul className="mt-5 grid gap-3 sm:grid-cols-2">
                   {course.outcomes.map((outcome, index) => (
-                    <li key={index} className="flex items-start gap-2.5 text-sm text-ink">
+                    <li
+                      key={index}
+                      className="flex items-start gap-3 rounded-2xl border-2 border-ink/10 bg-cream/60 p-3.5 text-sm font-medium text-ink"
+                    >
                       <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink bg-lime">
                         <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
                       </span>
-                      {outcome}
+                      <span className="leading-snug">{outcome}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             ) : null}
 
-            {/* Curriculum */}
-            <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">Curriculum</h2>
-                <p className="text-xs font-semibold text-smoke">
-                  {course.sections.length} sections · {course.videoCount} videos · {course.resourceCount} files
-                  {previewCount > 0
-                    ? ` · ${previewCount} free preview${previewCount === 1 ? "" : "s"}`
-                    : ""}
+            {freePreviewLesson ? (
+              <div className="rounded-3xl border-2 border-ink bg-ink p-6 text-cream shadow-hard-xs sm:p-7">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
+                      Free preview lesson
+                    </p>
+                    <h3 className="mt-1.5 text-lg font-bold leading-snug sm:text-xl">
+                      {freePreviewLesson.title}
+                    </h3>
+                    <p className="mt-1 text-xs leading-relaxed text-cream/75">
+                      {freePreviewLesson.description || "Watch a full lesson before you decide."}
+                      {freePreviewLesson.durationLabel ? ` · ${freePreviewLesson.durationLabel}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewLesson(freePreviewLesson)}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border-2 border-lime bg-lime px-4 py-2 text-xs font-bold text-ink transition-transform hover:-translate-y-0.5"
+                  >
+                    <Play className="size-3.5 fill-current" aria-hidden="true" />
+                    Watch now — no payment
+                  </button>
+                </div>
+                <p className="mt-3.5 flex items-center gap-2 border-t border-cream/15 pt-3 text-[11px] text-cream/55">
+                  <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
+                  Preview playback is checked server-side; the rest of the course stays locked.
                 </p>
               </div>
+            ) : null}
+
+            {/* Curriculum */}
+            <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
+                    Curriculum
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-smoke">
+                    {course.sections.length} {course.sections.length === 1 ? "section" : "sections"} ·{" "}
+                    {course.videoCount} {course.videoCount === 1 ? "video" : "videos"} ·{" "}
+                    {course.resourceCount} {course.resourceCount === 1 ? "file" : "files"}
+                    {previewCount > 0
+                      ? ` · ${previewCount} free preview${previewCount === 1 ? "" : "s"}`
+                      : ""}
+                  </p>
+                </div>
+                {course.sections.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={toggleAllSections}
+                    className="rounded-full border-2 border-ink bg-cream px-3 py-1 text-xs font-bold text-ink transition-colors hover:bg-lime"
+                  >
+                    {allSectionsOpen ? "Collapse all" : "Expand all"}
+                  </button>
+                ) : null}
+              </div>
+
               <ol className="mt-5 space-y-3">
                 {course.sections.map((section, sectionIndex) => {
-                  const expanded = expandedSection === section.id;
+                  const expanded = openSections.has(section.id);
                   return (
-                    <li key={section.id} className="overflow-hidden rounded-2xl border-2 border-ink/15 bg-cream">
+                    <li
+                      key={section.id}
+                      className="overflow-hidden rounded-2xl border-2 border-ink/15 bg-cream"
+                    >
                       <button
                         type="button"
-                        onClick={() => setExpandedSection(expanded ? null : section.id)}
+                        onClick={() => toggleSection(section.id)}
                         aria-expanded={expanded}
-                        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-parchment/60"
                       >
                         <span className="font-editorial text-lg text-accent italic">
                           {String(sectionIndex + 1).padStart(2, "0")}
                         </span>
-                        <span className="flex-1 text-sm font-bold text-ink sm:text-base">{section.title}</span>
-                        <span className="text-xs text-smoke">
+                        <span className="flex-1 text-sm font-bold text-ink sm:text-base">
+                          {section.title}
+                        </span>
+                        <span className="text-xs font-medium text-smoke">
                           {section.lessons.length} lesson{section.lessons.length === 1 ? "" : "s"}
                         </span>
+                        <ChevronDown
+                          className={cn(
+                            "size-4 shrink-0 text-smoke transition-transform duration-200",
+                            expanded && "rotate-180 text-ink",
+                          )}
+                          aria-hidden="true"
+                        />
                       </button>
                       {expanded ? (
-                        <ul className="divide-y divide-ink/10 border-t border-ink/10">
+                        <ul className="divide-y divide-ink/10 border-t border-ink/10 bg-white">
                           {section.lessons.map((lesson) => (
-                            <li key={lesson.id} className="flex items-start gap-3 px-4 py-3">
+                            <li key={lesson.id} className="flex items-start gap-3 px-4 py-3.5">
                               {lesson.isPreview ? (
                                 <button
                                   type="button"
@@ -266,7 +542,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                   <Play className="size-3.5 fill-current" aria-hidden="true" />
                                 </button>
                               ) : (
-                                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-white">
+                                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-cream">
                                   {lesson.type === "video" ? (
                                     <Play className="size-3.5" aria-hidden="true" />
                                   ) : (
@@ -282,15 +558,22 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                       Free preview
                                     </span>
                                   ) : (
-                                    <Lock className="size-3 text-smoke" aria-label="Locked until enrolled" />
+                                    <Lock
+                                      className="size-3 text-smoke"
+                                      aria-label="Locked until enrolled"
+                                    />
                                   )}
                                 </p>
                                 {lesson.description ? (
-                                  <p className="mt-0.5 text-xs leading-relaxed text-smoke">{lesson.description}</p>
+                                  <p className="mt-0.5 text-xs leading-relaxed text-smoke">
+                                    {lesson.description}
+                                  </p>
                                 ) : null}
                                 <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-smoke">
                                   <span>
-                                    {lesson.type === "video" ? "Video" : `${lesson.resourceCount} downloadable file${lesson.resourceCount === 1 ? "" : "s"}`}
+                                    {lesson.type === "video"
+                                      ? "Video"
+                                      : `${lesson.resourceCount} downloadable file${lesson.resourceCount === 1 ? "" : "s"}`}
                                   </span>
                                   {lesson.type === "video" ? (
                                     <span className="inline-flex items-center gap-1">
@@ -318,62 +601,42 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                 })}
               </ol>
             </div>
-          </div>
 
-          {/* Sidebar */}
-          <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-            {freePreviewLesson ? (
-              <div className="rounded-3xl border-2 border-ink bg-ink p-5 text-cream shadow-hard-xs">
-                <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">Free preview</p>
-                <h3 className="mt-2 text-lg font-bold leading-snug">{freePreviewLesson.title}</h3>
-                <p className="mt-1.5 text-xs leading-relaxed text-cream/70">
-                  {freePreviewLesson.description || "Watch a full lesson before you decide."}
-                  {freePreviewLesson.durationLabel ? ` · ${freePreviewLesson.durationLabel}` : ""}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPreviewLesson(freePreviewLesson)}
-                  className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-lime bg-lime px-3 py-1.5 text-xs font-bold text-ink transition-transform hover:-translate-y-0.5"
+            {/* Purchase Terms */}
+            <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <div>
+                  <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">
+                    Purchase terms
+                  </h3>
+                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-smoke">
+                    <li>
+                      {course.priceInPaise === 0
+                        ? "· Free enrolment — no payment details needed."
+                        : "· One-time payment in INR via UPI, cards, net-banking, or wallets."}
+                    </li>
+                    <li>· Access through your learner dashboard while the course is published.</li>
+                    <li>· Course purchases are non-refundable except where required by applicable law.</li>
+                    <li>· Your receipt and dashboard login are emailed right after checkout.</li>
+                  </ul>
+                </div>
+                <Button
+                  variant="accent"
+                  className="shrink-0 sm:self-end"
+                  onClick={() => setCheckoutOpen(true)}
+                  disabled={purchased}
                 >
-                  <Play className="size-3.5 fill-current" aria-hidden="true" />
-                  Watch now — no payment
-                </button>
-                <p className="mt-3 flex items-center gap-2 text-[11px] text-cream/50">
-                  <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
-                  Preview playback is checked server-side; the rest of the course stays locked.
-                </p>
+                  {purchased
+                    ? "Already in your library"
+                    : course.priceInPaise === 0
+                      ? "Enroll free"
+                      : `Enroll for ${formatINR(course.priceInPaise)}`}
+                </Button>
               </div>
-            ) : null}
-
-            <div className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
-              <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">Purchase terms</h3>
-              <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-smoke">
-                <li>
-                  {course.priceInPaise === 0
-                    ? "· Free enrolment — no payment details needed."
-                    : "· One-time payment in INR via UPI, cards, net-banking, or wallets."}
-                </li>
-                <li>· Access through your learner dashboard while the course is published.</li>
-                <li>· Course purchases are non-refundable except where required by applicable law.</li>
-                <li>· Your receipt and dashboard login are emailed right after checkout.</li>
-              </ul>
-              <Button
-                variant="accent"
-                className="mt-4 w-full"
-                onClick={() => setCheckoutOpen(true)}
-                disabled={purchased}
-              >
-                {purchased
-                  ? "Already in your library"
-                  : course.priceInPaise === 0
-                    ? "Enrol free"
-                    : `Enrol for ${formatINR(course.priceInPaise)}`}
-              </Button>
             </div>
-          </aside>
+          </div>
         </div>
-
-      </section>
+      </div>
 
       <PoweredByBanner />
 
@@ -392,7 +655,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
             </Button>
           ) : (
             <Button variant="accent" size="sm" onClick={() => setCheckoutOpen(true)}>
-              {course.priceInPaise === 0 ? "Enrol free" : "Enrol now"}
+              {course.priceInPaise === 0 ? "Enroll free" : "Enroll now"}
             </Button>
           )}
         </div>
