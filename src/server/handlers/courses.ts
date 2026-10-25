@@ -13,7 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { route } from "@/server/router";
-import { fail, ok, parseBody, requireUser, requireVerifiedUser } from "@/server/http";
+import { fail, ok, parseBody, requireCreatorUser, requireVerifiedCreatorUser } from "@/server/http";
 import { newId } from "@/server/auth";
 import {
   abortMultipartUpload,
@@ -155,7 +155,7 @@ async function editorFor(courseId: string): Promise<CourseEditor | null> {
 }
 
 route("POST", "courses", async (_req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const id = newId("course");
   await db.insert(courses).values({ id, creatorId: user.id });
@@ -164,7 +164,7 @@ route("POST", "courses", async (_req, ctx) => {
 });
 
 route("GET", "courses", async (_req, ctx) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   const rows = await db.query.courses.findMany({
     where: eq(courses.creatorId, user.id),
@@ -244,7 +244,7 @@ route("GET", "courses", async (_req, ctx) => {
 });
 
 route("GET", "courses/:id", async (_req, ctx, params) => {
-  const user = requireUser(ctx);
+  const user = requireCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) {
     return fail(
@@ -265,7 +265,7 @@ const detailsSchema = z.object({
 });
 
 route("PATCH", "courses/:id", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
@@ -328,7 +328,7 @@ route("PATCH", "courses/:id", async (req, ctx, params) => {
 });
 
 route("POST", "courses/:id/status", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Course not found.", 404);
@@ -412,7 +412,7 @@ route("POST", "courses/:id/status", async (req, ctx, params) => {
  * Objects in R2 for the course's media are cleaned up best-effort afterwards.
  */
 route("DELETE", "courses/:id", async (_req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) {
@@ -467,7 +467,7 @@ const sectionSchema = z.object({
 });
 
 route("POST", "courses/:id/sections", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
@@ -486,7 +486,7 @@ route("POST", "courses/:id/sections", async (req, ctx, params) => {
 });
 
 route("PATCH", "courses/:id/sections/:sectionId", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
@@ -504,7 +504,7 @@ route("PATCH", "courses/:id/sections/:sectionId", async (req, ctx, params) => {
 });
 
 route("DELETE", "courses/:id/sections/:sectionId", async (_req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
   const section = await db.query.sections.findFirst({
@@ -526,7 +526,7 @@ route("DELETE", "courses/:id/sections/:sectionId", async (_req, ctx, params) => 
 });
 
 route("PUT", "courses/:id/sections/reorder", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
   const parsed = parseBody(
@@ -585,7 +585,7 @@ async function assertMediaUsable(
 }
 
 route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
@@ -635,7 +635,7 @@ route("POST", "courses/:id/sections/:sectionId/lessons", async (req, ctx, params
 });
 
 route("PATCH", "courses/:id/sections/:sectionId/lessons/:lessonId", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const course = await ownCourse(params.id, user.id);
   if (!course) return fail("not_found", "Draft not found — reload the editor.", 404);
@@ -700,7 +700,7 @@ route("PATCH", "courses/:id/sections/:sectionId/lessons/:lessonId", async (req, 
 });
 
 route("DELETE", "courses/:id/sections/:sectionId/lessons/:lessonId", async (_req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
   const [target] = await db
@@ -730,7 +730,7 @@ route("DELETE", "courses/:id/sections/:sectionId/lessons/:lessonId", async (_req
 });
 
 route("PUT", "courses/:id/sections/:sectionId/lessons/reorder", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!(await ownCourse(params.id, user.id))) return fail("not_found", "Draft not found.", 404);
   const parsed = parseBody(
@@ -761,7 +761,7 @@ const uploadSessionSchema = z.object({
 });
 
 route("POST", "uploads/session", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const parsed = parseBody(uploadSessionSchema, await req.json().catch(() => ({})));
   if ("response" in parsed) return parsed.response;
@@ -864,7 +864,7 @@ route("POST", "uploads/session", async (req, ctx) => {
 const MAX_RELAY_BYTES = 20 * 1024 * 1024;
 
 route("PUT", "uploads/put/:assetId", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!R2.configured && !LOCAL_UPLOADS_ENABLED) {
     return fail(
@@ -941,7 +941,7 @@ function multipartUnavailable() {
 }
 
 route("POST", "uploads/multipart/start", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!R2.configured) return multipartUnavailable();
   const parsed = parseBody(multipartAssetSchema, await req.json().catch(() => ({})));
@@ -956,7 +956,7 @@ route("POST", "uploads/multipart/start", async (req, ctx) => {
 });
 
 route("POST", "uploads/multipart/sign-part", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!R2.configured) return multipartUnavailable();
   const parsed = parseBody(
@@ -982,7 +982,7 @@ route("POST", "uploads/multipart/sign-part", async (req, ctx) => {
 });
 
 route("POST", "uploads/multipart/complete", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!R2.configured) return multipartUnavailable();
   const parsed = parseBody(
@@ -1022,7 +1022,7 @@ route("POST", "uploads/multipart/complete", async (req, ctx) => {
 });
 
 route("POST", "uploads/multipart/abort", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   if (!R2.configured) return multipartUnavailable();
   const parsed = parseBody(multipartUploadSchema, await req.json().catch(() => ({})));
@@ -1039,7 +1039,7 @@ route("POST", "uploads/multipart/abort", async (req, ctx) => {
 
 /** Delete an uploaded but no-longer-wanted asset and its stored bytes. */
 route("DELETE", "uploads/:assetId", async (_req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const asset = await db.query.mediaAssets.findFirst({
     where: and(eq(mediaAssets.id, params.assetId), eq(mediaAssets.uploaderId, user.id)),
@@ -1064,7 +1064,7 @@ route("DELETE", "uploads/:assetId", async (_req, ctx, params) => {
  * never be used to touch another creator's asset or a non-video file.
  */
 route("PATCH", "uploads/:assetId", async (req, ctx, params) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const parsed = parseBody(
     z.object({
@@ -1092,7 +1092,7 @@ route("PATCH", "uploads/:assetId", async (req, ctx, params) => {
 });
 
 route("POST", "uploads/complete", async (req, ctx) => {
-  const user = requireVerifiedUser(ctx);
+  const user = requireVerifiedCreatorUser(ctx);
   if (user instanceof Response) return user;
   const parsed = parseBody(
     z.object({

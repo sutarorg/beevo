@@ -316,7 +316,7 @@ function CourseRow({
         <div className="relative hidden size-20 shrink-0 overflow-hidden rounded-xl border-2 border-ink bg-parchment sm:block">
           {course.coverPreviewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={course.coverPreviewUrl} alt="" className="h-full w-full object-cover" />
+            <img src={course.coverPreviewUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <div className="grid h-full place-items-center">
               <Clapperboard className="size-6 text-smoke" aria-hidden="true" />

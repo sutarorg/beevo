@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/db";
-import { adminRoles, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { getSessionUser, type SessionUser } from "@/server/auth";
+import { users } from "@/db/schema";
+import { getSessionContext, type SessionUser } from "@/server/auth";
 
 /**
  * One consistent API shape: ApiResult<T> — { ok: true, data } |
@@ -11,8 +9,14 @@ import { getSessionUser, type SessionUser } from "@/server/auth";
  * frontend contracts from Prompts 1-4, so no UI rework is needed.
  */
 
-export function ok<T>(data: T, init?: { status?: number }): NextResponse {
-  return NextResponse.json({ ok: true, data }, { status: init?.status ?? 200 });
+export function ok<T>(
+  data: T,
+  init?: { status?: number; headers?: Record<string, string> },
+): NextResponse {
+  return NextResponse.json(
+    { ok: true, data },
+    { status: init?.status ?? 200, headers: init?.headers },
+  );
 }
 
 export function fail(
@@ -21,7 +25,10 @@ export function fail(
   status = 400,
   fieldErrors?: Record<string, string[]>,
 ): NextResponse {
-  return NextResponse.json({ ok: false, error: { code, message, fieldErrors } }, { status });
+  return NextResponse.json(
+    { ok: false, error: { code, message, fieldErrors } },
+    { status, headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export interface Ctx {
@@ -29,13 +36,11 @@ export interface Ctx {
   isAdmin: boolean;
 }
 
+/** One indexed session query per request (user + admin flag joined). */
 export async function buildCtx(): Promise<Ctx> {
-  const user = await getSessionUser();
-  if (!user) return { user: null, isAdmin: false };
-  const admin = await db.query.adminRoles.findFirst({
-    where: eq(adminRoles.userId, user.id),
-  });
-  return { user, isAdmin: Boolean(admin) && !user.suspendedAt };
+  const context = await getSessionContext();
+  if (!context) return { user: null, isAdmin: false };
+  return context;
 }
 
 export function requireUser(ctx: Ctx): SessionUser | NextResponse {
@@ -48,6 +53,37 @@ export function requireUser(ctx: Ctx): SessionUser | NextResponse {
 
 export function requireVerifiedUser(ctx: Ctx): SessionUser | NextResponse {
   const user = requireUser(ctx);
+  if (user instanceof NextResponse) return user;
+  if (!user.emailVerifiedAt) {
+    return fail("email_not_verified", "Verify your email before continuing.", 403);
+  }
+  return user;
+}
+
+/** True when this email holds a creator account (creator terms accepted). */
+export function isCreatorAccount(user: Pick<SessionUser, "creatorTermsAcceptedAt">): boolean {
+  return Boolean(user.creatorTermsAcceptedAt);
+}
+
+const CREATOR_NOT_ENABLED_MESSAGE =
+  "Creator isn't enabled for this account yet. Open your learner dashboard and choose “Start teaching” to agree to the creator terms.";
+
+/**
+ * Creator-studio guard. A learner-only account must first accept the creator
+ * terms via POST auth/start-teaching — merely being signed in (or holding an
+ * old auto-assigned handle) never silently creates a creator account.
+ */
+export function requireCreatorUser(ctx: Ctx): SessionUser | NextResponse {
+  const user = requireUser(ctx);
+  if (user instanceof NextResponse) return user;
+  if (!isCreatorAccount(user)) {
+    return fail("creator_not_enabled", CREATOR_NOT_ENABLED_MESSAGE, 403);
+  }
+  return user;
+}
+
+export function requireVerifiedCreatorUser(ctx: Ctx): SessionUser | NextResponse {
+  const user = requireCreatorUser(ctx);
   if (user instanceof NextResponse) return user;
   if (!user.emailVerifiedAt) {
     return fail("email_not_verified", "Verify your email before continuing.", 403);

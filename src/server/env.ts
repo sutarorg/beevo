@@ -65,7 +65,12 @@ export function resolveRequestBaseUrl(req: Request): string {
 }
 
 export const SESSION_COOKIE = "ck_session";
-export const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+/**
+ * Stay-signed-in window. The cookie is persistent (survives tab and browser
+ * restarts) and the session is renewed on use, so an active user is not
+ * signed out just for leaving a tab open or coming back days later.
+ */
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const AUTH_SECRET =
   cleanEnv(process.env.AUTH_SECRET) || "dev-only-secret-change-me-in-production";

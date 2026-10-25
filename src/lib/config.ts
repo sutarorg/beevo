@@ -68,8 +68,9 @@ export const SUPPORT_EMAIL = "support@beevo.in";
 export const USE_MOCK_SERVICES = false as const;
 
 /**
- * Post-auth destination. The creator dashboard ships in a later phase;
- * until then the mock auth success panel explains this instead of faking a
- * dashboard route.
+ * Fallback post-auth destination. The real destination is session-aware
+ * (see dashboardPathFor in lib/services/auth.ts): learner-only emails land
+ * in My learning, creators in the studio, dual accounts in their last-used
+ * mode. This constant remains only for anonymous/legacy fallbacks.
  */
 export const POST_AUTH_PATH = "/creator/dashboard";

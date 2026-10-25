@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "@/db";
-import { authTokens, sessions, users } from "@/db/schema";
+import { adminRoles, authTokens, sessions, users } from "@/db/schema";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { AUTH_SECRET, SESSION_COOKIE, SESSION_TTL_MS } from "@/server/env";
 
@@ -77,29 +77,55 @@ export async function destroyCurrentSession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-/** Validates server-side session on every call; renews near half-life. */
-export async function getSessionUser(): Promise<SessionUser | null> {
+/**
+ * Validates the server-side session in ONE query (user + admin flag via a
+ * left join — this runs on every API request, so it stays a single indexed
+ * round-trip). Renews near half-life.
+ */
+export async function getSessionContext(): Promise<{ user: SessionUser; isAdmin: boolean } | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token || token.length > 256) return null;
   const tokenHash = hmacHash(token);
   const rows = await db
-    .select({ session: sessions, user: users })
+    .select({ session: sessions, user: users, adminUserId: adminRoles.userId })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
+    .leftJoin(adminRoles, eq(adminRoles.userId, users.id))
     .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date())))
     .limit(1);
   const row = rows[0];
   if (!row) return null;
-  // Sliding renewal: extend when past half-life.
+  // Sliding renewal: extend when past half-life, and re-issue the cookie
+  // with a fresh max-age at the same time. Renewing only the database row
+  // used to leave the browser cookie to expire on its original schedule,
+  // signing active users out. Cookie writes are best-effort (render
+  // contexts can't set cookies).
   const halfLife = SESSION_TTL_MS / 2;
   if (row.session.expiresAt.getTime() - Date.now() < halfLife) {
     await db
       .update(sessions)
       .set({ expiresAt: new Date(Date.now() + SESSION_TTL_MS) })
       .where(eq(sessions.tokenHash, tokenHash));
+    try {
+      jar.set(SESSION_COOKIE, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: SESSION_TTL_MS / 1000,
+      });
+    } catch {
+      // Read-only cookie context: the DB renewal above still holds; the
+      // cookie refreshes on the next request that can write headers.
+    }
   }
-  return row.user;
+  return { user: row.user, isAdmin: Boolean(row.adminUserId) && !row.user.suspendedAt };
+}
+
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const context = await getSessionContext();
+  return context?.user ?? null;
 }
 
 export async function issueAuthToken(userId: string, purpose: "verify" | "reset", ttlMs: number): Promise<string> {

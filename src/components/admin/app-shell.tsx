@@ -28,7 +28,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getAdminService } from "@/lib/services/admin";
 import { cn } from "@/lib/utils";
 import { RequireSession } from "@/components/auth/gates";
-import { LogoMark } from "@/components/site/chrome";
+import { LogoMark } from "@/components/site/logo";
 import { UnavailablePanel } from "@/components/states";
 
 type AdminNavItem = { href: string; label: string; icon: LucideIcon };

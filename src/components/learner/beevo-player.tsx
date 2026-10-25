@@ -7,7 +7,6 @@ import {
   Pause,
   Play,
   RotateCcw,
-  ShieldCheck,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -307,16 +306,8 @@ export function BeevoPlayer({
           <span className="beevo-watermark beevo-watermark-c">{watermark}</span>
         </div>
 
-        {/* Top chrome */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-ink/75 to-transparent p-3">
-          <span className="rounded-full border border-cream/30 bg-ink/70 px-2.5 py-1 text-[9px] font-bold tracking-[0.18em] text-cream/80 uppercase">
-            Beevo player
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-cream/30 bg-ink/70 px-2.5 py-1 text-[9px] font-bold tracking-[0.12em] text-cream/80 uppercase">
-            <ShieldCheck className="size-3 text-lime" aria-hidden="true" />
-            Protected lesson
-          </span>
-        </div>
+        {/* No top chrome: the only overlay above the video is the orange
+            centre play button (plus the watermark and bottom console). */}
 
         {/* Centre play / pause */}
         {!error ? (
@@ -325,7 +316,7 @@ export function BeevoPlayer({
             onClick={toggle}
             aria-label={playing ? "Pause lesson" : "Play lesson"}
             className={cn(
-              "absolute top-1/2 left-1/2 grid size-18 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-cream bg-accent text-cream shadow-hard-lime transition-transform hover:scale-105 active:scale-95",
+              "absolute top-1/2 left-1/2 grid size-18 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-cream bg-accent text-cream transition-transform hover:scale-105 active:scale-95",
               playing && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
             )}
           >

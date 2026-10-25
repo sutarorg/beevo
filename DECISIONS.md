@@ -183,3 +183,33 @@ Chronological, opinionated record. New phases append — never rewrite history.
   reason (missing keys, key/secret mix-up, live mode not enabled) with a retry,
   instead of only a transient "Couldn't start checkout" toast. `already_enrolled`
   now becomes a "you already own this course" panel linking to the library.
+- **One email can hold a learner account, a creator account, or both**
+  (migration `0005_modern_wendell_vaughn.sql`). Two timestamps on `users` are
+  the source of truth: `creator_terms_accepted_at` (set at website signup, or
+  when a learner clicks **Start teaching → I agree** in the learner sidebar,
+  `POST /api/v1/auth/start-teaching`) and `learner_enabled_at` (set at
+  checkout provisioning / first enrolment). The session payload exposes
+  `isCreator`, `isLearner`, and `hasBothAccounts`; the **Learner/Creator
+  toggle renders only when both are true**. Creator APIs enforce this
+  server-side (`requireCreatorUser` / `requireVerifiedCreatorUser`,
+  `creator_not_enabled`) so an old auto-assigned handle never silently makes
+  someone a creator, and login no longer backfills handles for
+  learner-only accounts. Existing rows are backfilled in the migration
+  (course owners / website signups → creator; enrolments → learner).
+- **Stay signed in.** Sessions are persistent 30-day cookies with sliding
+  renewal that now also re-issues the cookie `Max-Age` (previously the cookie
+  expired on its original schedule even though the DB session renewed). The
+  marketing header is session-aware: signed-in visitors always see
+  **Dashboard** (routing to the dashboard their account has / last used),
+  including after "Back to website". A non-sensitive local hint
+  (name/email/account kinds only — no token) paints that chrome instantly
+  and is verified/cleared against the server on every mount and tab return.
+- **Performance pass.** The marketing bundle no longer ships framer-motion
+  (header menu, scroll reveals, and toasts are CSS + IntersectionObserver),
+  the logo lives in a dependency-free module, images serve AVIF/WebP with
+  long cache TTLs plus immutable-style headers for `/images/**`, public
+  storefront APIs carry `Cache-Control: public` (browser/CDN reusable),
+  every API request resolves the session in one indexed join (was two
+  sequential queries), route groups have instant `loading.tsx` skeletons,
+  and app shells paint from the cached session instead of blocking on a
+  "Checking your session" spinner.

@@ -351,7 +351,7 @@ function getMock(): MockLearnerService {
 // Live adapter — real enrolments, progress, and purchases via /api/v1/learn/*
 // ---------------------------------------------------------------------------
 
-import { fetchSession } from "@/lib/services/auth";
+import { clearLocalSession, fetchSession } from "@/lib/services/auth";
 import { get as apiGet, patch as apiPatch, put as apiPut } from "@/lib/services/api";
 
 class ApiLearnerService implements LearnerService {
@@ -375,6 +375,7 @@ class ApiLearnerService implements LearnerService {
 
   signOut(): void {
     this.sessionCache = { signedIn: false, profile: null };
+    clearLocalSession();
     void fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin" });
   }
 

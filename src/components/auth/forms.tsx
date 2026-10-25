@@ -3,11 +3,12 @@
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
-import { POST_AUTH_PATH } from "@/lib/config";
 import {
   AUTH_UNAVAILABLE_MESSAGE,
+  dashboardPathFor,
   fetchSession,
   getAuthService,
+  type SessionSnapshot,
 } from "@/lib/services/auth";
 import {
   firstError,
@@ -95,6 +96,29 @@ export function LoginForm({
   const [notice] = useState(initialNotice ?? null);
   const [submitting, setSubmitting] = useState(false);
 
+  const destinationFor = (session: SessionSnapshot): string =>
+    next && next.startsWith("/")
+      ? next
+      : session.isAdmin
+        ? "/admin/dashboard"
+        : dashboardPathFor(session);
+
+  // Stay signed in: if a live session already exists (returning tab, shared
+  // login link, "Back to website" round-trip), skip the form entirely.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSession().then((session) => {
+      if (!cancelled && session.user) {
+        window.location.assign(destinationFor(session));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // destinationFor closes over `next`, which is fixed for this mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!service) {
     return (
       <UnavailablePanel
@@ -128,17 +152,12 @@ export function LoginForm({
       return;
     }
     // The real session cookie is set server-side; go straight to the
-    // destination. Platform admins land in the admin console instead of a
-    // creator studio they may not use.
+    // destination. Platform admins land in the admin console; everyone else
+    // lands in the dashboard their account(s) actually have (learner-only
+    // emails go to My learning, dual accounts to their last-used mode).
     const session = await fetchSession();
     toast.push({ variant: "success", title: "Signed in", description: "Welcome back." });
-    window.location.assign(
-      next && next.startsWith("/")
-        ? next
-        : session.isAdmin
-          ? "/admin/dashboard"
-          : POST_AUTH_PATH,
-    );
+    window.location.assign(destinationFor(session));
   }
 
   return (

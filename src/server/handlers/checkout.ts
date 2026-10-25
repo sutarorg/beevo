@@ -110,6 +110,9 @@ async function ensureBuyerAccount(email: string): Promise<{
       passwordHash: hashPassword(randomBytes(32).toString("hex")),
       emailVerifiedAt: new Date(),
       provisionedViaCheckout: true,
+      // Checkout creates the LEARNER account for this email. Creator is a
+      // separate, explicit opt-in ("Start teaching") — never implied here.
+      learnerEnabledAt: new Date(),
     })
     .onConflictDoNothing({ target: users.email })
     .returning();
@@ -381,6 +384,12 @@ route("POST", "checkout", async (req) => {
         .insert(enrollments)
         .values({ id: newId("enr"), userId: buyer.user.id, courseId: course.id })
         .onConflictDoNothing();
+      // First enrolment also opens the learner account for this email
+      // (e.g. a creator buying someone else's course becomes dual-account).
+      await tx
+        .update(users)
+        .set({ learnerEnabledAt: new Date() })
+        .where(and(eq(users.id, buyer.user.id), isNull(users.learnerEnabledAt)));
     });
     const account = await afterFulfilment(orderId);
     return ok(
@@ -543,6 +552,10 @@ async function fulfilPaidOrder(
       .insert(enrollments)
       .values({ id: newId("enr"), userId: order.userId, courseId: order.courseId })
       .onConflictDoNothing();
+    await tx
+      .update(users)
+      .set({ learnerEnabledAt: new Date() })
+      .where(and(eq(users.id, order.userId), isNull(users.learnerEnabledAt)));
 
     // Ledger row: created exactly once (unique on orderId AND paymentId).
     const course = await tx.query.courses.findFirst({ where: eq(courses.id, order.courseId) });

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { sessions, users } from "@/db/schema";
+import { enrollments, sessions, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { route } from "@/server/router";
-import { clientIp, fail, ok, parseBody, rateLimit } from "@/server/http";
+import { clientIp, fail, ok, parseBody, rateLimit, requireUser } from "@/server/http";
 import {
   consumeAuthToken,
   createSession,
@@ -37,13 +37,33 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-function sessionPayload(user: typeof users.$inferSelect) {
+/**
+ * Session payload, including which account kinds this one email holds.
+ * `hasBothAccounts` is what turns the Learner/Creator toggle on in the UI —
+ * with only one kind of account there is nothing to toggle between.
+ */
+async function sessionPayload(user: typeof users.$inferSelect) {
+  const isCreator = Boolean(user.creatorTermsAcceptedAt);
+  let isLearner = Boolean(user.learnerEnabledAt);
+  if (!isLearner) {
+    // Legacy rows: any enrolment means the email already learns here.
+    const enrolment = await db.query.enrollments.findFirst({
+      where: eq(enrollments.userId, user.id),
+      columns: { id: true },
+    });
+    isLearner = Boolean(enrolment);
+  }
   return {
     user: { id: user.id, email: user.email, fullName: user.name },
     accessToken: "session-cookie",
-    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
     isCreatorWithHandle: Boolean(user.handle),
+    handle: user.handle,
+    isCreator,
+    isLearner,
+    hasBothAccounts: isCreator && isLearner,
+    creatorTermsAcceptedAt: user.creatorTermsAcceptedAt?.toISOString() ?? null,
   };
 }
 
@@ -92,6 +112,10 @@ route("POST", "auth/signup", async (req) => {
         email: emailNorm,
         name: fullName.trim(),
         passwordHash: hashPassword(password),
+        // Website signup is creator signup: the auth screens state that
+        // continuing means agreeing to the Terms (which include the creator
+        // terms), so the creator account is enabled from day one.
+        creatorTermsAcceptedAt: new Date(),
       })
       .returning();
     user = created;
@@ -170,8 +194,10 @@ route("POST", "auth/login", async (req) => {
   if (user.suspendedAt) {
     return fail("account_suspended", "This account is suspended. Contact support.", 403);
   }
-  // Legacy accounts created before handles existed get one on next sign-in.
-  if (!user.handle) {
+  // Legacy CREATOR accounts created before handles existed get one on next
+  // sign-in. Learner-only accounts stay handle-less until they explicitly
+  // start teaching — an address must never appear without that agreement.
+  if (!user.handle && user.creatorTermsAcceptedAt) {
     try {
       const handle = await ensureHandleFor(user);
       if (handle) user.handle = handle;
@@ -181,7 +207,7 @@ route("POST", "auth/login", async (req) => {
   }
   const token = await createSession(user.id);
   await setSessionCookie(token);
-  return ok(sessionPayload(user));
+  return ok(await sessionPayload(user));
 });
 
 route("POST", "auth/logout", async () => {
@@ -190,8 +216,61 @@ route("POST", "auth/logout", async () => {
 });
 
 route("GET", "auth/session", async (_req, ctx) => {
-  if (!ctx.user) return ok({ user: null, isAdmin: false });
-  return ok({ ...sessionPayload(ctx.user), isAdmin: ctx.isAdmin });
+  if (!ctx.user) {
+    return ok(
+      { user: null, isAdmin: false, isCreator: false, isLearner: false, hasBothAccounts: false },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  return ok(
+    { ...(await sessionPayload(ctx.user)), isAdmin: ctx.isAdmin },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+});
+
+/**
+ * "Start teaching": turns the signed-in learner account into a dual
+ * learner + creator account for the same email. Requires an explicit
+ * `agreed: true` (the popup's creator terms + "I agree"); records when the
+ * terms were accepted, assigns the storefront handle, and audits it.
+ * Idempotent — agreeing twice keeps the original acceptance time.
+ */
+route("POST", "auth/start-teaching", async (req, ctx) => {
+  const user = requireUser(ctx);
+  if (user instanceof NextResponse) return user;
+  const parsed = parseBody(
+    z.object({
+      agreed: z.literal(true, {
+        message: "Please read the creator terms and tick “I agree” to continue.",
+      }),
+    }),
+    await req.json().catch(() => ({})),
+  );
+  if ("response" in parsed) return parsed.response;
+
+  let me = user;
+  if (!me.creatorTermsAcceptedAt || !me.handle) {
+    const handle = me.handle ?? (await suggestHandle(me.name, me.email));
+    const [updated] = await db
+      .update(users)
+      .set({
+        handle,
+        creatorTermsAcceptedAt: me.creatorTermsAcceptedAt ?? new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, me.id))
+      .returning();
+    if (updated) me = updated;
+    await audit({
+      actorId: me.id,
+      actorLabel: me.name,
+      area: "system",
+      action: "creator_account_enabled",
+      detail: `Learner account enabled Creator via Start teaching (@${handle}).`,
+      kind: "event",
+    });
+  }
+  return ok({ ...(await sessionPayload(me)), isAdmin: ctx.isAdmin });
 });
 
 route("POST", "auth/forgot", async (req) => {

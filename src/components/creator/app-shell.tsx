@@ -21,9 +21,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { getCourseService } from "@/lib/services/courses";
 import { cn } from "@/lib/utils";
+import { AccountModeToggle } from "@/components/account-mode-toggle";
 import { RequireSession } from "@/components/auth/gates";
 import { NotificationBell } from "@/components/creator/notifications";
-import { LogoMark } from "@/components/site/chrome";
+import { LogoMark } from "@/components/site/logo";
 import { UnavailablePanel } from "@/components/states";
 import { Button } from "@/components/ui/button";
 
@@ -93,7 +94,7 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <RequireSession>
+    <RequireSession requireCreator>
     <div className="min-h-dvh bg-cream lg:pl-66">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-66 flex-col border-r-2 border-ink bg-cream lg:flex">
@@ -154,7 +155,7 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile top bar */}
       <div className="fixed inset-x-0 top-0 z-50 border-b-2 border-ink bg-cream lg:hidden">
-        <div className="flex h-14 items-center justify-between px-4">
+        <div className="flex h-14 items-center justify-between gap-2 px-4">
           <Link
             href="/creator/dashboard"
             className="group flex items-center gap-2 text-lg font-bold tracking-tight text-ink"
@@ -163,12 +164,17 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
             Beevo{" "}
             <span className="font-editorial text-xs font-normal text-smoke italic">studio</span>
           </Link>
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            {/* Shows only when this email also has a learner account. */}
+            <AccountModeToggle current="creator" compact />
+            <NotificationBell />
+          </div>
         </div>
       </div>
 
-      {/* Desktop top row (bell only) */}
-      <div className="fixed right-0 left-66 top-0 z-30 hidden h-14 items-center justify-end border-b-2 border-ink/10 bg-cream px-6 lg:flex">
+      {/* Desktop top row: Learner/Creator toggle (dual accounts only) + bell */}
+      <div className="fixed right-0 left-66 top-0 z-30 hidden h-14 items-center justify-between border-b-2 border-ink/10 bg-cream px-6 lg:flex">
+        <AccountModeToggle current="creator" />
         <NotificationBell />
       </div>
 
