@@ -26,12 +26,6 @@ const SEED_PASSWORD = process.env.SEED_PASSWORD?.trim() || "Beevo1234";
 
 type Db = NodePgDatabase<typeof schema>;
 
-// Minimal valid ftyp+moov MP4 header stub for local dev seed assets.
-const DEV_MP4_STUB = Buffer.from(
-  "00000018667479706d703432000000006d70343269736f6d000000086d646174",
-  "hex",
-);
-
 async function seedCover(
   db: Db,
   input: { id: string; courseId: string; uploaderId: string; fileName: string; source: string },
@@ -62,39 +56,6 @@ async function seedCover(
     console.error("[db] cover seed skipped:", (error as Error).message);
     return null;
   }
-}
-
-async function seedVideo(
-  db: Db,
-  input: {
-    id: string;
-    courseId: string;
-    uploaderId: string;
-    fileName: string;
-    durationLabel: string;
-  },
-): Promise<string | null> {
-  if (!LOCAL_UPLOADS_ENABLED) return null;
-  const storageKey = `courses/${input.courseId}/video/${input.id}/${input.fileName}`;
-  await writeLocalObject(storageKey, DEV_MP4_STUB);
-  await db
-    .insert(schema.mediaAssets)
-    .values({
-      id: input.id,
-      uploaderId: input.uploaderId,
-      courseId: input.courseId,
-      kind: "video",
-      fileName: input.fileName,
-      mimeType: "video/mp4",
-      declaredSizeBytes: DEV_MP4_STUB.byteLength,
-      verifiedSizeBytes: DEV_MP4_STUB.byteLength,
-      durationLabel: input.durationLabel,
-      storageKey,
-      status: "verified",
-      verifiedAt: new Date(),
-    })
-    .onConflictDoNothing();
-  return input.id;
 }
 
 async function seedResource(
@@ -218,77 +179,31 @@ export async function seedDevelopmentDatabase(db: Db): Promise<void> {
       await db.update(schema.courses).set({ coverAssetId: coverId }).where(eq(schema.courses.id, course.id));
     }
 
-    const section1Id = `${course.id}_sec_1`;
-    const section2Id = `${course.id}_sec_2`;
-    await db.insert(schema.sections).values([
-      {
-        id: section1Id,
-        courseId: course.id,
-        title: "Getting started",
-        position: 0,
-      },
-      {
-        id: section2Id,
-        courseId: course.id,
-        title: "Light & exposure",
-        position: 1,
-      },
-    ]);
-
-    const lesson1Id = `${course.id}_les_1`;
-    const lesson2Id = `${course.id}_les_2`;
-    const lesson4Id = `${course.id}_les_4`;
-
+    const sectionId = `${course.id}_sec_1`;
+    await db.insert(schema.sections).values({
+      id: sectionId,
+      courseId: course.id,
+      title: "Getting started",
+      position: 0,
+    });
     await db.insert(schema.lessons).values([
       {
-        id: lesson1Id,
-        sectionId: section1Id,
+        id: `${course.id}_les_1`,
+        sectionId,
         type: "video",
         title: "Welcome & how this course works",
         description: "What you need, what you'll shoot, and how to get the most from each lesson.",
-        isPreview: true,
         position: 0,
       },
       {
-        id: lesson2Id,
-        sectionId: section1Id,
+        id: `${course.id}_les_2`,
+        sectionId,
         type: "video",
         title: "The one setting that changes everything",
         description: "A practical walkthrough of exposure, with exercises you can shoot today.",
-        isPreview: true,
         position: 1,
       },
-      {
-        id: lesson4Id,
-        sectionId: section2Id,
-        type: "video",
-        title: "Metering shadows in natural light",
-        description: "Sunny 16, incident vs reflective metering, and when to trust your eyes.",
-        isPreview: false,
-        position: 0,
-      },
     ]);
-
-    const videoLessons = [
-      { lessonId: lesson1Id, assetId: `${course.id}_asset_vid_1`, fileName: "welcome.mp4", durationLabel: "4:12" },
-      { lessonId: lesson2Id, assetId: `${course.id}_asset_vid_2`, fileName: "exposure-setting.mp4", durationLabel: "8:35" },
-      { lessonId: lesson4Id, assetId: `${course.id}_asset_vid_4`, fileName: "metering-shadows.mp4", durationLabel: "11:40" },
-    ];
-    for (const vid of videoLessons) {
-      const seededVideoId = await seedVideo(db, {
-        id: vid.assetId,
-        courseId: course.id,
-        uploaderId: creatorId,
-        fileName: vid.fileName,
-        durationLabel: vid.durationLabel,
-      });
-      if (seededVideoId) {
-        await db
-          .insert(schema.lessonMedia)
-          .values({ lessonId: vid.lessonId, assetId: seededVideoId, position: 0 })
-          .onConflictDoNothing();
-      }
-    }
 
     if (course.priceInPaise > 0) {
       const resourceId = `${course.id}_asset_guide`;
@@ -303,7 +218,7 @@ export async function seedDevelopmentDatabase(db: Db): Promise<void> {
         const resourceLessonId = `${course.id}_les_3`;
         await db.insert(schema.lessons).values({
           id: resourceLessonId,
-          sectionId: section1Id,
+          sectionId,
           type: "resources",
           title: "Film stock guide & worksheets",
           description: "The stock comparison sheet plus the exposure worksheet used in this course.",
