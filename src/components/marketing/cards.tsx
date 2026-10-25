@@ -33,7 +33,7 @@ export function CourseCard({
       </div>
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-bold text-ink sm:text-lg">
+          <h3 className="min-w-0 text-base font-bold text-ink sm:text-lg">
             {course.title}
           </h3>
           <span className="shrink-0 rounded-full border border-ink/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-smoke uppercase">
@@ -69,10 +69,14 @@ export function CreatorShowcaseCard({
   return (
     <article
       className={cn(
-        "relative flex flex-col rounded-3xl border-2 border-ink bg-white p-5 shadow-hard sm:p-6",
+        // w-full + min-w-0: the card must shrink to its grid track, never
+        // size to its widest line of content. The playful tilt starts at
+        // sm — on phones the card spans the full padded width, so rotated
+        // corners + the hard shadow would paint past the screen edge.
+        "relative flex w-full min-w-0 flex-col rounded-3xl border-2 border-ink bg-white p-5 shadow-hard sm:p-6",
+        rotate === 1 ? "sm:rotate-1" : rotate === -1 ? "sm:-rotate-1" : undefined,
         className,
       )}
-      style={{ transform: `rotate(${rotate}deg)` }}
     >
       <div className="flex items-start gap-4">
         <div className="relative size-14 shrink-0 overflow-hidden rounded-full border-2 border-ink">
@@ -88,33 +92,38 @@ export function CreatorShowcaseCard({
           <h3 className="truncate text-lg font-bold text-ink">
             {creator.displayName}
           </h3>
-          <p className="text-sm font-semibold text-accent">@{creator.handle}</p>
+          <p className="truncate text-sm font-semibold text-accent">@{creator.handle}</p>
           <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-smoke">
             {creator.tagline}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 divide-x-2 divide-ink/10 rounded-2xl border-2 border-ink bg-parchment text-center">
-        <div className="py-2.5">
-          <p className="text-base leading-none font-bold text-ink">
+      {/*
+        Uneven columns: counts are short, the niche ("Photography") is the
+        long pole — equal thirds made it paint outside its cell on narrow
+        cards. min-w-0 + truncate keep every value inside its cell.
+      */}
+      <div className="mt-4 grid grid-cols-[0.7fr_1fr_1.35fr] divide-x-2 divide-ink/10 rounded-2xl border-2 border-ink bg-parchment text-center">
+        <div className="min-w-0 px-1 py-2.5">
+          <p className="truncate text-base leading-none font-bold text-ink">
             {creator.stats.courseCount}
           </p>
-          <p className="mt-1 text-[10px] font-bold tracking-wider text-smoke uppercase">
+          <p className="mt-1 truncate text-[10px] font-bold tracking-wider text-smoke uppercase">
             {creator.stats.courseCount === 1 ? "course" : "courses"}
           </p>
         </div>
-        <div className="py-2.5">
-          <p className="text-base leading-none font-bold text-ink">
+        <div className="min-w-0 px-1 py-2.5">
+          <p className="truncate text-base leading-none font-bold text-ink">
             {creator.stats.learnerCount.toLocaleString("en-IN")}
           </p>
-          <p className="mt-1 text-[10px] font-bold tracking-wider text-smoke uppercase">
+          <p className="mt-1 truncate text-[10px] font-bold tracking-wider text-smoke uppercase">
             learners
           </p>
         </div>
-        <div className="py-2.5">
-          <p className="text-base leading-none font-bold text-ink">{creator.niche}</p>
-          <p className="mt-1 text-[10px] font-bold tracking-wider text-smoke uppercase">
+        <div className="min-w-0 px-1 py-2.5">
+          <p className="truncate text-base leading-none font-bold text-ink">{creator.niche}</p>
+          <p className="mt-1 truncate text-[10px] font-bold tracking-wider text-smoke uppercase">
             niche
           </p>
         </div>
@@ -137,7 +146,7 @@ export function CreatorShowcaseCard({
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-ink">{course.title}</p>
-              <p className="text-xs text-smoke">
+              <p className="truncate text-xs text-smoke">
                 {course.lessonCount} lessons · {course.durationLabel}
               </p>
             </div>
@@ -148,7 +157,12 @@ export function CreatorShowcaseCard({
         ))}
       </div>
 
-      <Button href="/signup" variant="outline" size="sm" className="mt-5 w-full">
+      <Button
+        href="/signup"
+        variant="outline"
+        size="sm"
+        className="mt-5 h-auto min-h-9 w-full py-1.5 text-center whitespace-normal"
+      >
         Start a storefront like this
       </Button>
     </article>
@@ -164,7 +178,7 @@ export function StorefrontPhoneMock({ className }: { className?: string }) {
     <div
       aria-hidden="true"
       className={cn(
-        "pointer-events-none w-62 select-none rounded-[2.5rem] border-2 border-ink bg-white p-3 shadow-hard sm:w-72",
+        "pointer-events-none w-full max-w-62 select-none rounded-[2.5rem] border-2 border-ink bg-white p-3 shadow-hard sm:max-w-72",
         className,
       )}
     >

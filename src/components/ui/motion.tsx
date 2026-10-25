@@ -125,7 +125,7 @@ export function Accordion({
             </button>
             <div
               className={cn(
-                "grid transition-all duration-300 ease-out",
+                "grid grid-cols-1 transition-all duration-300 ease-out",
                 open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
               )}
             >

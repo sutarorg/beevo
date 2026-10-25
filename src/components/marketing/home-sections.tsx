@@ -22,13 +22,13 @@ import { SectionHeader, Sticker } from "@/components/ui/primitives";
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden border-b-2 border-ink">
-      <div className="mx-auto grid max-w-7xl gap-12 px-4 pt-14 pb-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-8 lg:pt-24 lg:pb-24">
-        <div>
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 pt-14 pb-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-8 lg:pt-24 lg:pb-24">
+        <div className="min-w-0">
           <Reveal>
             <Sticker color="lime">Free plan · ₹0/month · No marketplace</Sticker>
           </Reveal>
           <Reveal delay={0.08}>
-            <h1 className="mt-7 text-[2.9rem] leading-[0.98] font-bold tracking-tight text-ink sm:text-6xl lg:text-7xl">
+            <h1 className="mt-7 text-[clamp(2.25rem,13vw,2.9rem)] leading-[0.98] font-bold tracking-tight text-ink sm:text-6xl lg:text-7xl">
               Your audience{" "}
               <span className="font-editorial font-normal text-accent italic">
                 is the
@@ -79,7 +79,7 @@ export function HeroSection() {
           </Reveal>
         </div>
 
-        <Reveal delay={0.2} className="relative mx-auto lg:mx-0">
+        <Reveal delay={0.2} className="relative mx-auto min-w-0 lg:mx-0">
           <div className="relative flex justify-center">
             <Sparkle
               aria-hidden="true"
@@ -126,9 +126,9 @@ export function BenefitsSection() {
           lede="You did the hard part — building an audience that trusts you. Beevo turns that trust into a course business without renting it back to you."
         />
       </Reveal>
-      <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:gap-6">
+      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6">
         {BENEFITS.map((benefit, index) => (
-          <Reveal key={benefit.title} delay={index * 0.07}>
+          <Reveal key={benefit.title} delay={index * 0.07} className="min-w-0">
             <div className="group h-full rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-sm transition-transform duration-200 hover:-translate-y-1 sm:p-7">
               <div className="grid size-12 place-items-center rounded-2xl border-2 border-ink bg-lime shadow-hard-xs transition-transform duration-200 group-hover:-rotate-6">
                 <ContentIcon name={benefit.icon} className="size-6" />
@@ -187,9 +187,9 @@ export function NotMarketplaceSection() {
             lede="Marketplaces are wonderful — until the algorithm decides your course competes with 40,000 others for a slot on page nine. Beevo skips the catalogue entirely. Discovery happens on your channels, where it always did."
           />
         </Reveal>
-        <div className="mt-12 grid gap-5 sm:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-3">
           {NO_MARKETPLACE_POINTS.map((point, index) => (
-            <Reveal key={point.label} delay={index * 0.08}>
+            <Reveal key={point.label} delay={index * 0.08} className="min-w-0">
               <div className="h-full rounded-3xl border-2 border-cream/25 bg-cream/5 p-6">
                 <p className="font-editorial text-6xl text-lime italic tabular-nums">
                   {point.value}
@@ -231,9 +231,9 @@ export function HowItWorksSection() {
           lede="No store builder, no plugins, no gatekeeping review queue. If you can post a video, you can sell a course."
         />
       </Reveal>
-      <ol className="relative mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+      <ol className="relative mt-14 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
         {HOW_IT_WORKS_STEPS.map((step, index) => (
-          <li key={step.step} className="relative">
+          <li key={step.step} className="relative min-w-0">
             {/*
               Connector runs from the right edge of this step's icon to the
               left edge of the next one: icon is size-14 (3.5rem), so the line
@@ -265,7 +265,11 @@ export function HowItWorksSection() {
       </ol>
       <Reveal delay={0.2}>
         <div className="mt-12 text-center">
-          <Button href="/how-it-works" variant="outline">
+          <Button
+            href="/how-it-works"
+            variant="outline"
+            className="h-auto min-h-11 py-2 text-center whitespace-normal"
+          >
             The detailed walkthrough
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
@@ -296,9 +300,25 @@ export function ShowcaseSection() {
             lede="A profile with your face, your courses with your prices, your links where your audience already clicks. This is the shape of every Beevo storefront."
           />
         </Reveal>
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
+        {/*
+          grid-cols-1 (minmax(0, 1fr)) is load-bearing: a bare `grid` with
+          columns only at larger breakpoints creates an implicit `auto`
+          track sized to the cards' max-content (~415px), which pushed the
+          cards off the right edge of phone screens. Cards also need real
+          width for their course rows, so 3-up starts at lg; on md the
+          third card spans the row, centred at the same width as the pair.
+        */}
+        <div className="mx-auto mt-12 grid w-full max-w-md grid-cols-1 gap-6 md:max-w-none md:grid-cols-2 lg:grid-cols-3">
           {MOCK_CREATORS.map((creator, index) => (
-            <Reveal key={creator.id} delay={index * 0.08}>
+            <Reveal
+              key={creator.id}
+              delay={index * 0.08}
+              className={cn(
+                "min-w-0",
+                index === 2 &&
+                  "md:col-span-2 md:mx-auto md:w-[calc(50%-0.75rem)] lg:col-span-1 lg:mx-0 lg:w-auto",
+              )}
+            >
               <CreatorShowcaseCard
                 creator={creator}
                 rotate={index === 1 ? 1 : -1}
@@ -346,7 +366,7 @@ export function CreateLearnSection() {
           lede="Creators get a real studio. Buyers get a real classroom. Neither needs a manual."
         />
       </Reveal>
-      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {[
           {
             eyebrow: "You create",
@@ -361,7 +381,7 @@ export function CreateLearnSection() {
             courseId: MOCK_CREATORS[2].courses[0].id,
           },
         ].map((panel, panelIndex) => (
-          <Reveal key={panel.eyebrow} delay={panelIndex * 0.08}>
+          <Reveal key={panel.eyebrow} delay={panelIndex * 0.08} className="min-w-0">
             <div
               className={cn(
                 "flex h-full flex-col rounded-3xl border-2 border-ink p-6 shadow-hard-sm sm:p-8",
@@ -450,8 +470,8 @@ export function PricingPreviewSection() {
   return (
     <section className="border-t-2 border-ink bg-cream">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          <Reveal>
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+          <Reveal className="min-w-0">
             <SectionHeader
               eyebrow="Pricing"
               title={
@@ -485,7 +505,7 @@ export function PricingPreviewSection() {
               </Button>
             </div>
           </Reveal>
-          <Reveal delay={0.1}>
+          <Reveal delay={0.1} className="min-w-0">
             <PlanCard />
           </Reveal>
         </div>

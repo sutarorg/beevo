@@ -120,7 +120,7 @@ export function PlanCard({ className }: { className?: string }) {
 
       <div className="ticket-divider my-6" aria-hidden="true" />
 
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {FREE_PLAN.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2.5 text-sm text-ink">
             <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink bg-lime">
