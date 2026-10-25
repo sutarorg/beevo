@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   ArrowUpRight,
   BadgeIndianRupee,
   Check,
@@ -20,7 +19,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { formatINR, priceLabel } from "@/lib/domain";
+import { priceLabel } from "@/lib/domain";
 import type { PublicCoursePage, PublicLessonMeta } from "@/lib/learner-types";
 import { useAsyncData } from "@/lib/hooks";
 import { getStorefrontService } from "@/lib/services/storefront";
@@ -163,7 +162,7 @@ export function CourseSalesPage({ handle, slug }: { handle: string; slug: string
 
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-12 sm:px-6">
         <Skeleton className="h-64" />
         <CardListSkeleton count={3} />
       </div>
@@ -231,9 +230,12 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           Buy Card (`#course-enrol-card`) spans Rows 1–2 on the Right as a sticky sidebar.
         - On mobile (`< lg`), the Hero header and Buy Card sit inside the parchment top
           section, followed by the Body cards below.
+        - Spacing rhythm is uniform: every gap between cards is 2rem (`gap-8` /
+          `space-y-8` / `lg:gap-x-8`), section edges use the same padding on both
+          sides of the hero border, and every card shares `p-6 sm:p-8` padding.
       */}
       <div className="overflow-x-clip">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_25rem] lg:grid-rows-[auto_1fr] lg:gap-x-10">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-y-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_25rem] lg:grid-rows-[auto_1fr] lg:gap-x-8 lg:gap-y-0">
           {/* Full-bleed Hero background */}
           <div
             aria-hidden="true"
@@ -241,16 +243,16 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           />
 
           {/* Hero Left — Course Identity & Creator */}
-          <header className="relative z-10 pt-8 pb-6 sm:pt-12 lg:col-start-1 lg:row-start-1 lg:py-14">
+          <header className="relative z-10 pt-8 sm:pt-12 lg:col-start-1 lg:row-start-1 lg:py-12">
             <nav
               aria-label="Breadcrumb"
               className="flex flex-wrap items-center gap-2 text-xs font-semibold text-smoke"
             >
+              {/* Back-to-storefront is plain text (@username) — no button background. */}
               <Link
                 href={`/@${course.creator.handle}`}
-                className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-white px-3 py-1 text-[11px] font-bold text-ink shadow-hard-xs transition-transform hover:-translate-y-0.5 hover:text-accent"
+                className="font-bold text-accent underline-offset-2 hover:underline"
               >
-                <ArrowLeft className="size-3" aria-hidden="true" />
                 @{course.creator.handle}
               </Link>
               <span aria-hidden="true" className="text-smoke/60">
@@ -312,10 +314,11 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           {/* Right Column — Sticky Course Enrol Card */}
           <aside
             id="course-enrol-card"
-            className="relative z-10 pb-10 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-start lg:py-12 lg:sticky lg:top-6"
+            className="relative z-10 pb-8 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:self-start lg:py-12 lg:sticky lg:top-6"
           >
             <div className="overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard">
-              <div className="relative aspect-[16/10] border-b-2 border-ink bg-parchment sm:aspect-[4/3]">
+              {/* Course thumbnail is always 16:9, matching the uploaded cover. */}
+              <div className="relative aspect-video border-b-2 border-ink bg-parchment">
                 {course.coverPreviewUrl ? (
                   <Image
                     src={course.coverPreviewUrl}
@@ -411,7 +414,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           </aside>
 
           {/* Body Left — Outcomes, Free Preview, Curriculum & Purchase Terms */}
-          <div className="relative z-10 space-y-8 py-10 sm:py-12 lg:col-start-1 lg:row-start-2 lg:py-12">
+          <div className="relative z-10 space-y-8 pb-8 lg:col-start-1 lg:row-start-2 lg:py-12">
             {course.outcomes.length > 0 ? (
               <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -422,16 +425,19 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     {course.outcomes.length} key {course.outcomes.length === 1 ? "outcome" : "outcomes"}
                   </span>
                 </div>
-                <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+                {/* Each outcome stretches the full width of the card (single
+                    column), so a sentence has room to sit on one line instead
+                    of being squeezed into a half-width cell and wrapping. */}
+                <ul className="mt-5 grid gap-3">
                   {course.outcomes.map((outcome, index) => (
                     <li
                       key={index}
-                      className="flex items-start gap-3 rounded-2xl border-2 border-ink/10 bg-cream/60 p-3.5 text-sm font-medium text-ink"
+                      className="flex w-full items-start gap-3 rounded-2xl border-2 border-ink/10 bg-cream/60 p-3.5 text-sm font-medium text-ink"
                     >
                       <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink bg-lime">
                         <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
                       </span>
-                      <span className="leading-snug">{outcome}</span>
+                      <span className="flex-1 leading-snug">{outcome}</span>
                     </li>
                   ))}
                 </ul>
@@ -439,7 +445,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
             ) : null}
 
             {freePreviewLesson ? (
-              <div className="rounded-3xl border-2 border-ink bg-ink p-6 text-cream shadow-hard-xs sm:p-7">
+              <div className="rounded-3xl border-2 border-ink bg-ink p-6 text-cream shadow-hard-xs sm:p-8">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                   <div className="min-w-0">
                     <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
@@ -459,7 +465,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border-2 border-lime bg-lime px-4 py-2 text-xs font-bold text-ink transition-transform hover:-translate-y-0.5"
                   >
                     <Play className="size-3.5 fill-current" aria-hidden="true" />
-                    Watch now — no payment
+                    Watch now
                   </button>
                 </div>
                 <p className="mt-3.5 flex items-center gap-2 border-t border-cream/15 pt-3 text-[11px] text-cream/55">
@@ -553,11 +559,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                               <div className="min-w-0 flex-1">
                                 <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
                                   {lesson.title}
-                                  {lesson.isPreview ? (
-                                    <span className="rounded-full border-2 border-ink bg-lime px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase">
-                                      Free preview
-                                    </span>
-                                  ) : (
+                                  {lesson.isPreview ? null : (
                                     <Lock
                                       className="size-3 text-smoke"
                                       aria-label="Locked until enrolled"
@@ -602,37 +604,22 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
               </ol>
             </div>
 
-            {/* Purchase Terms */}
+            {/* Purchase Terms — enrolment happens from the buy card / mobile
+                buy bar, so this card is terms only (no duplicate enrol button). */}
             <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                <div>
-                  <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">
-                    Purchase terms
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-smoke">
-                    <li>
-                      {course.priceInPaise === 0
-                        ? "· Free enrolment — no payment details needed."
-                        : "· One-time payment in INR via UPI, cards, net-banking, or wallets."}
-                    </li>
-                    <li>· Access through your learner dashboard while the course is published.</li>
-                    <li>· Course purchases are non-refundable except where required by applicable law.</li>
-                    <li>· Your receipt and dashboard login are emailed right after checkout.</li>
-                  </ul>
-                </div>
-                <Button
-                  variant="accent"
-                  className="shrink-0 sm:self-end"
-                  onClick={() => setCheckoutOpen(true)}
-                  disabled={purchased}
-                >
-                  {purchased
-                    ? "Already in your library"
-                    : course.priceInPaise === 0
-                      ? "Enroll free"
-                      : `Enroll for ${formatINR(course.priceInPaise)}`}
-                </Button>
-              </div>
+              <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">
+                Purchase terms
+              </h3>
+              <ul className="mt-3 space-y-2 text-xs leading-relaxed text-smoke">
+                <li>
+                  {course.priceInPaise === 0
+                    ? "· Free enrolment — no payment details needed."
+                    : "· One-time payment in INR via UPI, cards, net-banking, or wallets."}
+                </li>
+                <li>· Access through your learner dashboard while the course is published.</li>
+                <li>· Course purchases are non-refundable except where required by applicable law.</li>
+                <li>· Your receipt and dashboard login are emailed right after checkout.</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -640,8 +627,20 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
 
       <PoweredByBanner />
 
+      {/*
+        Spacer matching the fixed mobile buy bar's height (plus safe-area),
+        painted in the footer's ink colour. Without it the page could not
+        scroll far enough — the buy bar permanently covered the bottom of
+        the "This storefront runs on Beevo." footer. With it, the page
+        scrolls to the very end and the whole footer sits clear of the bar.
+      */}
+      <div
+        aria-hidden="true"
+        className="h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-ink lg:hidden"
+      />
+
       {/* Sticky mobile buy bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-cream/95 px-4 py-3 backdrop-blur-sm lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-cream/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-lg font-bold text-ink tabular-nums">{priceLabel(course.priceInPaise)}</p>

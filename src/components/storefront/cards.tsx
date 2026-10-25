@@ -63,7 +63,8 @@ export function StorefrontCourseCard({
       href={`/@${handle}/${course.slug}`}
       className="group flex h-full flex-col overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard-sm transition-transform duration-200 hover:-translate-y-1.5"
     >
-      <div className="relative aspect-[4/3] border-b-2 border-ink bg-parchment">
+      {/* Course thumbnail is always 16:9, matching the uploaded cover. */}
+      <div className="relative aspect-video border-b-2 border-ink bg-parchment">
         {course.coverPreviewUrl ? (
           <Image
             src={course.coverPreviewUrl}
