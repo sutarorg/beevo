@@ -220,7 +220,7 @@ export function Footer() {
   return (
     <footer className="border-t-2 border-ink bg-ink text-cream">
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <Logo dark />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-cream/60">

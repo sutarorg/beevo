@@ -17,6 +17,17 @@
   --breakpoint-xs: 26rem;
 }
 
+html,
+body {
+  /*
+   * The page must never scroll sideways (rotated stickers/cards and hard
+   * shadows paint a few px past their boxes). `clip` — unlike `hidden` —
+   * does not create a scroll container, so the sticky header keeps working
+   * and the mobile menu's body scroll-lock still applies.
+   */
+  overflow-x: clip;
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 6rem;
