@@ -76,6 +76,60 @@ export function CourseSalesPage({ handle, slug }: { handle: string; slug: string
   return <SalesBody course={state.data} />;
 }
 
+/** “What you’ll walk away with” panel — lives in the hero on desktop, in the body on mobile. */
+function OutcomesCard({ outcomes, className }: { outcomes: string[]; className?: string }) {
+  if (outcomes.length === 0) return null;
+  return (
+    <div className={cn("rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8 lg:p-7", className)}>
+      <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">What you’ll walk away with</h2>
+      <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:gap-5">
+        {outcomes.map((outcome, index) => (
+          <li key={index} className="flex items-start gap-2.5 text-sm text-ink">
+            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink bg-lime">
+              <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
+            </span>
+            {outcome}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Free-preview promo panel — hero column on desktop, sidebar on mobile. */
+function FreePreviewCard({
+  lesson,
+  onPlay,
+  className,
+}: {
+  lesson: PublicLessonMeta;
+  onPlay: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-3xl border-2 border-ink bg-ink p-5 text-cream shadow-hard-xs", className)}>
+      <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">Free preview</p>
+      <h3 className="mt-2 text-lg font-bold leading-snug">{lesson.title}</h3>
+      <p className="mt-1.5 text-xs leading-relaxed text-cream/70">
+        {lesson.description || "Watch a full lesson before you decide."}
+        {lesson.durationLabel ? ` · ${lesson.durationLabel}` : ""}
+      </p>
+      <button
+        type="button"
+        onClick={onPlay}
+        className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-lime bg-lime px-3 py-1.5 text-xs font-bold text-ink transition-transform hover:-translate-y-0.5"
+      >
+        <Play className="size-3.5 fill-current" aria-hidden="true" />
+        Watch now — no payment
+      </button>
+      <p className="mt-3 flex items-center gap-2 text-[11px] text-cream/50">
+        <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
+        Preview playback is checked server-side; the rest of the course stays locked.
+      </p>
+    </div>
+  );
+}
+
 function SalesBody({ course }: { course: PublicCoursePage }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [purchased, setPurchased] = useState(false);
@@ -92,49 +146,69 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
 
   return (
     <>
-      {/* Hero */}
+      {/*
+        Hero.
+        Desktop: a single two-column grid — pitch + preview + outcomes on the left,
+        the enrol card on the right. Both columns stretch to the same height so the
+        section edges never leave a gap. Mobile keeps the original single stack.
+      */}
       <section className="border-b-2 border-ink bg-parchment">
-        <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:py-16">
-          <div>
-            <nav aria-label="Breadcrumb" className="text-xs font-semibold text-smoke">
-              <Link href={`/@${course.creator.handle}`} className="hover:text-accent">
-                @{course.creator.handle}
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-stretch lg:gap-10 lg:py-16">
+          <div className="lg:flex lg:h-full lg:flex-col lg:gap-6">
+            <div>
+              <nav aria-label="Breadcrumb" className="text-xs font-semibold text-smoke">
+                <Link href={`/@${course.creator.handle}`} className="hover:text-accent">
+                  @{course.creator.handle}
+                </Link>
+                <span aria-hidden="true"> / </span>
+                <span className="text-ink">{course.title}</span>
+              </nav>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight text-balance text-ink sm:text-5xl">
+                {course.title}
+              </h1>
+              <p className="mt-4 max-w-xl text-sm leading-relaxed text-pretty text-smoke sm:text-base lg:mt-5">
+                {course.shortDescription}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2 lg:mt-6">
+                <Sticker color="lime">{course.lessonCount} lessons</Sticker>
+                <Sticker color="cream">{course.durationLabel}</Sticker>
+                <Sticker color="cream">{course.resourceCount} downloads</Sticker>
+              </div>
+              <Link
+                href={`/@${course.creator.handle}`}
+                className="mt-6 flex items-center gap-3 rounded-2xl border-2 border-ink bg-white p-3 transition-transform hover:-translate-y-0.5 lg:mt-7 lg:p-4"
+              >
+                <ProfileAvatar
+                  src={course.creator.avatarUrl}
+                  name={course.creator.displayName}
+                  sizePx={44}
+                  className="size-11"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-ink">{course.creator.displayName}</span>
+                  <span className="block text-xs text-accent">
+                    @{course.creator.handle} · view all courses
+                  </span>
+                </span>
               </Link>
-              <span aria-hidden="true"> / </span>
-              <span className="text-ink">{course.title}</span>
-            </nav>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-balance text-ink sm:text-5xl">
-              {course.title}
-            </h1>
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-pretty text-smoke sm:text-base">
-              {course.shortDescription}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Sticker color="lime">{course.lessonCount} lessons</Sticker>
-              <Sticker color="cream">{course.durationLabel}</Sticker>
-              <Sticker color="cream">{course.resourceCount} downloads</Sticker>
             </div>
-            <Link
-              href={`/@${course.creator.handle}`}
-              className="mt-6 flex items-center gap-3 rounded-2xl border-2 border-ink bg-white p-3 transition-transform hover:-translate-y-0.5"
-            >
-              <ProfileAvatar
-                src={course.creator.avatarUrl}
-                name={course.creator.displayName}
-                sizePx={44}
-                className="size-11"
-              />
-              <span>
-                <span className="block text-sm font-bold text-ink">{course.creator.displayName}</span>
-                <span className="block text-xs text-accent">@{course.creator.handle} · view all courses</span>
-              </span>
-            </Link>
+
+            {/* Desktop-only: the promo + outcomes panels fill the column beside the enrol card. */}
+            <div className="hidden lg:mt-auto lg:block lg:space-y-6">
+              {freePreviewLesson ? (
+                <FreePreviewCard
+                  lesson={freePreviewLesson}
+                  onPlay={() => setPreviewLesson(freePreviewLesson)}
+                />
+              ) : null}
+              <OutcomesCard outcomes={course.outcomes} />
+            </div>
           </div>
 
           {/* Buy card */}
-          <div className="lg:pt-8" id="course-enrol-card">
-            <div className="overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard">
-              <div className="relative aspect-[4/3] border-b-2 border-ink bg-parchment">
+          <div className="lg:flex lg:h-full lg:flex-col" id="course-enrol-card">
+            <div className="overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard lg:flex lg:h-full lg:flex-col">
+              <div className="relative aspect-[4/3] border-b-2 border-ink bg-parchment lg:aspect-[16/10]">
                 {course.coverPreviewUrl ? (
                   <Image
                     src={course.coverPreviewUrl}
@@ -150,7 +224,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                   </div>
                 )}
               </div>
-              <div className="p-5">
+              <div className="p-5 lg:flex lg:flex-1 lg:flex-col">
                 <div className="flex items-end justify-between gap-2">
                   <div>
                     <p className="font-editorial text-5xl leading-none text-ink italic">
@@ -178,7 +252,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     {course.priceInPaise === 0 ? "Enrol free" : "Enrol now"}
                   </Button>
                 )}
-                <ul className="mt-4 space-y-2">
+                <ul className="mt-4 space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
                   {INCLUDED.map((item) => (
                     <li key={item.label} className="flex items-center gap-2.5 text-xs text-smoke">
                       <item.icon className="size-4 shrink-0 text-ink" aria-hidden="true" />
@@ -186,7 +260,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-4 rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
+                <p className="mt-4 rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke lg:mt-auto">
                   Course purchases are non-refundable except where required by applicable law.{" "}
                   <Link href="/refund-policy" className="font-semibold text-accent underline underline-offset-2">
                     Read the purchase policy
@@ -199,30 +273,19 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
         </div>
       </section>
 
-      {/* Body */}
+      {/*
+        Body.
+        Desktop: the same column widths as the hero so the curriculum lines up under
+        the hero copy and the terms panel lines up under the enrol card. Both columns
+        stretch to full height — no leftover space under either card. Mobile unchanged.
+      */}
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-        <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
-          <div className="space-y-8">
-            {course.outcomes.length > 0 ? (
-              <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
-                <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                  What you’ll walk away with
-                </h2>
-                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {course.outcomes.map((outcome, index) => (
-                    <li key={index} className="flex items-start gap-2.5 text-sm text-ink">
-                      <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink bg-lime">
-                        <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
-                      </span>
-                      {outcome}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-stretch lg:gap-10">
+          <div className="space-y-8 lg:flex lg:flex-col">
+            <OutcomesCard outcomes={course.outcomes} className="lg:hidden" />
 
             {/* Curriculum */}
-            <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
+            <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8 lg:flex lg:flex-1 lg:flex-col">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">Curriculum</h2>
                 <p className="text-xs font-semibold text-smoke">
@@ -321,33 +384,19 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
           </div>
 
           {/* Sidebar */}
-          <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+          <aside className="space-y-5 lg:flex lg:h-full lg:flex-col">
+            {/* Mobile-only: on desktop this panel is promoted into the hero column. */}
             {freePreviewLesson ? (
-              <div className="rounded-3xl border-2 border-ink bg-ink p-5 text-cream shadow-hard-xs">
-                <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">Free preview</p>
-                <h3 className="mt-2 text-lg font-bold leading-snug">{freePreviewLesson.title}</h3>
-                <p className="mt-1.5 text-xs leading-relaxed text-cream/70">
-                  {freePreviewLesson.description || "Watch a full lesson before you decide."}
-                  {freePreviewLesson.durationLabel ? ` · ${freePreviewLesson.durationLabel}` : ""}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPreviewLesson(freePreviewLesson)}
-                  className="mt-3 inline-flex items-center gap-2 rounded-full border-2 border-lime bg-lime px-3 py-1.5 text-xs font-bold text-ink transition-transform hover:-translate-y-0.5"
-                >
-                  <Play className="size-3.5 fill-current" aria-hidden="true" />
-                  Watch now — no payment
-                </button>
-                <p className="mt-3 flex items-center gap-2 text-[11px] text-cream/50">
-                  <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
-                  Preview playback is checked server-side; the rest of the course stays locked.
-                </p>
-              </div>
+              <FreePreviewCard
+                lesson={freePreviewLesson}
+                onPlay={() => setPreviewLesson(freePreviewLesson)}
+                className="lg:hidden"
+              />
             ) : null}
 
-            <div className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
+            <div className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs lg:flex lg:flex-1 lg:flex-col">
               <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">Purchase terms</h3>
-              <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-smoke">
+              <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-smoke lg:mt-4 lg:flex lg:flex-1 lg:flex-col lg:justify-around lg:space-y-0 lg:leading-loose">
                 <li>
                   {course.priceInPaise === 0
                     ? "· Free enrolment — no payment details needed."
@@ -372,7 +421,6 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
             </div>
           </aside>
         </div>
-
       </section>
 
       <PoweredByBanner />
