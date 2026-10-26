@@ -213,3 +213,11 @@ Chronological, opinionated record. New phases append — never rewrite history.
   sequential queries), route groups have instant `loading.tsx` skeletons,
   and app shells paint from the cached session instead of blocking on a
   "Checking your session" spinner.
+
+## D14 — 2026-10 · Seamless page transitions
+
+- **No full-screen loading screen on page changes.** All route-level
+  `loading.tsx` boundaries were removed so Next.js keeps the current page
+  visible while the destination is prepared. Inline loading indicators still
+  communicate pending data, while `FullPageLoader` remains limited to blocking
+  states such as session verification and course-draft creation.

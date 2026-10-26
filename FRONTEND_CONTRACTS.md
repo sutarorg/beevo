@@ -88,7 +88,7 @@ Zod schemas in `src/lib/validation.ts` — `loginSchema`, `signupSchema`, `forgo
 
 ## 7. States every view must handle
 
-`loading` (route `loading.tsx` + spinner), `error` (`error.tsx` boundary with retry), `empty` (future list views), `unavailable` (service not configured), `success` (toasts + panels). Toast notifications via `useToast()` (success/error/info, auto-dismiss, dismissible).
+`loading` (inline skeletons/spinners within a view; route transitions do not display a full-screen loading screen), `error` (`error.tsx` boundary with retry), `empty` (future list views), `unavailable` (service not configured), `success` (toasts + panels). Toast notifications via `useToast()` (success/error/info, auto-dismiss, dismissible).
 
 ## 8. Creator app contracts (Prompt 2)
 

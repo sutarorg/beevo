@@ -14,13 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/primitives";
 
 /**
- * The one loading screen for the whole website — used by every route-level
- * `loading.tsx`. It is a viewport-fixed overlay (not a box inside whatever
- * layout happens to wrap the page), so the spinner sits at the exact
- * horizontal and vertical centre of the website on every single page:
- * marketing, auth, learner, creator, admin and storefront alike. The
- * branded tile matches the site's card language (border-2, rounded-3xl,
- * hard shadow); the label uses the same tracked uppercase style.
+ * Full-screen loading overlay for blocking application states, such as
+ * session verification and actions that must finish before another screen
+ * appears. Route transitions deliberately do not render this overlay, so the
+ * current page stays visible until the destination is ready. The viewport-fixed
+ * overlay keeps the spinner at the exact horizontal and vertical centre of
+ * the website. The branded tile matches the site's card language (border-2,
+ * rounded-3xl, hard shadow); the label uses the same tracked uppercase style.
  */
 export function FullPageLoader({ label = "Loading" }: { label?: string }) {
   return (
