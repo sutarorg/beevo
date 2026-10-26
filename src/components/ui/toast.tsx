@@ -35,7 +35,7 @@ export function useToast() {
 
 const VARIANT_STYLES: Record<ToastVariant, { classes: string; Icon: typeof Info }> = {
   success: { classes: "bg-moss text-lime border-ink", Icon: CheckCircle2 },
-  error: { classes: "bg-accent text-cream border-ink", Icon: AlertCircle },
+  error: { classes: "bg-accent-deep text-cream border-ink", Icon: AlertCircle },
   info: { classes: "bg-cream text-ink border-ink", Icon: Info },
 };
 

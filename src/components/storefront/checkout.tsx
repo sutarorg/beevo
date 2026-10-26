@@ -524,7 +524,7 @@ export function CheckoutSheet({
                 <button
                   type="button"
                   onClick={() => void sendCode(true)}
-                  className="text-[11px] font-bold text-accent underline underline-offset-2"
+                  className="text-[11px] font-bold text-accent-deep underline underline-offset-2"
                 >
                   Resend code
                 </button>
@@ -638,7 +638,7 @@ export function CheckoutSheet({
               <button
                 type="button"
                 onClick={cancel}
-                className="mt-3 w-full text-center text-sm font-semibold text-accent underline underline-offset-4"
+                className="mt-3 w-full text-center text-sm font-semibold text-accent-deep underline underline-offset-4"
               >
                 Cancel payment
               </button>

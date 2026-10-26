@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import { PRICING_FAQS } from "@/lib/content";
+import { createPageMetadata } from "@/lib/seo";
 import { CTASection, PageHero, PlanCard } from "@/components/marketing/blocks";
+import { RelatedLinks } from "@/components/marketing/related-links";
 import { CommissionCalculator } from "@/components/marketing/commission-calculator";
 import { Accordion, Reveal } from "@/components/ui/motion";
 
-export const metadata: Metadata = {
-  title: "Pricing",
+export const metadata: Metadata = createPageMetadata({
+  title: "Pricing — free plan, 8% only when you sell",
   description:
-    "Beevo has one free plan at ₹0/month. We charge a flat 8% commission per successful eligible course sale — no Pro plan, no subscriptions.",
-};
+    "Beevo has one free plan at ₹0/month. We charge a flat 8% commission per successful eligible course sale — no Pro plan, no subscriptions, no setup fee.",
+  path: "/pricing",
+  keywords: ["online course platform pricing", "course platform commission", "free course selling"],
+});
 
 export default function PricingPage() {
   return (
@@ -95,6 +99,26 @@ export default function PricingPage() {
           </div>
         </Reveal>
       </section>
+
+      <RelatedLinks
+        links={[
+          {
+            href: "/how-it-works",
+            label: "How it works",
+            description: "See where the 8% lands in a real sale and how payouts are recorded.",
+          },
+          {
+            href: "/faq",
+            label: "FAQ",
+            description: "Commission, payments, refunds, and platform questions answered.",
+          },
+          {
+            href: "/refund-policy",
+            label: "Refund policy",
+            description: "Our purchase policy, including mandatory statutory remedies.",
+          },
+        ]}
+      />
 
       <CTASection />
     </>

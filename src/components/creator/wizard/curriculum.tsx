@@ -212,7 +212,7 @@ function LessonDialog({
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
               placeholder="One or two sentences about what this lesson covers."
-              className="w-full rounded-xl border-2 border-ink bg-white px-4 py-3 text-sm text-ink placeholder:text-ink/35 focus:border-accent focus:ring-4 focus:ring-accent/15 focus:outline-none"
+              className="w-full rounded-xl border-2 border-ink bg-white px-4 py-3 text-sm text-ink placeholder:text-smoke focus:border-accent focus:ring-4 focus:ring-accent/15 focus:outline-none"
             />
           </Field>
         ) : null}

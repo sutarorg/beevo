@@ -94,9 +94,10 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
                 className={cn(
                   "link-underline text-sm font-semibold transition-colors",
-                  pathname === link.href ? "text-accent" : "text-ink hover:text-accent",
+                  pathname === link.href ? "text-accent-deep" : "text-ink hover:text-accent-deep",
                 )}
               >
                 {link.label}
@@ -124,7 +125,7 @@ export function Header() {
               <>
                 <Link
                   href="/login"
-                  className="link-underline hidden text-sm font-semibold text-ink hover:text-accent sm:block"
+                  className="link-underline hidden text-sm font-semibold text-ink hover:text-accent-deep sm:block"
                 >
                   Log in
                 </Link>
@@ -174,6 +175,7 @@ export function Header() {
               >
                 <Link
                   href={link.href}
+                  aria-current={pathname === link.href ? "page" : undefined}
                   className="group flex items-center justify-between border-b border-cream/15 py-4"
                 >
                   <span className="font-editorial text-4xl italic">{link.label}</span>
@@ -220,7 +222,21 @@ export function Header() {
   );
 }
 
-const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
+type FooterLink = { href: string; label: string };
+
+type FooterColumn = {
+  title: string;
+  links: FooterLink[];
+  /**
+   * A single entry that is only rendered on the homepage. The blog is a
+   * marketing surface for first-time visitors, so it belongs in the footer of
+   * `/` only — not in the header, the mobile menu, or every other page's
+   * footer (where it would compete with the product and legal links).
+   */
+  homepageOnlyLink?: FooterLink;
+};
+
+const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "Product",
     links: [
@@ -229,6 +245,7 @@ const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] 
       { href: "/pricing", label: "Pricing" },
       { href: "/faq", label: "FAQ" },
     ],
+    homepageOnlyLink: { href: "/blog", label: "Blog" },
   },
   {
     title: "Legal",
@@ -249,6 +266,12 @@ const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] 
 ];
 
 export function Footer() {
+  // `Footer` lives in a client module, so the current pathname is available
+  // during prerender as well as on the client: `/` ships the blog link in its
+  // static HTML, every other route ships without it, and client-side
+  // navigation keeps the two in sync.
+  const pathname = usePathname();
+
   return (
     <footer className="border-t-2 border-ink bg-ink text-cream">
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
@@ -284,6 +307,16 @@ export function Footer() {
                     </Link>
                   </li>
                 ))}
+                {column.homepageOnlyLink && pathname === "/" ? (
+                  <li key={column.homepageOnlyLink.href}>
+                    <Link
+                      href={column.homepageOnlyLink.href}
+                      className="link-underline text-sm text-cream/80 transition-colors hover:text-cream"
+                    >
+                      {column.homepageOnlyLink.label}
+                    </Link>
+                  </li>
+                ) : null}
               </ul>
             </nav>
           ))}

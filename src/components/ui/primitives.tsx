@@ -19,7 +19,7 @@ export function Sticker({
 }) {
   const colors = {
     lime: "bg-lime text-ink",
-    accent: "bg-accent text-cream",
+    accent: "bg-accent-deep text-cream",
     cream: "bg-cream text-ink",
     ink: "bg-ink text-cream",
   } as const;
@@ -63,7 +63,7 @@ export function SectionHeader({
         className={cn(
           "mb-3 flex items-center gap-2 text-xs font-bold tracking-[0.22em] uppercase",
           align === "center" && "justify-center",
-          dark ? "text-lime" : "text-accent",
+          dark ? "text-lime" : "text-accent-deep",
         )}
       >
         <span aria-hidden="true" className={cn("inline-block size-2 rounded-full", dark ? "bg-lime" : "bg-accent")} />
@@ -132,7 +132,7 @@ export function Input({ className, invalid, ...props }: InputProps) {
       aria-invalid={invalid || undefined}
       className={cn(
         "w-full rounded-xl border-2 bg-white px-4 py-3 text-base text-ink transition-colors",
-        "placeholder:text-ink/35 focus:outline-none",
+        "placeholder:text-smoke focus:outline-none",
         invalid
           ? "border-accent-deep ring-4 ring-accent/15"
           : "border-ink focus:border-accent focus:ring-4 focus:ring-accent/15",

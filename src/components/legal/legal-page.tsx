@@ -8,15 +8,25 @@ import { Sticker } from "@/components/ui/primitives";
  * Shared renderer for all legal pages. Copy lives in @/lib/legal so policy
  * updates never require touching page files.
  */
+const LEGAL_LINKS = [
+  { href: "/terms", label: "Terms of Service" },
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/refund-policy", label: "Purchase & Refund Policy" },
+  { href: "/faq", label: "FAQ" },
+] as const;
+
 export function LegalPage({
   title,
   intro,
   sections,
+  currentPath,
   children,
 }: {
   title: string;
   intro: string;
   sections: LegalSection[];
+  /** Used to omit the current document from the related-policy links. */
+  currentPath?: string;
   children?: ReactNode;
 }) {
   return (
@@ -96,6 +106,24 @@ export function LegalPage({
           </section>
         ))}
       </div>
+
+      <nav aria-label="Related policies" className="mt-12 border-t-2 border-ink/10 pt-8">
+        <h2 className="text-xs font-bold tracking-[0.22em] text-accent-deep uppercase">
+          Related policies
+        </h2>
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {LEGAL_LINKS.filter((link) => link.href !== currentPath).map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="inline-block rounded-full border-2 border-ink bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-ink hover:text-cream"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </article>
   );
 }

@@ -92,7 +92,7 @@ export function CreatorShowcaseCard({
           <h3 className="truncate text-lg font-bold text-ink">
             {creator.displayName}
           </h3>
-          <p className="truncate text-sm font-semibold text-accent">@{creator.handle}</p>
+          <p className="truncate text-sm font-semibold text-accent-deep">@{creator.handle}</p>
           <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-smoke">
             {creator.tagline}
           </p>
@@ -196,7 +196,7 @@ export function StorefrontPhoneMock({ className }: { className?: string }) {
           </div>
           <div>
             <p className="text-sm leading-tight font-bold text-ink">Meera Kapoor</p>
-            <p className="text-xs font-semibold text-accent">@meera-shoots</p>
+            <p className="text-xs font-semibold text-accent-deep">@meera-shoots</p>
           </div>
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-smoke">

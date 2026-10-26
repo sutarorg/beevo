@@ -206,7 +206,7 @@ export function LoginForm({
           <div className="flex justify-end">
             <Link
               href="/forgot-password"
-              className="link-underline text-sm font-semibold text-accent"
+              className="link-underline text-sm font-semibold text-accent-deep"
             >
               Forgot password?
             </Link>
@@ -217,7 +217,7 @@ export function LoginForm({
         </form>
         <p className="mt-5 text-center text-sm text-smoke">
           New to Beevo?{" "}
-          <Link href="/signup" className="font-semibold text-accent underline underline-offset-4">
+          <Link href="/signup" className="font-semibold text-accent-deep underline underline-offset-4">
             Create a free account
           </Link>
         </p>
@@ -286,7 +286,7 @@ function VerifyPendingPanel({
       <button
         type="button"
         onClick={onRestart}
-        className="text-sm font-semibold text-accent underline underline-offset-4"
+        className="text-sm font-semibold text-accent-deep underline underline-offset-4"
       >
         Wrong email? Start over
       </button>
@@ -413,11 +413,11 @@ export function SignupForm() {
               />
               <span>
                 I agree to the{" "}
-                <Link href="/terms" className="font-semibold text-accent underline underline-offset-2">
+                <Link href="/terms" className="font-semibold text-accent-deep underline underline-offset-2">
                   Terms of Service
                 </Link>{" "}
                 and the{" "}
-                <Link href="/refund-policy" className="font-semibold text-accent underline underline-offset-2">
+                <Link href="/refund-policy" className="font-semibold text-accent-deep underline underline-offset-2">
                   Refund Policy
                 </Link>
                 .
@@ -435,7 +435,7 @@ export function SignupForm() {
         </form>
         <p className="mt-5 text-center text-sm text-smoke">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-accent underline underline-offset-4">
+          <Link href="/login" className="font-semibold text-accent-deep underline underline-offset-4">
             Log in
           </Link>
         </p>
@@ -544,7 +544,7 @@ export function ForgotPasswordForm() {
       </form>
       <p className="mt-5 text-center text-sm text-smoke">
         Remembered it?{" "}
-        <Link href="/login" className="font-semibold text-accent underline underline-offset-4">
+        <Link href="/login" className="font-semibold text-accent-deep underline underline-offset-4">
           Back to log in
         </Link>
       </p>

@@ -81,7 +81,7 @@ export function Marquee({
   const tones = {
     lime: "bg-lime text-ink border-ink",
     ink: "bg-ink text-cream border-ink",
-    accent: "bg-accent text-cream border-ink",
+    accent: "bg-accent-deep text-cream border-ink",
   } as const;
 
   const strip = (ariaHidden: boolean) => (
@@ -142,23 +142,24 @@ export function Accordion({
               className="group flex w-full items-center gap-4 py-5 text-left"
             >
               {numbered ? (
-                <span className="shrink-0 font-editorial text-xl text-accent italic">
+                <span className="shrink-0 font-editorial text-xl text-accent-deep italic">
                   {String(index + 1).padStart(2, "0")}
                 </span>
               ) : null}
-              <span className="flex-1 text-base font-bold text-ink transition-colors group-hover:text-accent sm:text-lg">
+              <span className="flex-1 text-base font-bold text-ink transition-colors group-hover:text-accent-deep sm:text-lg">
                 {item.q}
               </span>
               <span
                 className={cn(
                   "grid size-8 shrink-0 place-items-center rounded-full border-2 border-ink transition-all duration-300",
-                  open ? "rotate-45 bg-accent text-cream" : "bg-transparent",
+                  open ? "rotate-45 bg-accent-deep text-cream" : "bg-transparent",
                 )}
               >
                 <Plus className="size-4" aria-hidden="true" />
               </span>
             </button>
             <div
+              aria-hidden={!open}
               className={cn(
                 "grid grid-cols-1 transition-all duration-300 ease-out",
                 open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
