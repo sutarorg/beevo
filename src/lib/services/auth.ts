@@ -393,13 +393,14 @@ export const CREATOR_DASHBOARD_PATH = "/creator/dashboard";
 
 /**
  * Where "Dashboard" (and post-login) should land for this session:
- * the last-used mode when the email holds both accounts, otherwise the one
- * dashboard the account actually has.
+ * when the email holds both accounts the LEARNER dashboard is the default,
+ * unless the user last explicitly switched to Creator via the header
+ * dropdown; otherwise the one dashboard the account actually has.
  */
 export function dashboardPathFor(snapshot: SessionSnapshot | null): string {
   if (!snapshot?.user) return "/login";
   if (snapshot.hasBothAccounts) {
-    return getAccountModePref() === "learner" ? LEARNER_DASHBOARD_PATH : CREATOR_DASHBOARD_PATH;
+    return getAccountModePref() === "creator" ? CREATOR_DASHBOARD_PATH : LEARNER_DASHBOARD_PATH;
   }
   if (snapshot.isLearner && !snapshot.isCreator) return LEARNER_DASHBOARD_PATH;
   if (snapshot.isCreator) return CREATOR_DASHBOARD_PATH;

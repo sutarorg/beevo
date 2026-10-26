@@ -13,17 +13,26 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/primitives";
 
-/** Centered loader for route-level `loading.tsx` files. */
+/**
+ * The one loading screen for the whole website — used by every route-level
+ * `loading.tsx`. It is a viewport-fixed overlay (not a box inside whatever
+ * layout happens to wrap the page), so the spinner sits at the exact
+ * horizontal and vertical centre of the website on every single page:
+ * marketing, auth, learner, creator, admin and storefront alike. The
+ * branded tile matches the site's card language (border-2, rounded-3xl,
+ * hard shadow); the label uses the same tracked uppercase style.
+ */
 export function FullPageLoader({ label = "Loading" }: { label?: string }) {
   return (
     <div
       role="status"
-      className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-ink"
+      aria-label={label}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-cream text-ink"
     >
-      <Spinner className="size-8 text-accent" />
-      <p className="text-sm font-semibold tracking-[0.18em] uppercase">
-        {label}
-      </p>
+      <span className="grid size-16 place-items-center rounded-3xl border-2 border-ink bg-white shadow-hard-sm">
+        <Spinner className="size-8 text-accent" />
+      </span>
+      <p className="text-sm font-semibold tracking-[0.18em] uppercase">{label}</p>
     </div>
   );
 }

@@ -172,10 +172,15 @@ export function CreatorAppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* Desktop top row: Learner/Creator toggle (dual accounts only) + bell */}
-      <div className="fixed right-0 left-66 top-0 z-30 hidden h-14 items-center justify-between border-b-2 border-ink/10 bg-cream px-6 lg:flex">
-        <AccountModeToggle current="creator" />
-        <NotificationBell />
+      {/* Desktop top row: Learner/Creator dropdown (dual accounts only)
+          immediately left of the bell. h-16 matches the sidebar logo
+          header, so the low-brightness bottom line runs at exactly the
+          same height as the sidebar header's bottom line. */}
+      <div className="fixed top-0 right-0 left-66 z-30 hidden h-16 items-center justify-end border-b-2 border-ink/10 bg-cream px-6 lg:flex">
+        <div className="flex items-center gap-2">
+          <AccountModeToggle current="creator" />
+          <NotificationBell />
+        </div>
       </div>
 
       <div className="px-4 pt-16 pb-28 sm:px-6 lg:px-8 lg:pt-20 lg:pb-12">
