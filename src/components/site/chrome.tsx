@@ -17,7 +17,6 @@ import {
 
 const noSession = (): SessionSnapshot | null => null;
 import { cn } from "@/lib/utils";
-import { AccountModeToggle } from "@/components/account-mode-toggle";
 import { Logo } from "@/components/site/logo";
 import { Button } from "@/components/ui/button";
 import { Sticker } from "@/components/ui/primitives";
@@ -113,14 +112,14 @@ export function Header() {
                 className="hidden h-9 w-36 animate-pulse rounded-full bg-ink/10 sm:block"
               />
             ) : signedIn ? (
-              <>
-                {/* Both accounts on this email → Learner/Creator switch. */}
-                <AccountModeToggle className="hidden lg:inline-flex" />
-                <Button href={dashboardHref} size="sm" className="hidden sm:inline-flex">
-                  <LayoutDashboard className="size-4" aria-hidden="true" />
-                  Dashboard
-                </Button>
-              </>
+              // No Learner/Creator toggle on the website header — switching
+              // dashboards happens inside the dashboards themselves, to the
+              // left of the notification bell. "Dashboard" lands dual
+              // accounts on the learner dashboard by default.
+              <Button href={dashboardHref} size="sm" className="hidden sm:inline-flex">
+                <LayoutDashboard className="size-4" aria-hidden="true" />
+                Dashboard
+              </Button>
             ) : (
               <>
                 <Link
@@ -192,9 +191,6 @@ export function Header() {
           >
             {signedIn ? (
               <>
-                <div className="flex justify-center">
-                  <AccountModeToggle />
-                </div>
                 <Button href={dashboardHref} variant="lime" size="lg" className="w-full">
                   <LayoutDashboard className="size-5" aria-hidden="true" />
                   Dashboard

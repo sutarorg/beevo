@@ -13,7 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { route } from "@/server/router";
-import { fail, ok, parseBody, requireCreatorUser, requireVerifiedCreatorUser } from "@/server/http";
+import { fail, ok, parseBody, requireCreatorUser, requireUser, requireVerifiedCreatorUser } from "@/server/http";
 import { newId } from "@/server/auth";
 import type { CreatorProfile, CreatorSettings, PayoutDetails } from "@/lib/creator-types";
 import type { AnalyticsData, DashboardData } from "@/lib/services/creator-data";
@@ -522,8 +522,11 @@ function toNotification(row: typeof notifications.$inferSelect): CreatorNotifica
   };
 }
 
+// In-app notifications are per-user rows (filtered by userId below), and
+// the bell now sits in BOTH dashboard headers — so any signed-in account
+// may read its own list, not only creators.
 route("GET", "creator/notifications", async (_req, ctx) => {
-  const user = requireCreatorUser(ctx);
+  const user = requireUser(ctx);
   if (user instanceof Response) return user;
   const rows = await db.query.notifications.findMany({
     where: and(eq(notifications.userId, user.id), eq(notifications.channel, "in_app")),
@@ -533,7 +536,7 @@ route("GET", "creator/notifications", async (_req, ctx) => {
 });
 
 route("POST", "creator/notifications/read-all", async (_req, ctx) => {
-  const user = requireCreatorUser(ctx);
+  const user = requireUser(ctx);
   if (user instanceof Response) return user;
   await db
     .update(notifications)
