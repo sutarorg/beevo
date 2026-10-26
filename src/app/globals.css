@@ -6,8 +6,13 @@
   --color-sand: #e2d6ba;
   --color-ink: #171307;
   --color-smoke: #5c543f;
+  /* Brand vermilion for large display type and decoration. */
   --color-accent: #e8490f;
+  /* Accessible vermilion for small text, links, and filled buttons
+     (≥ 4.5:1 against cream, parchment, and white). */
   --color-accent-deep: #c23a0a;
+  /* Hover/pressed shade for accessible accent surfaces. */
+  --color-accent-deeper: #9a2d05;
   --color-lime: #d5f34e;
   --color-moss: #20301c;
 
@@ -157,20 +162,27 @@ body {
   animation: sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Scroll reveal (see Reveal in components/ui/motion.tsx). */
+/* Scroll reveal (see Reveal in components/ui/motion.tsx).
+   Progressive enhancement: content is visible by default so crawlers and
+   no-JS readers get the whole page. Only after the tiny inline script sets
+   [data-js] on <html> do elements start hidden and animate in. */
 .reveal {
+  opacity: 1;
+  transform: none;
+}
+html[data-js] .reveal {
   opacity: 0;
   transform: translateY(var(--reveal-y, 28px));
   transition:
     opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.reveal.is-visible {
+html[data-js] .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
+  html[data-js] .reveal {
     opacity: 1;
     transform: none;
     transition: none;

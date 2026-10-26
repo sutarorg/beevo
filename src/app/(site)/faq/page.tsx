@@ -2,19 +2,25 @@ import type { Metadata } from "next";
 import { LifeBuoy } from "lucide-react";
 import { SUPPORT_EMAIL } from "@/lib/config";
 import { FAQS } from "@/lib/content";
+import { faqPageJsonLd, createPageMetadata } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/json-ld";
 import { PageHero } from "@/components/marketing/blocks";
+import { RelatedLinks } from "@/components/marketing/related-links";
 import { Button } from "@/components/ui/button";
 import { Accordion, Reveal } from "@/components/ui/motion";
 
-export const metadata: Metadata = {
-  title: "FAQ",
+export const metadata: Metadata = createPageMetadata({
+  title: "Creator FAQ — plans, payouts & refunds",
   description:
-    "Answers about Beevo: the free plan, 8% commission, no marketplace, payouts, course features, and the refund policy.",
-};
+    "Answers about Beevo: the free plan, the 8% commission, our no-marketplace model, payouts, course features, and the refund policy.",
+  path: "/faq",
+  keywords: ["Beevo FAQ", "creator payouts", "course refund policy India"],
+});
 
 export default function FaqPage() {
   return (
     <>
+      <JsonLd id="beevo-faq-structured-data" data={faqPageJsonLd(FAQS)} />
       <PageHero
         eyebrow="FAQ"
         title={
@@ -64,6 +70,26 @@ export default function FaqPage() {
           </div>
         </Reveal>
       </section>
+
+      <RelatedLinks
+        links={[
+          {
+            href: "/pricing",
+            label: "Pricing",
+            description: "The complete plan: ₹0/month with a flat 8% on successful sales.",
+          },
+          {
+            href: "/how-it-works",
+            label: "How it works",
+            description: "Profile → course → share link → get paid, in four steps.",
+          },
+          {
+            href: "/refund-policy",
+            label: "Refund policy",
+            description: "How course purchases and statutory remedies work at Beevo.",
+          },
+        ]}
+      />
     </>
   );
 }

@@ -22,6 +22,10 @@ if (r2PublicBase) {
 }
 
 const nextConfig: NextConfig = {
+  // Never advertise the framework version in responses.
+  poweredByHeader: false,
+  // Canonical URLs never carry a trailing slash (`/pricing`, not `/pricing/`).
+  trailingSlash: false,
   // Dev-only: allow the proxied preview host to load dev assets/HMR.
   allowedDevOrigins: ["*.e2b.app", "localhost:3000"],
   // The local development database is a WebAssembly build of PostgreSQL — keep
@@ -47,10 +51,26 @@ const nextConfig: NextConfig = {
     ],
     remotePatterns,
   },
+  async redirects() {
+    return [
+      // Canonical dashboard URLs: these index routes used to answer 307 from a
+      // page component. A permanent 308 tells crawlers and bookmarks the real
+      // destination.
+      { source: "/creator", destination: "/creator/dashboard", permanent: true },
+      { source: "/learn", destination: "/learn/courses", permanent: true },
+      { source: "/admin", destination: "/admin/dashboard", permanent: true },
+    ];
+  },
   async headers() {
+    const privateNoIndex = [
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ];
+    const baseSecurityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    ];
     return [
       {
-        // Bundled brand/course imagery: cache hard, revalidate in background.
         source: "/images/:path*",
         headers: [
           {
@@ -68,6 +88,37 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Discovery files: let CDNs absorb traffic but revalidate quickly so
+        // new courses appear promptly.
+        source: "/sitemap.xml",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
+      {
+        source: "/robots.txt",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, s-maxage=86400, stale-while-revalidate=86400",
+          },
+        ],
+      },
+      // Defense in depth alongside the layout-level `robots` metadata: even a
+      // cached or accidentally linked private URL cannot be indexed.
+      { source: "/creator/:path*", headers: privateNoIndex },
+      { source: "/learn/:path*", headers: privateNoIndex },
+      { source: "/admin/:path*", headers: privateNoIndex },
+      { source: "/login", headers: privateNoIndex },
+      { source: "/signup", headers: privateNoIndex },
+      { source: "/forgot-password", headers: privateNoIndex },
+      { source: "/forgot-password/:path*", headers: privateNoIndex },
+      { source: "/api/:path*", headers: baseSecurityHeaders },
+      { source: "/:path*", headers: baseSecurityHeaders },
     ];
   },
 };

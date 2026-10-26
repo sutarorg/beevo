@@ -94,9 +94,10 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
                 className={cn(
                   "link-underline text-sm font-semibold transition-colors",
-                  pathname === link.href ? "text-accent" : "text-ink hover:text-accent",
+                  pathname === link.href ? "text-accent-deep" : "text-ink hover:text-accent-deep",
                 )}
               >
                 {link.label}
@@ -124,7 +125,7 @@ export function Header() {
               <>
                 <Link
                   href="/login"
-                  className="link-underline hidden text-sm font-semibold text-ink hover:text-accent sm:block"
+                  className="link-underline hidden text-sm font-semibold text-ink hover:text-accent-deep sm:block"
                 >
                   Log in
                 </Link>
@@ -174,6 +175,7 @@ export function Header() {
               >
                 <Link
                   href={link.href}
+                  aria-current={pathname === link.href ? "page" : undefined}
                   className="group flex items-center justify-between border-b border-cream/15 py-4"
                 >
                   <span className="font-editorial text-4xl italic">{link.label}</span>

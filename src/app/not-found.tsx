@@ -1,6 +1,16 @@
 import { House, Map } from "lucide-react";
+import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Sticker } from "@/components/ui/primitives";
+
+/**
+ * Global 404. Next answers with an HTTP 404 status; the explicit robots tag
+ * keeps the page out of the index even if something links to it directly.
+ */
+export const metadata: Metadata = {
+  title: "Page not found",
+  robots: { index: false, follow: false },
+};
 
 export default function NotFound() {
   return (

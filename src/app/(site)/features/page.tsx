@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
 import { Ban } from "lucide-react";
 import { FEATURE_GROUPS } from "@/lib/content";
+import { createPageMetadata } from "@/lib/seo";
 import { CTASection, PageHero } from "@/components/marketing/blocks";
+import { RelatedLinks } from "@/components/marketing/related-links";
 import { Button } from "@/components/ui/button";
 import { ContentIcon } from "@/components/ui/icon";
 import { Reveal } from "@/components/ui/motion";
 import { Sticker } from "@/components/ui/primitives";
 
-export const metadata: Metadata = {
-  title: "Features",
+export const metadata: Metadata = createPageMetadata({
+  title: "Course storefront & selling features",
   description:
-    "Creator profile, course storefront, video lessons, file uploads, secure payments, and a learner dashboard — everything in Beevo's single free plan.",
-};
+    "Creator profile, course storefront, video lessons, file uploads, secure Razorpay checkout, and a learner dashboard — everything in Beevo's single free plan.",
+  path: "/features",
+  keywords: ["online course software", "creator storefront features", "sell video courses"],
+});
 
 const ABSENT_BY_DESIGN = [
   {
@@ -115,6 +119,26 @@ export default function FeaturesPage() {
           </div>
         </div>
       </section>
+
+      <RelatedLinks
+        links={[
+          {
+            href: "/how-it-works",
+            label: "How it works",
+            description: "The four-step loop from free signup to your first course sale.",
+          },
+          {
+            href: "/pricing",
+            label: "Pricing",
+            description: "One free plan at ₹0/month and a flat 8% only on successful eligible sales.",
+          },
+          {
+            href: "/faq",
+            label: "FAQ",
+            description: "Straight answers on plans, payouts, refunds, and course setup.",
+          },
+        ]}
+      />
 
       <CTASection />
     </>

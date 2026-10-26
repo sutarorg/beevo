@@ -1,7 +1,7 @@
 import { ArrowRight, Check, Sparkle } from "lucide-react";
 import Image from "next/image";
 import { BENEFITS, HOW_IT_WORKS_STEPS, MARQUEE_ITEMS, FAQS } from "@/lib/content";
-import { MOCK_CREATORS } from "@/lib/mocks/creators";
+import { MOCK_CREATORS, MOCK_DATA_NOTICE } from "@/lib/mocks/creators";
 import { PLATFORM_COMMISSION_LABEL } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import {
@@ -250,7 +250,7 @@ export function HowItWorksSection() {
               <div className="mx-auto flex size-14 items-center justify-center rounded-full border-2 border-ink bg-accent text-cream shadow-hard-sm lg:mx-0">
                 <ContentIcon name={step.icon} className="size-6" />
               </div>
-              <p className="mt-4 text-center font-editorial text-lg text-accent italic lg:text-left">
+              <p className="mt-4 text-center font-editorial text-lg text-accent-deep italic lg:text-left">
                 {step.step}
               </p>
               <h3 className="mt-1 text-center text-lg font-bold text-ink lg:text-left">
@@ -300,6 +300,10 @@ export function ShowcaseSection() {
             lede="A profile with your face, your courses with your prices, your links where your audience already clicks. This is the shape of every Beevo storefront."
           />
         </Reveal>
+        <p className="mt-6 flex flex-wrap items-center gap-3 text-xs font-semibold text-smoke sm:mt-8">
+          <Sticker color="cream">Demo</Sticker>
+          {MOCK_DATA_NOTICE}
+        </p>
         {/*
           grid-cols-1 (minmax(0, 1fr)) is load-bearing: a bare `grid` with
           columns only at larger breakpoints creates an implicit `auto`
@@ -391,7 +395,7 @@ export function CreateLearnSection() {
               <p
                 className={cn(
                   "text-xs font-bold tracking-[0.22em] uppercase",
-                  panelIndex === 0 ? "text-accent" : "text-lime",
+                  panelIndex === 0 ? "text-accent-deep" : "text-lime",
                 )}
               >
                 {panel.eyebrow}

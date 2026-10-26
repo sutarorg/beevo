@@ -7,9 +7,9 @@ type Variant = "ink" | "accent" | "lime" | "outline" | "outline-cream";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  ink: "bg-ink text-cream border-ink hover:bg-accent hover:border-accent shadow-hard-xs hover:shadow-hard-sm",
+  ink: "bg-ink text-cream border-ink hover:bg-accent-deep hover:border-accent-deep shadow-hard-xs hover:shadow-hard-sm",
   accent:
-    "bg-accent text-cream border-ink shadow-hard-xs hover:bg-accent-deep hover:shadow-hard-sm",
+    "bg-accent-deep text-cream border-ink shadow-hard-xs hover:bg-accent-deeper hover:shadow-hard-sm",
   lime: "bg-lime text-ink border-ink shadow-hard-xs hover:shadow-hard-sm",
   outline:
     "bg-transparent text-ink border-ink hover:bg-ink hover:text-cream",

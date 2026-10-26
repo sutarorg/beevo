@@ -7,16 +7,20 @@ import {
   CREATOR_SHARE_LABEL,
   PLATFORM_COMMISSION_LABEL,
 } from "@/lib/domain";
+import { createPageMetadata } from "@/lib/seo";
 import { CTASection, PageHero } from "@/components/marketing/blocks";
+import { RelatedLinks } from "@/components/marketing/related-links";
 import { Button } from "@/components/ui/button";
 import { ContentIcon } from "@/components/ui/icon";
 import { Reveal } from "@/components/ui/motion";
 
-export const metadata: Metadata = {
-  title: "How it works",
+export const metadata: Metadata = createPageMetadata({
+  title: "How Beevo works — sell your first course",
   description:
-    "From free signup to first course sale: claim your profile, publish a course, share your link, and get paid — with a flat 8% commission.",
-};
+    "From free signup to first course sale: claim your profile, publish a course, share your link, and get paid — with a flat 8% commission on successful sales.",
+  path: "/how-it-works",
+  keywords: ["how to sell a course online", "create an online course India", "course checkout"],
+});
 
 const example = commissionBreakdown(99900);
 
@@ -42,11 +46,12 @@ export default function HowItWorksPage() {
       </PageHero>
 
       <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
-        <ol className="relative space-y-10">
+        <div className="relative">
           <div
             aria-hidden="true"
             className="absolute top-4 bottom-4 left-7 hidden w-0.5 -translate-x-1/2 border-l-2 border-dashed border-ink/30 sm:block"
           />
+          <ol className="relative space-y-10">
           {HOW_IT_WORKS_STEPS.map((step, index) => (
             <li key={step.step} className="relative sm:pl-24">
               <Reveal delay={index * 0.05}>
@@ -58,11 +63,11 @@ export default function HowItWorksPage() {
                     <div className="flex size-11 items-center justify-center rounded-full border-2 border-ink bg-accent text-cream">
                       <ContentIcon name={step.icon} className="size-5" />
                     </div>
-                    <p className="font-editorial text-xl text-accent italic">
+                    <p className="font-editorial text-xl text-accent-deep italic">
                       {step.step}
                     </p>
                   </div>
-                  <p className="hidden font-editorial text-xl text-accent italic sm:block">
+                  <p className="hidden font-editorial text-xl text-accent-deep italic sm:block">
                     {step.step}
                   </p>
                   <h2 className="mt-1 text-2xl font-bold tracking-tight text-ink">
@@ -75,7 +80,8 @@ export default function HowItWorksPage() {
               </Reveal>
             </li>
           ))}
-        </ol>
+          </ol>
+        </div>
       </section>
 
       <section className="border-y-2 border-ink bg-parchment">
@@ -108,7 +114,7 @@ export default function HowItWorksPage() {
                     <dt className="text-sm font-semibold text-smoke">
                       Beevo commission ({PLATFORM_COMMISSION_LABEL})
                     </dt>
-                    <dd className="text-lg font-bold text-accent tabular-nums">
+                    <dd className="text-lg font-bold text-accent-deep tabular-nums">
                       −{formatINR(example.platformFeeInPaise, { decimals: true })}
                     </dd>
                   </div>
@@ -171,6 +177,26 @@ export default function HowItWorksPage() {
           </div>
         </div>
       </section>
+
+      <RelatedLinks
+        links={[
+          {
+            href: "/pricing",
+            label: "Pricing",
+            description: "The full 8% maths, worked examples, and the single free plan.",
+          },
+          {
+            href: "/features",
+            label: "Features",
+            description: "Course studio, storefront, checkout, and the learner dashboard.",
+          },
+          {
+            href: "/faq",
+            label: "FAQ",
+            description: "Plans, payouts, refunds, and what happens after a sale.",
+          },
+        ]}
+      />
 
       <CTASection
         title="Weekend project. Weekday income."

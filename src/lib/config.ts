@@ -45,6 +45,15 @@ export function shareableOrigin(): string {
 export const SUPPORT_EMAIL = "support@beevo.in";
 
 /**
+ * Optional Search Console verification token (the `content` value of the
+ * `google-site-verification` meta tag). Empty when not configured — the tag is
+ * then omitted rather than rendered blank.
+ */
+export const GOOGLE_SITE_VERIFICATION = (process.env.GOOGLE_SITE_VERIFICATION ?? "")
+  .trim()
+  .replace(/^["']|["']$/g, "");
+
+/**
  * Service mode for the pre-backend phases (Prompts 1–4).
  *
  * Resolution order:

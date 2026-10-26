@@ -9,7 +9,7 @@ import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 /** Public creator header — avatar, identity, bio, links. */
 export function CreatorHero({ creator }: { creator: PublicCreatorPage }) {
   return (
-    <section className="border-b-2 border-ink bg-parchment">
+    <header className="border-b-2 border-ink bg-parchment">
       <div className="mx-auto max-w-6xl px-4 py-12 text-center sm:px-6 sm:py-16 lg:flex lg:items-center lg:gap-12 lg:py-20 lg:text-left">
         <ProfileAvatar
           src={creator.avatarUrl}
@@ -22,7 +22,7 @@ export function CreatorHero({ creator }: { creator: PublicCreatorPage }) {
           <h1 className="mt-5 text-3xl font-bold tracking-tight text-ink sm:text-5xl lg:mt-0">
             {creator.displayName}
           </h1>
-          <p className="mt-1.5 text-base font-bold text-accent sm:text-lg">@{creator.handle}</p>
+          <p className="mt-1.5 text-base font-bold text-accent-deep sm:text-lg">@{creator.handle}</p>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-pretty text-smoke sm:text-base lg:mx-0 lg:max-w-2xl">
             {creator.tagline}
           </p>
@@ -46,7 +46,7 @@ export function CreatorHero({ creator }: { creator: PublicCreatorPage }) {
           </p>
         </div>
       </div>
-    </section>
+    </header>
   );
 }
 
@@ -70,7 +70,7 @@ export function StorefrontCourseCard({
             src={course.coverPreviewUrl}
             alt={`${course.title} course cover`}
             fill
-            sizes="(max-width: 768px) 100vw, 50vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -88,9 +88,9 @@ export function StorefrontCourseCard({
         ) : null}
       </div>
       <div className="flex flex-1 flex-col p-5">
-        <h2 className="text-lg font-bold tracking-tight text-ink transition-colors group-hover:text-accent sm:text-xl">
+        <h3 className="text-lg font-bold tracking-tight text-ink transition-colors group-hover:text-accent-deep sm:text-xl">
           {course.title}
-        </h2>
+        </h3>
         <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-smoke">
           {course.shortDescription}
         </p>
@@ -98,7 +98,7 @@ export function StorefrontCourseCard({
           <span className="text-xs font-semibold text-smoke">
             {course.lessonCount} lesson{course.lessonCount === 1 ? "" : "s"}
           </span>
-          <span className="inline-flex items-center gap-1 text-sm font-bold text-accent">
+          <span className="inline-flex items-center gap-1 text-sm font-bold text-accent-deep">
             View course
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
           </span>
@@ -112,7 +112,7 @@ export function EmptyStorefrontState({ handle }: { handle: string }) {
   return (
     <div className="rounded-3xl border-2 border-dashed border-ink/40 bg-white/60 px-6 py-14 text-center">
       <Ghost className="mx-auto size-8 text-smoke" aria-hidden="true" />
-      <h2 className="mt-3 text-xl font-bold text-ink">No courses yet</h2>
+      <h3 className="mt-3 text-xl font-bold text-ink">No courses yet</h3>
       <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-smoke">
         @{handle} hasn&apos;t published any courses right now. Follow their links above — new
         courses usually get announced there first.
@@ -121,71 +121,29 @@ export function EmptyStorefrontState({ handle }: { handle: string }) {
   );
 }
 
-export function CreatorNotFound() {
-  return (
-    <section className="mx-auto max-w-lg px-4 py-20 text-center sm:px-6">
-      <div className="rounded-[2.5rem] border-2 border-ink bg-white p-8 shadow-hard sm:p-12">
-        <Sticker color="accent">Not found</Sticker>
-        <p className="mt-8 font-editorial text-6xl italic">Wrong shelf.</p>
-        <h1 className="mt-3 text-xl font-bold tracking-tight text-ink">
-          That creator page doesn’t exist
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-smoke">
-          The handle may be mistyped, or the creator made their page private. We don&apos;t reveal
-          which — check the link you came from.
-        </p>
-        <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button href="/" variant="ink" size="sm">
-            Back to Beevo
-          </Button>
-          <Button href="/signup" variant="outline" size="sm">
-            Start your own page
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function CourseNotFound({ handle }: { handle: string }) {
-  return (
-    <section className="mx-auto max-w-lg px-4 py-20 text-center sm:px-6">
-      <div className="rounded-[2.5rem] border-2 border-ink bg-white p-8 shadow-hard sm:p-12">
-        <Sticker color="accent">Not available</Sticker>
-        <h1 className="mt-6 text-2xl font-bold tracking-tight text-ink">
-          This course isn’t available
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-smoke">
-          It may have been unpublished, archived, or the link is incomplete. Only published courses
-          are visible here.
-        </p>
-        <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button href={`/@${handle}`} variant="ink" size="sm">
-            View @{handle}
-          </Button>
-          <Button href="/" variant="outline" size="sm">
-            Beevo home
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /** "Powered by Beevo" strip at the bottom of every storefront. */
 export function PoweredByBanner() {
   return (
-    <section className="border-t-2 border-ink bg-ink">
+    <aside aria-label="About Beevo" className="border-t-2 border-ink bg-ink">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
         <p className="flex items-center gap-2 text-sm font-semibold text-cream/80">
           <Sparkles className="size-4 text-lime" aria-hidden="true" />
-          This storefront runs on Beevo.
+          <span>
+            This storefront runs on{" "}
+            <Link
+              href="/"
+              className="font-bold text-cream underline decoration-lime/60 underline-offset-4 hover:decoration-lime"
+            >
+              Beevo
+            </Link>
+            .
+          </span>
         </p>
         <Button href="/signup" variant="lime" size="sm">
           Create yours free
           <ArrowRight className="size-4" aria-hidden="true" />
         </Button>
       </div>
-    </section>
+    </aside>
   );
 }

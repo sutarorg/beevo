@@ -221,3 +221,69 @@ Chronological, opinionated record. New phases append — never rewrite history.
   visible while the destination is prepared. Inline loading indicators still
   communicate pending data, while `FullPageLoader` remains limited to blocking
   states such as session verification and course-draft creation.
+
+## D15 — 2026-10 · Search visibility (SEO) foundation
+
+- **One canonical origin for every absolute URL.** `src/lib/seo.ts` derives
+  `SITE_URL` from `NEXT_PUBLIC_APP_URL` (falling back to `https://beevo.in`) and
+  every `metadataBase`, `<link rel="canonical">`, `og:url`, sitemap `<loc>`,
+  robots `Host`/`Sitemap` line and JSON-LD `@id` comes from it. `www.` requests
+  308-redirect to the apex host, built from that origin, so a dev port or a
+  preview hostname can never leak into a production redirect.
+- **Titles are templated once.** The root layout owns `%s · Beevo`; pages pass a
+  bare title. The homepage opts out with `title.absolute` because its title
+  already names the product — otherwise Google would see `… · Beevo · Beevo`.
+  `createPageMetadata()` is the single helper used by every public page, so
+  canonical URL, Open Graph, Twitter card and robots directives can't drift.
+  A page-level `openGraph` always carries the full set: Next replaces (does not
+  merge) the parent object.
+- **Structured data is limited to verifiable facts.** Organization + WebSite +
+  SoftwareApplication on the homepage, `ProfilePage`/`Person` on creator
+  storefronts, `Course` (with `offers`, `provider`, `hasCourseInstance`) plus
+  `BreadcrumbList` on course pages, `FAQPage` on `/faq`. Deliberately absent:
+  `aggregateRating`, enrolment counts, `SearchAction`, `sameAs` and postal
+  address — we hold no such data, and inventing it risks a manual action.
+  Serialisation escapes `<` to `\u003c`, so a course title containing
+  `</script>` cannot break out of the JSON-LD block.
+- **Private trees stay crawlable but `noindex`.** `robots.txt` allows
+  everything except `/api/` crawl noise. `/creator`, `/learn`, `/admin` and the
+  auth screens are *not* disallowed: a blocked URL is never fetched, so its
+  `noindex` is never read and it can still be indexed from links. They are
+  marked with `robots: noindex, nofollow` metadata plus an
+  `X-Robots-Tag: noindex, nofollow` response header from `next.config.ts`,
+  which also covers API JSON and anything not routed through a page.
+- **Sitemap is dynamic and honest.** `/sitemap.xml` (revalidate 1h) lists the
+  static marketing/legal pages plus non-empty creator storefronts and published
+  courses read straight from the database — never drafts, archived or
+  unpublished courses, empty storefronts, or suspended creators. `lastmod`
+  comes from `publishedAt`/`updatedAt`, not from request time. If the database
+  is unreachable the route degrades to the static list instead of returning 500,
+  and the list is sliced to the protocol's 50k-URL limit.
+- **Storefronts render server-side.** `loadPublicCreatorPage` /
+  `loadPublicCoursePage` (`src/server/storefront-data.ts`) are shared by the API
+  handlers and the pages, wrapped in React `cache` so `generateMetadata` and the
+  page body run one set of queries per request. Unknown handles, unknown slugs
+  and suspended creators call `notFound()` → a real 404 with a 404 status,
+  instead of a 200 shell that hydrates into an empty state.
+- **`noindex` is removed only where the content is real.** Storefront pages
+  dropped `noindex` because they now ship title, description, price, curriculum
+  and JSON-LD in the initial HTML. A creator with no published courses keeps
+  `noindex, follow` and is excluded from the sitemap — thin pages stay out of
+  the index until they have something to say.
+- **Page quality shipped alongside the metadata.** `--color-accent-deep`
+  (`#c23a0a`) for small orange text and filled buttons, because the brand accent
+  `#e8490f` only clears WCAG AA at large display sizes on cream; `--color-smoke`
+  for placeholders; skip link; one `<h1>` per page (with the extra storefront
+  headings demoted); `<ol>` breadcrumbs; `aria-current="page"` in nav;
+  `aria-hidden` on closed mobile menus; responsive `sizes` on card images.
+  `.reveal` animations only arm when JS runs (`html[data-js]`), so content is
+  never invisible to crawlers or no-JS visitors.
+- **Malformed URLs answer 400, not 500.** `src/proxy.ts` decodes percent-escapes
+  itself and returns a plain 400 for malformed encoding, and 404s unknown
+  top-level segments (allowlist + `/@handle`), so we don't emit stack-trace
+  errors for junk URLs.
+- **The audit is repeatable.** `npm run seo:audit` (`scripts/seo-audit.mjs`)
+  checks robots.txt, sitemap validity/origin/uniqueness, per-page title,
+  description length, canonical, OG, Twitter card, JSON-LD parseability, single
+  `<h1>`, `lang`, private-route `noindex` (meta **and** header) and real 404s
+  against a running server. It is a smoke test, not a ranking promise.

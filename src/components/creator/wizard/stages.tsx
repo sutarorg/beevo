@@ -238,7 +238,7 @@ export function PricingStage({
             placeholder="999"
             aria-invalid={Boolean(error) || undefined}
             className={cn(
-              "w-full max-w-56 rounded-xl border-2 bg-white px-4 py-3 text-xl font-bold text-ink tabular-nums placeholder:text-ink/25 focus:ring-4 focus:ring-accent/15 focus:outline-none",
+              "w-full max-w-56 rounded-xl border-2 bg-white px-4 py-3 text-xl font-bold text-ink tabular-nums placeholder:text-smoke focus:ring-4 focus:ring-accent/15 focus:outline-none",
               error ? "border-accent-deep" : "border-ink focus:border-accent",
             )}
           />

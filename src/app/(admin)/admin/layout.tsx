@@ -7,6 +7,7 @@ export const metadata: Metadata = {
     default: "Admin",
     template: "%s · Beevo Admin",
   },
+  description: "Beevo Admin — the private platform administration console.",
   robots: { index: false, follow: false },
 };
 

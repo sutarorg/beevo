@@ -1,7 +1,21 @@
 import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/site/logo";
+
+/**
+ * Authentication screens are private and never useful in search results.
+ * `noindex, nofollow` is declared once here for every /login, /signup and
+ * password-reset variant (pages keep their own human-facing titles).
+ */
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+};
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,7 +25,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <Logo />
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-ink transition-colors hover:text-accent"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-ink transition-colors hover:text-accent-deep"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back to home

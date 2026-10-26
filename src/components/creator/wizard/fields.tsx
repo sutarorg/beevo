@@ -95,7 +95,7 @@ export function AutosaveField({
           rows={4}
           aria-invalid={Boolean(validationError) || undefined}
           className={cn(
-            "w-full rounded-xl border-2 bg-white px-4 py-3 text-base text-ink transition-colors placeholder:text-ink/35 focus:ring-4 focus:ring-accent/15 focus:outline-none",
+            "w-full rounded-xl border-2 bg-white px-4 py-3 text-base text-ink transition-colors placeholder:text-smoke focus:ring-4 focus:ring-accent/15 focus:outline-none",
             validationError ? "border-accent-deep" : "border-ink focus:border-accent",
           )}
         />

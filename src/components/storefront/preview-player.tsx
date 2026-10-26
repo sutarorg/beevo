@@ -116,7 +116,7 @@ export function PreviewPlayerModal({
             >
               <div className="flex items-center justify-between gap-3 border-b-2 border-ink bg-white px-5 py-3.5">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] text-accent uppercase">
+                  <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] text-accent-deep uppercase">
                     <Play className="size-3 fill-current" aria-hidden="true" />
                     {isFreeCourse ? "Preview" : "Free preview"}
                   </p>

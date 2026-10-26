@@ -47,6 +47,14 @@
 
 `/@username` (creator storefront), `/@username/course-slug` (course sales page + Razorpay checkout)
 
+### SEO surfaces
+
+`/robots.txt` (`src/app/robots.ts`), `/sitemap.xml` (`src/app/sitemap.ts`, revalidated hourly:
+static pages + non-empty storefronts + published courses). Every public page carries a canonical
+URL, Open Graph/Twitter metadata and JSON-LD; the private app trees (`/creator`, `/learn`, `/admin`,
+auth) are `noindex` via metadata and `X-Robots-Tag`. `npm run seo:audit` verifies the surface
+against a running server.
+
 ### Auth
 
 `/login`, `/signup`, `/forgot-password`, `/forgot-password/reset` (completion, token via query param)
@@ -92,7 +100,8 @@ Canonical definitions live in `.env.example`:
 | --- | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string | scaffold |
 | `NEXT_PUBLIC_USE_MOCKS` | Explicit opt-in to mock service adapters. Never enable in real production. | 1 |
-| `NEXT_PUBLIC_APP_URL` | Absolute site URL for metadata/emails | 1 |
+| `NEXT_PUBLIC_APP_URL` | Absolute site URL for metadata/emails (canonical origin; `https://beevo.in` in production) | 1 |
+| `GOOGLE_SITE_VERIFICATION` | Search Console verification token (optional; omitted when empty) | 1 |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase client | 5 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase | 5 |
 | `NEXT_PUBLIC_RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET` | Payments | 5 |

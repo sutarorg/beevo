@@ -21,11 +21,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { priceLabel } from "@/lib/domain";
 import type { PublicCoursePage, PublicLessonMeta } from "@/lib/learner-types";
-import { useAsyncData } from "@/lib/hooks";
-import { getStorefrontService } from "@/lib/services/storefront";
 import { cn } from "@/lib/utils";
-import { CardListSkeleton, FailedState, Skeleton } from "@/components/creator/ui";
-import { CourseNotFound, PoweredByBanner } from "@/components/storefront/cards";
+import { PoweredByBanner } from "@/components/storefront/cards";
 // Loaded on demand: checkout and the video preview are only needed after the
 // buyer clicks, so their JavaScript stays out of the first paint.
 const CheckoutSheet = dynamic(
@@ -53,11 +50,11 @@ const INCLUDED = [
 function SecureCheckoutLogos() {
   return (
     <div className="mt-3.5 flex flex-col items-center">
-      <p className="text-center text-[11px] font-medium tracking-wide text-neutral-400">
+      <p className="text-center text-[11px] font-medium tracking-wide text-smoke">
         Secure checkout
       </p>
       <div
-        className="mt-2 flex flex-wrap items-center justify-center gap-5 text-neutral-400 sm:gap-6"
+        className="mt-2 flex flex-wrap items-center justify-center gap-5 text-smoke/80 sm:gap-6"
         aria-label="Accepted payment methods: UPI, Visa, Mastercard, and RuPay"
       >
         {/* UPI */}
@@ -147,41 +144,14 @@ function SecureCheckoutLogos() {
   );
 }
 
-export function CourseSalesPage({ handle, slug }: { handle: string; slug: string }) {
-  const service = getStorefrontService();
-  const { state, reload } = useAsyncData(
-    () =>
-      service
-        ? service.getCourse(handle, slug)
-        : Promise.resolve({
-            ok: false as const,
-            error: { code: "unavailable", message: "Storefront service unavailable" },
-          }),
-    [handle, slug],
-  );
-
-  if (state.status === "loading" || state.status === "idle") {
-    return (
-      <div className="mx-auto max-w-6xl space-y-8 px-4 py-12 sm:px-6">
-        <Skeleton className="h-64" />
-        <CardListSkeleton count={3} />
-      </div>
-    );
-  }
-
-  if (state.status === "error") {
-    if (state.error.code === "not_found") return <CourseNotFound handle={handle} />;
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <FailedState title="Couldn't load this course" body={state.error.message} onRetry={reload} />
-      </div>
-    );
-  }
-
-  return <SalesBody course={state.data} />;
-}
-
-function SalesBody({ course }: { course: PublicCoursePage }) {
+/**
+ * Course sales page body.
+ *
+ * The published course arrives from the server page (already rendered into
+ * the HTML). Only the accordion, checkout sheet, and preview player are
+ * interactive; everything else is static markup that crawlers can read.
+ */
+export function CourseSalesPage({ course }: { course: PublicCoursePage }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [purchased, setPurchased] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(() => {
@@ -249,21 +219,24 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
 
           {/* Hero Left — Course Identity & Creator */}
           <header className="relative z-10 pt-8 sm:pt-12 lg:col-start-1 lg:row-start-1 lg:py-12">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex flex-wrap items-center gap-2 text-xs font-semibold text-smoke"
-            >
-              {/* Back-to-storefront is plain text (@username) — no button background. */}
-              <Link
-                href={`/@${course.creator.handle}`}
-                className="font-bold text-accent underline-offset-2 hover:underline"
-              >
-                @{course.creator.handle}
-              </Link>
-              <span aria-hidden="true" className="text-smoke/60">
-                /
-              </span>
-              <span className="truncate font-bold text-ink">{course.title}</span>
+            <nav aria-label="Breadcrumb">
+              <ol className="flex flex-wrap items-center gap-2 text-xs font-semibold text-smoke">
+                <li>
+                  {/* Back-to-storefront is plain text (@username) — no button background. */}
+                  <Link
+                    href={`/@${course.creator.handle}`}
+                    className="font-bold text-accent-deep underline-offset-2 hover:underline"
+                  >
+                    @{course.creator.handle}
+                  </Link>
+                </li>
+                <li aria-hidden="true" className="text-smoke/60">
+                  /
+                </li>
+                <li aria-current="page" className="min-w-0">
+                  <span className="block truncate font-bold text-ink">{course.title}</span>
+                </li>
+              </ol>
             </nav>
 
             <h1 className="mt-4 text-3xl font-bold tracking-tight text-balance text-ink sm:text-5xl lg:leading-[1.08]">
@@ -304,7 +277,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                   <span className="block truncate text-sm font-bold text-ink sm:text-base">
                     {course.creator.displayName}
                   </span>
-                  <span className="block truncate text-xs font-semibold text-accent">
+                  <span className="block truncate text-xs font-semibold text-accent-deep">
                     @{course.creator.handle} · {course.creator.niche || "Creator"}
                   </span>
                 </span>
@@ -408,7 +381,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                   Non-refundable ·{" "}
                   <Link
                     href="/refund-policy"
-                    className="font-semibold text-accent underline underline-offset-2"
+                    className="font-semibold text-accent-deep underline underline-offset-2"
                   >
                     Purchase policy
                   </Link>
@@ -520,7 +493,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                         aria-expanded={expanded}
                         className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-parchment/60"
                       >
-                        <span className="font-editorial text-lg text-accent italic">
+                        <span className="font-editorial text-lg text-accent-deep italic">
                           {String(sectionIndex + 1).padStart(2, "0")}
                         </span>
                         <span className="flex-1 text-sm font-bold text-ink sm:text-base">
@@ -566,6 +539,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                   {lesson.isPreview ? null : (
                                     <Lock
                                       className="size-3 text-smoke"
+                                      role="img"
                                       aria-label="Locked until enrolled"
                                     />
                                   )}
@@ -591,7 +565,7 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
                                     <button
                                       type="button"
                                       onClick={() => setPreviewLesson(lesson)}
-                                      className="font-bold text-accent underline underline-offset-2"
+                                      className="font-bold text-accent-deep underline underline-offset-2"
                                     >
                                       Watch {previewNoun}
                                     </button>
@@ -644,7 +618,11 @@ function SalesBody({ course }: { course: PublicCoursePage }) {
       />
 
       {/* Sticky mobile buy bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-cream/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm lg:hidden">
+      <div
+        aria-label="Buy this course"
+        role="region"
+        className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-cream/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm lg:hidden"
+      >
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-lg font-bold text-ink tabular-nums">{priceLabel(course.priceInPaise)}</p>
