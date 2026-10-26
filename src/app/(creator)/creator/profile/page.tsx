@@ -1,13 +1,15 @@
 "use client";
 
-import { Camera, Globe, Link2, Loader2, Plus, Trash2, UserRound } from "lucide-react";
+import { Camera, Globe, Link2, Loader2, LogOut, Plus, Trash2, UserRound } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { shareableOrigin } from "@/lib/config";
 import { useAsyncData } from "@/lib/hooks";
+import { getAuthService } from "@/lib/services/auth";
 import { getCreatorDataService } from "@/lib/services/creator-data";
 import { getMediaService, UPLOAD_RULES, validateUploadFile } from "@/lib/services/media";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/creator/dialogs";
 import {
   CardListSkeleton,
   CopyButton,
@@ -39,6 +41,7 @@ export default function CreatorProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarProgress, setAvatarProgress] = useState(0);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -151,6 +154,12 @@ export default function CreatorProfilePage() {
     }
     toast.push({ variant: "success", title: "Profile saved", description: "Your public page will use these details." });
     reload();
+  };
+
+  const signOut = async () => {
+    // Destroy the server session + cookie first, then leave for sign-in.
+    await getAuthService()?.signOut();
+    window.location.assign("/login");
   };
 
   return (
@@ -324,6 +333,10 @@ export default function CreatorProfilePage() {
             <Button variant="outline" onClick={reload} disabled={saving}>
               Discard changes
             </Button>
+            <Button variant="outline" className="ml-auto" onClick={() => setConfirmSignOut(true)}>
+              <LogOut className="size-4" aria-hidden="true" />
+              Log out
+            </Button>
           </div>
         </div>
 
@@ -401,6 +414,15 @@ export default function CreatorProfilePage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmSignOut}
+        title="Log out?"
+        body="Your profile, courses, and earnings stay saved on your account for the next sign-in."
+        confirmLabel="Log out"
+        onConfirm={() => void signOut()}
+        onCancel={() => setConfirmSignOut(false)}
+      />
     </div>
   );
 }

@@ -153,7 +153,12 @@ export function CourseWizard({
           <ArrowLeft className="size-4" aria-hidden="true" />
           My courses
         </Button>
-        <div className="flex flex-wrap items-center gap-2">
+        {/*
+          ml-auto on the cluster keeps it pinned right when the header wraps
+          on phones; ml-auto on the delete button keeps the trash right-aligned
+          even if the chip + timestamp wrap onto their own line.
+        */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <StatusChip status={course.status} />
           <span className="text-[11px] font-semibold text-smoke">
             Updated {formatDateTime(course.updatedAt)}
@@ -165,7 +170,7 @@ export function CourseWizard({
             onClick={() => setConfirmDelete(true)}
             aria-label="Delete course"
             title="Delete course"
-            className="w-9 border-accent-deep px-0 text-accent-deep hover:bg-accent-deep hover:text-cream"
+            className="ml-auto w-9 border-accent-deep px-0 text-accent-deep hover:bg-accent-deep hover:text-cream"
           >
             <Trash2 className="size-4" aria-hidden="true" />
           </Button>

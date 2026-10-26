@@ -64,7 +64,13 @@ export default function CreatorOrdersPage() {
       />
 
       {state.status === "success" ? (
-        <div className="mb-5 grid grid-cols-3 gap-3">
+        /*
+          Mobile: 2 rows × 2 columns — Gross and Paid share the top row,
+          Refunded fills the row below them. Three across squeezed these
+          stat cards into slivers and let them run past the screen edge.
+          sm+ keeps the compact one-row layout.
+        */
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard
             icon={<IndianRupee className="size-4.5" aria-hidden="true" />}
             label="Gross (paid)"
@@ -79,6 +85,7 @@ export default function CreatorOrdersPage() {
             icon={<RotateCcw className="size-4.5" aria-hidden="true" />}
             label="Refunded"
             value={String(totals.refunded)}
+            className="col-span-2 sm:col-span-1"
           />
         </div>
       ) : null}

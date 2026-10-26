@@ -63,13 +63,16 @@ export function StatCard({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-2xl border-2 border-ink bg-white p-4 shadow-hard-xs", className)}>
+    // min-w-0: the card must shrink to its grid track, never size to its
+    // widest value — a long ₹ figure used to push the row past the screen
+    // edge on narrow phones.
+    <div className={cn("min-w-0 rounded-2xl border-2 border-ink bg-white p-4 shadow-hard-xs", className)}>
       <div className="flex items-center justify-between gap-2">
         <span className="grid size-9 place-items-center rounded-xl border-2 border-ink bg-parchment">
           {icon}
         </span>
       </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
+      <p className="mt-3 truncate text-2xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
       <p className="text-xs font-bold tracking-wide text-smoke uppercase">{label}</p>
       {hint ? <p className="mt-1 text-[11px] leading-snug text-smoke">{hint}</p> : null}
     </div>
