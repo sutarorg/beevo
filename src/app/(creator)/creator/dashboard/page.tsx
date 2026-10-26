@@ -123,9 +123,15 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
+      {/*
+        Two-up on desktop, stacked on phones. `minmax(0, …)` + `min-w-0` +
+        `w-full` keep both cards locked to their grid track: a card must never
+        size to its widest line and push its right edge into the screen on
+        narrow viewports (the same rule as the marketing cards in PR #12).
+      */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         {/* Recent orders */}
-        <section aria-labelledby="recent-orders" className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
+        <section aria-labelledby="recent-orders" className="w-full min-w-0 rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
           <div className="flex items-center justify-between gap-2">
             <h2 id="recent-orders" className="flex items-center gap-2 text-base font-bold text-ink">
               Recent orders
@@ -142,7 +148,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
             ) : null}
             {data.recentOrders.map((order) => (
               <li key={order.id} className="flex items-center gap-3 py-2.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-ink bg-parchment text-xs font-bold">
+                <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-ink bg-parchment text-xs font-bold">
                   {order.buyerName.split(" ").map((part) => part[0]).join("")}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -151,7 +157,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
                     {order.courseTitle} · {formatDate(order.placedAt)}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-sm font-bold text-ink tabular-nums">{formatINR(order.grossInPaise)}</p>
                   <span className={`inline-block rounded-full border px-1.5 text-[9px] font-bold tracking-wide uppercase ${ORDER_STATUS_STYLE[order.status]}`}>
                     {order.status}
@@ -163,7 +169,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
         </section>
 
         {/* Publication statuses */}
-        <section aria-labelledby="pub-status" className="rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
+        <section aria-labelledby="pub-status" className="w-full min-w-0 rounded-3xl border-2 border-ink bg-white p-5 shadow-hard-xs">
           <div className="flex items-center justify-between gap-2">
             <h2 id="pub-status" className="flex items-center gap-2 text-base font-bold text-ink">
               <Clapperboard className="size-4.5 text-accent" aria-hidden="true" /> Course statuses
@@ -197,7 +203,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
         </section>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Notifications */}
         <section
           aria-labelledby="dash-ntf"
@@ -226,7 +232,7 @@ function DashboardBody({ data, reload }: { data: DashboardState; reload: () => v
         </section>
 
         {/* Earnings + performance mini */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <section aria-labelledby="dash-earnings" className="rounded-3xl border-2 border-ink bg-ink p-5 text-cream shadow-hard-xs">
             <div className="flex items-center justify-between gap-2">
               <h2 id="dash-earnings" className="text-base font-bold">

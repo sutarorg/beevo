@@ -4,11 +4,16 @@ import {
   ArrowUpRight,
   BadgeIndianRupee,
   Check,
+  ChevronDown,
   CircleAlert,
+  Clock3,
   Eye,
   FileText,
   Globe,
+  Lock,
+  Play,
   Share2,
+  ShieldCheck,
   UserRound,
   Video,
   X,
@@ -18,14 +23,21 @@ import Link from "next/link";
 import { useState } from "react";
 import type { CourseEditor } from "@/lib/creator-types";
 import { shareableOrigin } from "@/lib/config";
+import { useAsyncData } from "@/lib/hooks";
 import { commissionBreakdown, formatINR, priceLabel } from "@/lib/domain";
 import { readinessChecklist, type CourseService, type CourseStage } from "@/lib/services/courses";
-import { cn, formatDate } from "@/lib/utils";
+import { getCreatorDataService } from "@/lib/services/creator-data";
+import { cn, formatDate, isMissingDuration, parseDurationLabel } from "@/lib/utils";
 import { ConfirmDialog, Modal } from "@/components/creator/dialogs";
 import { AutosaveField, OutcomesEditor } from "@/components/creator/wizard/fields";
 import { CoverUpload } from "@/components/creator/wizard/uploads";
 import { StatusChip, CopyButton } from "@/components/creator/ui";
+import {
+  COURSE_INCLUDES,
+  SecureCheckoutLogos,
+} from "@/components/storefront/sales-page";
 import { Button } from "@/components/ui/button";
+import { ProfileAvatar, Sticker } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 
 export function coursePublicUrl(course: CourseEditor): string {
@@ -248,16 +260,11 @@ export function PricingStage({
         ) : null}
 
         {isFree ? (
-          <div className="mt-4 flex items-center gap-2 rounded-2xl border-2 border-ink bg-lime px-4 py-3">
-            <span className="grid size-8 place-items-center rounded-lg border-2 border-ink bg-white text-[10px] font-black tracking-widest">
-              ₹0
-            </span>
-            <div>
-              <p className="text-sm font-bold text-ink">FREE course</p>
-              <p className="text-[11px] text-ink/80">
-                No payment step. Anyone with the link can enrol and get dashboard access.
-              </p>
-            </div>
+          <div className="mt-4 rounded-2xl border-2 border-ink bg-lime px-4 py-3">
+            <p className="text-sm font-bold text-ink">FREE course</p>
+            <p className="text-[11px] text-ink/80">
+              No payment step. Anyone with the link can enrol and get dashboard access.
+            </p>
           </div>
         ) : null}
 
@@ -327,69 +334,440 @@ export function StorefrontPreviewModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const lessonTotal = course.sections.reduce((sum, section) => sum + section.lessons.length, 0);
+  /*
+    This is a faithful replica of the live course detail page
+    (CourseSalesPage at /@handle/slug) — same sections, same order, same
+    visual language — so what the creator previews is exactly what buyers
+    get. Stats are derived with the same formulas the storefront data layer
+    uses, so the numbers match the live page. Only the accordion is
+    interactive here; enrolment and playback stay decorative.
+  */
+  const { state: profileState } = useAsyncData(() => {
+    const service = getCreatorDataService();
+    return service
+      ? service.getProfile()
+      : Promise.resolve({
+          ok: false as const,
+          error: { code: "unavailable", message: "Service unavailable" },
+        });
+  }, []);
+  const profile = profileState.status === "success" ? profileState.data : null;
+  const creator = {
+    handle: course.creatorHandle,
+    displayName: profile?.displayName || course.creatorName,
+    avatarUrl: profile?.avatarUrl ?? null,
+    niche: profile?.niche || "",
+  };
+
+  const isFreeCourse = (course.priceInPaise ?? 0) === 0;
+  // On a ₹0 course the whole course is free, so preview lessons are simply
+  // "preview"; "free preview" is only meaningful on a paid course.
+  const previewNoun = isFreeCourse ? "preview" : "free preview";
+  const previewNounPlural = isFreeCourse ? "previews" : "free previews";
+  const allLessons = course.sections.flatMap((section) => section.lessons);
+  const previewable = (lesson: { type: string; isPreview?: boolean }) =>
+    lesson.type === "video" && lesson.isPreview === true;
+  const freePreviewLesson = allLessons.find(previewable) ?? null;
+  const previewCount = allLessons.filter(previewable).length;
+  const lessonCount = allLessons.length;
+  const videoCount = allLessons.filter((lesson) => lesson.type === "video").length;
+  const resourceCount = allLessons.reduce(
+    (sum, lesson) => sum + (lesson.type === "resources" ? lesson.media.length : 0),
+    0,
+  );
+  // Real runtime from measured video durations; the same estimate fallback
+  // as the live page when nothing has been measured yet.
+  const measuredSeconds = allLessons.reduce(
+    (sum, lesson) =>
+      lesson.type === "video" ? sum + parseDurationLabel(lesson.media[0]?.durationLabel) : sum,
+    0,
+  );
+  const totalSeconds = measuredSeconds > 0 ? measuredSeconds : Math.max(videoCount, 1) * 8 * 60;
+  const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
+  const durationLabel =
+    totalMinutes < 60
+      ? `${totalMinutes}m`
+      : `${Math.floor(totalMinutes / 60)}h${totalMinutes % 60 === 0 ? "" : ` ${totalMinutes % 60}m`}`;
+
+  const lessonDurationOf = (lesson: (typeof allLessons)[number]): string | undefined =>
+    isMissingDuration(lesson.media[0]?.durationLabel) ? undefined : lesson.media[0]?.durationLabel;
+
+  // Curriculum accordion — same behaviour as the live page (first section open).
+  const [openSections, setOpenSections] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    if (course.sections[0]?.id) initial.add(course.sections[0].id);
+    return initial;
+  });
+  const allSectionsOpen =
+    course.sections.length > 0 &&
+    course.sections.every((section) => openSections.has(section.id));
+  const toggleSection = (sectionId: string) => {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  };
+  const toggleAllSections = () => {
+    if (allSectionsOpen) setOpenSections(new Set());
+    else setOpenSections(new Set(course.sections.map((section) => section.id)));
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="Storefront preview" wide>
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="inline-flex items-center rounded-full border-2 border-ink bg-lime px-2 py-0.5 text-[10px] font-bold tracking-[0.14em] text-ink uppercase">
-          {course.status === "published" ? "Storefront preview" : "Draft preview"}
+          {course.status === "published" ? "Preview" : "Draft preview"}
         </span>
-        <p className="text-[11px] text-smoke">How your sales page looks to buyers.</p>
+        <p className="text-[11px] text-smoke">
+          The live course page, exactly as buyers see it — purchases are disabled here.
+        </p>
       </div>
-      <div className="overflow-hidden rounded-2xl border-2 border-ink bg-white">
-        <div className="relative aspect-[16/9] bg-parchment">
-          {course.cover?.previewUrl ? (
-            <Image src={course.cover.previewUrl} alt="" fill className="object-cover" />
-          ) : (
-            <div className="grid h-full place-items-center text-sm text-smoke">No cover yet</div>
-          )}
-          <span className="absolute bottom-3 left-3 rounded-full border-2 border-ink bg-lime px-3 py-1 text-sm font-bold shadow-hard-xs">
-            {course.priceInPaise !== null ? priceLabel(course.priceInPaise) : "No price"}
-          </span>
-        </div>
-        <div className="p-5">
-          <p className="text-xs font-bold tracking-[0.2em] text-accent uppercase">
-            @{course.creatorHandle}
-          </p>
-          <h3 className="mt-1 text-2xl font-bold tracking-tight text-ink">
+
+      {/* Replica of the live course detail page. */}
+      <div className="overflow-hidden rounded-2xl border-2 border-ink">
+        {/* Hero — parchment backdrop, breadcrumb → title → stats → creator card */}
+        <div className="border-b-2 border-ink bg-parchment px-5 pt-8 pb-8 sm:px-8">
+          <nav aria-label="Breadcrumb">
+            <ol className="flex flex-wrap items-center gap-2 text-xs font-semibold text-smoke">
+              <li>
+                <Link
+                  href={`/@${course.creatorHandle}`}
+                  className="font-bold text-accent-deep underline-offset-2 hover:underline"
+                >
+                  @{course.creatorHandle}
+                </Link>
+              </li>
+              <li aria-hidden="true" className="text-smoke/60">
+                /
+              </li>
+              <li aria-current="page" className="min-w-0">
+                <span className="block truncate font-bold text-ink">{course.title || "Untitled course"}</span>
+              </li>
+            </ol>
+          </nav>
+
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-balance text-ink">
             {course.title || "Untitled course"}
-          </h3>
-          <p className="mt-2 text-sm leading-relaxed text-smoke">
+          </h1>
+
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-pretty text-smoke">
             {course.shortDescription || "No description yet."}
           </p>
-          {course.outcomes.length > 0 ? (
-            <ul className="mt-4 space-y-2">
-              {course.outcomes.slice(0, 4).map((outcome, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm text-ink">
-                  <Check className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-                  {outcome}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <div className="mt-5 border-t-2 border-dashed border-ink/20 pt-4">
-            <p className="text-xs font-bold tracking-[0.18em] text-smoke uppercase">
-              Curriculum · {course.sections.length} sections · {lessonTotal} lessons
-            </p>
-            <ul className="mt-2.5 space-y-1.5">
-              {course.sections.slice(0, 3).map((section, index) => (
-                <li key={section.id} className="text-sm text-ink">
-                  <span className="font-editorial mr-1.5 text-accent italic">{index + 1}.</span>
-                  {section.title}
-                </li>
-              ))}
-              {course.sections.length > 3 ? (
-                <li className="text-xs text-smoke">+ {course.sections.length - 3} more sections</li>
-              ) : null}
-            </ul>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Sticker color="lime">
+              {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"}
+            </Sticker>
+            <Sticker color="cream">{durationLabel}</Sticker>
+            <Sticker color="cream">
+              {resourceCount} {resourceCount === 1 ? "download" : "downloads"}
+            </Sticker>
+            {previewCount > 0 ? (
+              <Sticker color="ink">
+                {previewCount} {previewCount === 1 ? previewNoun : previewNounPlural}
+              </Sticker>
+            ) : null}
           </div>
-          <div aria-hidden="true" className="pointer-events-none mt-5">
-            <div className="flex w-full items-center justify-center rounded-full border-2 border-ink bg-accent py-3 text-sm font-bold text-cream opacity-70">
-              Enrol now
+
+          <Link
+            href={`/@${course.creatorHandle}`}
+            className="group mt-6 flex items-center justify-between gap-3 rounded-2xl border-2 border-ink bg-white p-3.5 shadow-hard-xs sm:p-4"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <ProfileAvatar
+                src={creator.avatarUrl}
+                name={creator.displayName}
+                sizePx={48}
+                className="size-12"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-ink sm:text-base">
+                  {creator.displayName}
+                </span>
+                <span className="block truncate text-xs font-semibold text-accent-deep">
+                  @{creator.handle} · {creator.niche || "Creator"}
+                </span>
+              </span>
+            </span>
+            <span className="hidden shrink-0 items-center gap-1 rounded-full border-2 border-ink bg-cream px-3 py-1 text-[11px] font-bold text-ink transition-colors group-hover:bg-lime sm:inline-flex">
+              View storefront
+              <ArrowUpRight className="size-3.5" aria-hidden="true" />
+            </span>
+          </Link>
+        </div>
+
+        {/* Body — same mobile flow as the live page: enrol card, then the sections. */}
+        <div className="space-y-8 bg-cream px-5 py-8 sm:px-8">
+          {/* Enrol card — cover, price, secure checkout, includes, policy */}
+          <div className="overflow-hidden rounded-3xl border-2 border-ink bg-white shadow-hard">
+            {/* Course thumbnail is always 16:9, matching the uploaded cover. */}
+            <div className="relative aspect-video border-b-2 border-ink bg-parchment">
+              {course.cover?.previewUrl ? (
+                <Image
+                  src={course.cover.previewUrl}
+                  alt={`${course.title || "Course"} course cover`}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 400px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="grid h-full place-items-center font-editorial text-5xl text-ink/20 italic">
+                  {(course.title || "C").slice(0, 1)}
+                </div>
+              )}
+              {freePreviewLesson ? (
+                <span className="absolute right-3 bottom-3 inline-flex items-center gap-2 rounded-full border-2 border-ink bg-lime px-3.5 py-1.5 text-xs font-bold text-ink shadow-hard-xs">
+                  <Play className="size-3.5 fill-current" aria-hidden="true" />
+                  Watch {previewNoun}
+                </span>
+              ) : null}
             </div>
-            <p className="mt-2 text-center text-[11px] text-smoke">
-              Purchases are disabled in this preview.
-            </p>
+
+            <div className="p-5 sm:p-6">
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <p className="font-editorial text-5xl leading-none text-ink italic">
+                    {course.priceInPaise !== null ? priceLabel(course.priceInPaise) : "No price"}
+                  </p>
+                  <p className="mt-1.5 text-[11px] font-bold tracking-[0.14em] text-smoke uppercase">
+                    {course.priceInPaise === null
+                      ? "price not set"
+                      : isFreeCourse
+                        ? "free · enrol instantly"
+                        : "one time · INR"}
+                  </p>
+                </div>
+                <span className="grid size-10 place-items-center rounded-2xl border-2 border-ink bg-lime/40">
+                  <ShieldCheck className="size-5 text-moss" aria-hidden="true" />
+                </span>
+              </div>
+
+              <div aria-hidden="true" className="pointer-events-none">
+                <Button
+                  type="button"
+                  variant="accent"
+                  size="lg"
+                  tabIndex={-1}
+                  className="mt-5 w-full"
+                >
+                  <BadgeIndianRupee className="size-5" aria-hidden="true" />
+                  {isFreeCourse ? "Enroll free" : "Enroll now"}
+                </Button>
+              </div>
+
+              {/* Small low-brightness "Secure checkout" label + 4 grey payment logos */}
+              <SecureCheckoutLogos />
+
+              <div className="mt-5 border-t-2 border-dashed border-ink/15 pt-4">
+                <p className="text-[11px] font-bold tracking-[0.14em] text-smoke uppercase">
+                  This course includes
+                </p>
+                <ul className="mt-3 space-y-2.5">
+                  {COURSE_INCLUDES.map((item) => (
+                    <li key={item.label} className="flex items-center gap-2.5 text-xs font-medium text-smoke">
+                      <span className="grid size-6 shrink-0 place-items-center rounded-lg border border-ink/20 bg-cream">
+                        <item.icon className="size-3.5 text-ink" aria-hidden="true" />
+                      </span>
+                      {item.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="mt-5 rounded-xl bg-parchment/70 p-3 text-[11px] leading-relaxed text-smoke">
+                Non-refundable ·{" "}
+                <Link
+                  href="/refund-policy"
+                  className="font-semibold text-accent-deep underline underline-offset-2"
+                >
+                  Purchase policy
+                </Link>
+              </p>
+            </div>
+          </div>
+
+          {/* Outcomes */}
+          {course.outcomes.length > 0 ? (
+            <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
+                  What you’ll walk away with
+                </h2>
+                <span className="text-xs font-semibold text-smoke">
+                  {course.outcomes.length} key {course.outcomes.length === 1 ? "outcome" : "outcomes"}
+                </span>
+              </div>
+              <ul className="mt-5 grid gap-3">
+                {course.outcomes.map((outcome, index) => (
+                  <li
+                    key={index}
+                    className="flex w-full items-start gap-3 rounded-2xl border-2 border-ink/10 bg-cream/60 p-3.5 text-sm font-medium text-ink"
+                  >
+                    <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 border-ink bg-lime">
+                      <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
+                    </span>
+                    <span className="flex-1 leading-snug">{outcome}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Free preview lesson */}
+          {freePreviewLesson ? (
+            <div className="rounded-3xl border-2 border-ink bg-ink p-6 text-cream shadow-hard-xs sm:p-8">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold tracking-[0.18em] text-lime uppercase">
+                    {isFreeCourse ? "Preview lesson" : "Free preview lesson"}
+                  </p>
+                  <h3 className="mt-1.5 text-lg font-bold leading-snug sm:text-xl">
+                    {freePreviewLesson.title}
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-cream/75">
+                    {freePreviewLesson.description || "Watch a full lesson before you decide."}
+                    {lessonDurationOf(freePreviewLesson) ? ` · ${lessonDurationOf(freePreviewLesson)}` : ""}
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border-2 border-lime bg-lime px-4 py-2 text-xs font-bold text-ink">
+                  <Play className="size-3.5 fill-current" aria-hidden="true" />
+                  Watch now
+                </span>
+              </div>
+              <p className="mt-3.5 flex items-center gap-2 border-t border-cream/15 pt-3 text-[11px] text-cream/55">
+                <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
+                Preview playback is checked server-side; the rest of the course stays locked.
+              </p>
+            </div>
+          ) : null}
+
+          {/* Curriculum */}
+          <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">Curriculum</h2>
+                <p className="mt-1 text-xs font-semibold text-smoke">
+                  {course.sections.length} {course.sections.length === 1 ? "section" : "sections"} ·{" "}
+                  {videoCount} {videoCount === 1 ? "video" : "videos"} ·{" "}
+                  {resourceCount} {resourceCount === 1 ? "file" : "files"}
+                  {previewCount > 0
+                    ? ` · ${previewCount} ${previewCount === 1 ? previewNoun : previewNounPlural}`
+                    : ""}
+                </p>
+              </div>
+              {course.sections.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={toggleAllSections}
+                  className="rounded-full border-2 border-ink bg-cream px-3 py-1 text-xs font-bold text-ink transition-colors hover:bg-lime"
+                >
+                  {allSectionsOpen ? "Collapse all" : "Expand all"}
+                </button>
+              ) : null}
+            </div>
+
+            <ol className="mt-5 space-y-3">
+              {course.sections.map((section, sectionIndex) => {
+                const expanded = openSections.has(section.id);
+                return (
+                  <li key={section.id} className="overflow-hidden rounded-2xl border-2 border-ink/15 bg-cream">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(section.id)}
+                      aria-expanded={expanded}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-parchment/60"
+                    >
+                      <span className="font-editorial text-lg text-accent-deep italic">
+                        {String(sectionIndex + 1).padStart(2, "0")}
+                      </span>
+                      <span className="flex-1 text-sm font-bold text-ink sm:text-base">{section.title}</span>
+                      <span className="text-xs font-medium text-smoke">
+                        {section.lessons.length} lesson{section.lessons.length === 1 ? "" : "s"}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-smoke transition-transform duration-200",
+                          expanded && "rotate-180 text-ink",
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    {expanded ? (
+                      <ul className="divide-y divide-ink/10 border-t border-ink/10 bg-white">
+                        {section.lessons.map((lesson) => {
+                          const isPreview = previewable(lesson);
+                          return (
+                            <li key={lesson.id} className="flex items-start gap-3 px-4 py-3.5">
+                              <span
+                                className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-2 border-ink ${
+                                  isPreview ? "bg-lime" : "bg-cream"
+                                }`}
+                              >
+                                {lesson.type === "video" ? (
+                                  <Play className={`size-3.5 ${isPreview ? "fill-current" : ""}`} aria-hidden="true" />
+                                ) : (
+                                  <FileText className="size-3.5" aria-hidden="true" />
+                                )}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+                                  {lesson.title}
+                                  {isPreview ? null : (
+                                    <Lock
+                                      className="size-3 text-smoke"
+                                      role="img"
+                                      aria-label="Locked until enrolled"
+                                    />
+                                  )}
+                                </p>
+                                {lesson.description ? (
+                                  <p className="mt-0.5 text-xs leading-relaxed text-smoke">{lesson.description}</p>
+                                ) : null}
+                                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-smoke">
+                                  <span>
+                                    {lesson.type === "video"
+                                      ? "Video"
+                                      : `${lesson.media.length} downloadable file${lesson.media.length === 1 ? "" : "s"}`}
+                                  </span>
+                                  {lesson.type === "video" ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock3 className="size-3" aria-hidden="true" />
+                                      {lessonDurationOf(lesson) ?? "Duration unavailable"}
+                                    </span>
+                                  ) : null}
+                                  {isPreview ? (
+                                    <span className="font-bold text-accent-deep underline underline-offset-2">
+                                      Watch {previewNoun}
+                                    </span>
+                                  ) : null}
+                                </p>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          {/* Purchase terms */}
+          <div className="rounded-3xl border-2 border-ink bg-white p-6 shadow-hard-xs sm:p-8">
+            <h3 className="text-sm font-bold tracking-[0.14em] text-smoke uppercase">Purchase terms</h3>
+            <ul className="mt-3 space-y-2 text-xs leading-relaxed text-smoke">
+              <li>
+                {isFreeCourse
+                  ? "· Free enrolment — no payment details needed."
+                  : "· One-time payment in INR via UPI, cards, net-banking, or wallets."}
+              </li>
+              <li>· Access through your learner dashboard while the course is published.</li>
+              <li>· Course purchases are non-refundable except where required by applicable law.</li>
+              <li>· Your receipt and dashboard login are emailed right after checkout.</li>
+            </ul>
           </div>
         </div>
       </div>

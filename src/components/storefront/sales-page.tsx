@@ -43,11 +43,15 @@ const INCLUDED = [
   { icon: InfinityIcon, label: "Access while published" },
 ];
 
+/** What buyers get — shared with the editor's storefront preview replica. */
+export const COURSE_INCLUDES = INCLUDED;
+
 /**
  * Low-brightness "Secure checkout" label above a horizontal line of 4 monochrome
  * grey payment logos (UPI, Visa, Mastercard, RuPay) with no background block.
+ * Shared with the editor's storefront preview replica.
  */
-function SecureCheckoutLogos() {
+export function SecureCheckoutLogos() {
   return (
     <div className="mt-3.5 flex flex-col items-center">
       <p className="text-center text-[11px] font-medium tracking-wide text-smoke">
