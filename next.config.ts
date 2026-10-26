@@ -59,6 +59,8 @@ const nextConfig: NextConfig = {
       { source: "/creator", destination: "/creator/dashboard", permanent: true },
       { source: "/learn", destination: "/learn/courses", permanent: true },
       { source: "/admin", destination: "/admin/dashboard", permanent: true },
+      // Legacy static path: /blog is the one canonical location for the guides.
+      { source: "/blog.html", destination: "/blog", permanent: true },
     ];
   },
   async headers() {

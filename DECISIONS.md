@@ -287,3 +287,42 @@ Chronological, opinionated record. New phases append — never rewrite history.
   description length, canonical, OG, Twitter card, JSON-LD parseability, single
   `<h1>`, `lang`, private-route `noindex` (meta **and** header) and real 404s
   against a running server. It is a smoke test, not a ranking promise.
+
+## D16 — 2026-10 · Blog and content marketing
+
+- **Articles are typed data, not MDX.** `src/content/blog/*.ts` exports a
+  `BlogArticle` object (blocks, takeaways, sources, FAQ, related slugs); the
+  index module is the only registry. The listing page, article pages,
+  `sitemap.xml`, related cards and JSON-LD all read from that one source, so a
+  post cannot appear in one place and be missing from another. No database
+  table, no CMS, no runtime fetch: `/blog/[slug]` is statically generated with
+  `dynamicParams = false`, and an unknown slug is a real 404.
+- **Facts carry their receipts.** Competitor fees are quoted from each
+  platform's own pricing page, stored in an article-level `sources` array with
+  the date the number was read, and rendered as a visible "Sources, and when
+  they were checked" block. Comparison posts open with a one-line disclosure
+  that we build Beevo, and include a "what Beevo can't do" section.
+- **No invented proof.** No testimonials, earnings screenshots, aggregate
+  ratings or "creators earn ₹X" claims — the same rule the rest of the site
+  follows. Arithmetic in the posts is reproducible from the published rates;
+  the interactive fee calculator states its rates and its assumptions inline.
+- **SEO surface is the same one the rest of the site uses.**
+  `createPageMetadata` (now with an `article` block for published/modified
+  time, section and tags) produces canonical, OG and Twitter tags per post;
+  Article + BreadcrumbList + FAQPage JSON-LD are server-rendered; the sitemap
+  gains `/blog` and every post with honest `lastmod` dates. Titles are unique
+  per post (checked by the audit).
+- **Reading experience is server-first.** The article body, tables, table of
+  contents, FAQ and takeaways are all in the initial HTML. The only client
+  JavaScript is the share row, the optional fee calculator and a decorative
+  progress bar. Images are Next-optimised AVIF/WebP at a fixed 1200×675 with
+  per-article alt text; every card uses a responsive `sizes` hint.
+- **One 404 for the whole app.** `not-found.tsx` files inside sibling route
+  groups resolved unpredictably in Next 16 — a storefront-shaped 404 appeared
+  for `/blog/...`. The group-level boundaries were removed in favour of the
+  single `src/app/not-found.tsx`, which now links to the guides, the homepage
+  and the storefront convention.
+- **One entry point, in the footer.** The blog is linked from the marketing
+  footer only (no header nav item), keeps the existing typography, stickers,
+  hard shadows and cream/ink/lime palette, and `/blog.html` 308-redirects to
+  `/blog` so any legacy link keeps working.

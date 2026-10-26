@@ -1,15 +1,26 @@
-import { House, Map } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight, BookOpen, House, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sticker } from "@/components/ui/primitives";
 
 /**
- * Global 404. Next answers with an HTTP 404 status; the explicit robots tag
- * keeps the page out of the index even if something links to it directly.
+ * The 404 for the whole app.
+ *
+ * Deliberately a single, self-contained page rather than one per route group:
+ * Next.js resolves `not-found.tsx` files from sibling route groups in a way
+ * that made a storefront-shaped 404 appear for marketing URLs. One honest 404
+ * that links to the blog, the homepage and the guides beats several
+ * unpredictable ones.
+ *
+ * Next answers with a real HTTP 404 status, so dead links are dropped from the
+ * index; `noindex` keeps a mistyped URL out of it even when linked directly.
  */
 export const metadata: Metadata = {
   title: "Page not found",
-  robots: { index: false, follow: false },
+  description:
+    "That page isn’t here. Browse the Beevo guides or head back to the homepage to see how creators sell courses to their own audience.",
+  robots: { index: false, follow: true },
 };
 
 export default function NotFound() {
@@ -29,14 +40,34 @@ export default function NotFound() {
           of us — even creators with great links.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button href="/" variant="ink">
+          <Button href="/blog" variant="ink">
+            <BookOpen className="size-4" aria-hidden="true" />
+            Read the guides
+          </Button>
+          <Button href="/" variant="outline">
             <House className="size-4" aria-hidden="true" />
             Back home
           </Button>
-          <Button href="/how-it-works" variant="outline">
-            <Map className="size-4" aria-hidden="true" />
-            See how it works
-          </Button>
+        </div>
+        <p className="mt-6 text-xs leading-relaxed text-smoke">
+          Looking for a creator’s storefront? Those live at{" "}
+          <span className="font-semibold text-ink">beevo.in/@their-handle</span>.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-bold">
+          <Link
+            href="/how-it-works"
+            className="inline-flex items-center gap-1 text-accent-deep underline decoration-2 decoration-accent-deep/40 underline-offset-2"
+          >
+            <Map className="size-3.5" aria-hidden="true" />
+            How it works
+          </Link>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-1 text-accent-deep underline decoration-2 decoration-accent-deep/40 underline-offset-2"
+          >
+            ₹0/month plan
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
         </div>
       </div>
     </main>

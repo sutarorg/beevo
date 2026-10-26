@@ -57,6 +57,7 @@ export const STATIC_SITEMAP_PAGES: {
   { path: "/how-it-works", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pricing", changeFrequency: "monthly", priority: 0.8 },
   { path: "/faq", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/blog", changeFrequency: "weekly", priority: 0.8 },
   { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/refund-policy", changeFrequency: "yearly", priority: 0.3 },
@@ -126,6 +127,14 @@ export interface PageSeoOptions {
   images?: { url: string; width?: number; height?: number; alt?: string }[];
   robots?: Metadata["robots"];
   keywords?: string[];
+  /** Extra Open Graph fields required for `type: "article"` pages. */
+  article?: {
+    publishedTime: string;
+    modifiedTime?: string;
+    authors?: string[];
+    section?: string;
+    tags?: string[];
+  };
 }
 
 /**
@@ -155,21 +164,42 @@ export function createPageMetadata(options: PageSeoOptions): Metadata {
           },
         ];
 
+  const sharedOpenGraph = {
+    url: canonical,
+    title: ogTitle,
+    description,
+    siteName: SITE_NAME,
+    locale: SITE_LOCALE,
+    images,
+  };
+
+  // Article pages carry published/modified times, byline and tags. Next does
+  // not deep-merge `openGraph`, so the shared fields are repeated here on
+  // purpose rather than spread from the root layout.
+  const openGraph: Metadata["openGraph"] =
+    options.type === "article"
+      ? {
+          ...sharedOpenGraph,
+          type: "article",
+          ...(options.article?.publishedTime
+            ? { publishedTime: options.article.publishedTime }
+            : {}),
+          ...(options.article?.modifiedTime
+            ? { modifiedTime: options.article.modifiedTime }
+            : {}),
+          ...(options.article?.authors ? { authors: options.article.authors } : {}),
+          ...(options.article?.section ? { section: options.article.section } : {}),
+          ...(options.article?.tags ? { tags: options.article.tags } : {}),
+        }
+      : { ...sharedOpenGraph, type: options.type ?? "website" };
+
   return {
     title: options.absoluteTitle ? { absolute: options.title } : options.title,
     description,
     keywords: options.keywords,
     alternates: { canonical },
     robots: options.robots ?? INDEXABLE_ROBOTS,
-    openGraph: {
-      type: options.type ?? "website",
-      url: canonical,
-      title: ogTitle,
-      description,
-      siteName: SITE_NAME,
-      locale: SITE_LOCALE,
-      images,
-    },
+    openGraph,
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
@@ -396,6 +426,78 @@ export function breadcrumbJsonLd(
         name: item.name,
         item: item.url,
       })),
+    },
+  ]);
+}
+
+/**
+ * Article structured data for a blog post.
+ *
+ * `author` and `publisher` point at the Organization because the Beevo blog is
+ * written by the team, not by an invented persona with fake credentials. Dates
+ * are the real publication date and the last edit, never the request time.
+ */
+export function articleJsonLd(input: {
+  url: string;
+  title: string;
+  description: string;
+  image: { url: string; width: number; height: number };
+  publishedAt: string;
+  updatedAt?: string;
+  section: string;
+  tags: string[];
+}): JsonLdNode {
+  return schemaGraph([
+    {
+      "@type": "Article",
+      "@id": `${input.url}#article`,
+      mainEntityOfPage: { "@type": "WebPage", "@id": input.url },
+      url: input.url,
+      headline: input.title,
+      description: input.description,
+      image: {
+        "@type": "ImageObject",
+        url: absoluteUrl(input.image.url),
+        width: input.image.width,
+        height: input.image.height,
+      },
+      datePublished: input.publishedAt,
+      dateModified: input.updatedAt ?? input.publishedAt,
+      author: { "@id": ORGANIZATION_ID },
+      publisher: { "@id": ORGANIZATION_ID },
+      isPartOf: { "@id": WEBSITE_ID },
+      inLanguage: SITE_LANGUAGE,
+      articleSection: input.section,
+      keywords: input.tags.join(", "),
+    },
+  ]);
+}
+
+/** CollectionPage + ItemList for the /blog index. */
+export function blogIndexJsonLd(
+  posts: { slug: string; title: string }[],
+  description: string,
+): JsonLdNode {
+  const url = absoluteUrl("/blog");
+  return schemaGraph([
+    {
+      "@type": "CollectionPage",
+      "@id": `${url}#collection`,
+      url,
+      name: `${SITE_NAME} blog`,
+      description,
+      isPartOf: { "@id": WEBSITE_ID },
+      inLanguage: SITE_LANGUAGE,
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: posts.length,
+        itemListElement: posts.map((post, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          url: absoluteUrl(`/blog/${post.slug}`),
+          name: post.title,
+        })),
+      },
     },
   ]);
 }

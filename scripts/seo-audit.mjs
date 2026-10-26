@@ -168,6 +168,100 @@ async function auditPrivate() {
   }
 }
 
+/**
+ * Blog checks: Article/Breadcrumb structured data, `og:type=article`, unique
+ * titles across the site, real thumbnail files, and internal links that
+ * actually resolve.
+ */
+async function auditBlog(allUrls) {
+  const blogUrls = allUrls.filter((url) => url.includes("/blog/"));
+  console.log("\nBlog");
+  if (blogUrls.length === 0) return fail("no blog posts in sitemap.xml");
+  pass(`${blogUrls.length} posts in sitemap.xml`);
+
+  const titleOwners = new Map();
+  const internalLinks = new Set();
+
+  for (const url of blogUrls) {
+    const path = url.slice(ORIGIN.length) || "/";
+    const { response, body } = await get(path);
+    if (response.status !== 200) {
+      fail(`${path} → status ${response.status}`);
+      continue;
+    }
+    const label = path.replace("/blog/", "");
+    const problems = [];
+
+    const title = decodeEntities(extract(body, /<title[^>]*>([\s\S]*?)<\/title>/g)[0] ?? "");
+    if (title) {
+      titleOwners.set(title, [...(titleOwners.get(title) ?? []), path]);
+    }
+    if (!/<meta property="og:type" content="article"/.test(body)) problems.push("og:type not article");
+
+    const blocks = extract(body, /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g);
+    const parsed = [];
+    for (const block of blocks) {
+      try {
+        parsed.push(JSON.parse(block));
+      } catch {
+        problems.push("invalid JSON-LD");
+      }
+    }
+    const nodes = parsed.flatMap((doc) => doc["@graph"] ?? [doc]);
+    const article = nodes.find((node) => node["@type"] === "Article");
+    if (!article) {
+      problems.push("no Article node");
+    } else {
+      if (!article.headline) problems.push("Article without headline");
+      if (!/^\d{4}-\d{2}-\d{2}/.test(article.datePublished ?? "")) {
+        problems.push("Article without datePublished");
+      }
+      if (!article.author) problems.push("Article without author");
+      if (!article.publisher) problems.push("Article without publisher");
+      if (!article.image?.url) problems.push("Article without image");
+    }
+    if (!nodes.some((node) => node["@type"] === "BreadcrumbList")) {
+      problems.push("no BreadcrumbList");
+    }
+
+    const ogImage = extract(body, /<meta property="og:image" content="([^"]+)"/g)[0] ?? "";
+    if (ogImage.startsWith(ORIGIN)) {
+      const imageResponse = await fetch(`${BASE}${ogImage.slice(ORIGIN.length)}`, { method: "HEAD" });
+      if (imageResponse.status !== 200) problems.push(`og:image ${imageResponse.status}`);
+    }
+
+    for (const href of extract(body, /href="(\/[^"#?]*)/g)) {
+      if (href.startsWith("/_next") || href.startsWith("/api/")) continue;
+      if (href.startsWith("/images/")) continue;
+      internalLinks.add(href);
+    }
+
+    if (problems.length) fail(`${label}: ${problems.join("; ")}`);
+    else pass(`${label} — Article + Breadcrumb JSON-LD, article Open Graph, image`);
+  }
+
+  const duplicates = [...titleOwners.entries()].filter(([, owners]) => owners.length > 1);
+  if (duplicates.length) {
+    fail(`duplicate <title>: ${duplicates.map(([title, owners]) => `"${title}" on ${owners.join(", ")}`).join(" | ")}`);
+  } else {
+    pass("every post has a unique title");
+  }
+
+  // Internal link integrity on the blog (and everything it links to).
+  console.log("\nInternal links");
+  const links = [...internalLinks].filter((href) => href !== "/blog").slice(0, 80);
+  let broken = 0;
+  for (const href of links) {
+    const response = await fetch(`${BASE}${href}`, { redirect: "manual" });
+    const ok = response.status === 200 || (response.status >= 300 && response.status < 400);
+    if (!ok) {
+      broken += 1;
+      fail(`${href} → status ${response.status}`);
+    }
+  }
+  if (broken === 0) pass(`${links.length} internal links resolve`);
+}
+
 async function audit404() {
   console.log("\n404 handling");
   const { response } = await get("/this-page-should-not-exist-9f3a");
@@ -185,6 +279,7 @@ async function main() {
     await auditPage(url);
   }
 
+  await auditBlog(urls);
   await auditPrivate();
   await audit404();
 

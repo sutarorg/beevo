@@ -19,6 +19,8 @@ const KNOWN_SEGMENTS = new Set([
   "how-it-works",
   "pricing",
   "faq",
+  "blog",
+  "blog.html",
   "terms",
   "privacy",
   "refund-policy",

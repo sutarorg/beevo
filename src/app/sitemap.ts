@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { BLOG_ARTICLES } from "@/content/blog";
 import {
   absoluteUrl,
   STATIC_CONTENT_UPDATED,
@@ -28,6 +29,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: STATIC_CONTENT_UPDATED,
     changeFrequency: page.changeFrequency,
     priority: page.priority,
+  }));
+
+  // Blog posts are build-time content: listed with their real publication and
+  // edit dates so a refreshed article gets recrawled without churning every
+  // other entry.
+  const blogEntries: MetadataRoute.Sitemap = BLOG_ARTICLES.map((article) => ({
+    url: absoluteUrl(`/blog/${article.slug}`),
+    lastModified: new Date(`${article.updatedAt ?? article.publishedAt}T00:00:00.000Z`),
+    changeFrequency: "monthly",
+    priority: 0.7,
   }));
 
   const courseRows = await listPublishedCourseUrls();
@@ -64,5 +75,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Sitemaps are capped at 50,000 URLs per file. Entering that territory
   // requires a sitemap index; until then one file is correct and simplest.
-  return [...staticEntries, ...storefrontEntries, ...courseEntries].slice(0, 50_000);
+  return [
+    ...staticEntries,
+    ...blogEntries,
+    ...storefrontEntries,
+    ...courseEntries,
+  ].slice(0, 50_000);
 }

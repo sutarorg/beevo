@@ -43,6 +43,13 @@
 
 `/`, `/features`, `/how-it-works`, `/pricing`, `/faq`, `/terms`, `/privacy`, `/refund-policy`
 
+### Blog (static content)
+
+`/blog` (guide index, grouped by topic) and `/blog/[slug]` (ten long-form articles:
+platform comparisons, pricing, selling in India, launch playbooks, audience
+conversion). Content lives in `src/content/blog/`; Article + BreadcrumbList +
+FAQPage JSON-LD, Article Open Graph, and sitemap entries are generated from it.
+
 ### Public storefront (live data)
 
 `/@username` (creator storefront), `/@username/course-slug` (course sales page + Razorpay checkout)
