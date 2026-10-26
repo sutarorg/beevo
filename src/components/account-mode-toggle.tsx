@@ -49,11 +49,10 @@ const MODES: {
  * Rendered only when the session reports `hasBothAccounts` — with a single
  * kind of account it returns null, so single-account users never see a
  * switch with nothing to switch to. It lives in the dashboard headers,
- * immediately to the left of the notification bell, as a dropdown in the
- * same button language as the bell (h-10, rounded-xl, border-2, hard
- * shadow): the trigger shows the dashboard you are in, the menu lists
- * Learner and Creator. Choosing a side navigates straight to that
- * dashboard and remembers the mode for "Dashboard" buttons elsewhere.
+ * immediately to the left of the notification bell, as a plain dropdown
+ * trigger: just an icon, the current dashboard label, and a chevron. The
+ * menu lists Learner and Creator. Choosing a side navigates straight to
+ * that dashboard and remembers the mode for "Dashboard" buttons elsewhere.
  */
 export function AccountModeToggle({
   current,
@@ -120,10 +119,7 @@ export function AccountModeToggle({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Switch dashboard — currently ${activeMode.label}`}
-        className={cn(
-          "inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border-2 border-ink bg-white text-sm font-bold whitespace-nowrap text-ink shadow-hard-xs transition-transform active:translate-y-0.5 active:shadow-none",
-          compact ? "px-2.5" : "px-3",
-        )}
+        className="inline-flex min-h-10 appearance-none items-center justify-center gap-1.5 border-0 bg-transparent p-0 text-sm font-bold whitespace-nowrap text-ink shadow-none transition-colors hover:text-accent"
       >
         <ActiveIcon className={compact ? "size-4" : "size-4.5"} aria-hidden="true" />
         {compact ? null : activeMode.label}
