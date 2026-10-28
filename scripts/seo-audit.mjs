@@ -148,6 +148,35 @@ async function auditPage(url) {
   }
   if (!/<html[^>]+lang="[a-z-]+"/i.test(body)) problems.push("missing <html lang>");
 
+  if (path === "/") {
+    const expectedTitle = "Create & Sell Online Courses in India | Beevo";
+    const expectedDescription = "Create and sell online courses with ease. Join our platform to share your knowledge, reach learners, and turn your expertise into income. Start selling today!";
+    const title = decodeEntities(extract(body, /<title[^>]*>([\s\S]*?)<\/title>/g)[0] ?? "");
+    const meta = (attribute, name) => decodeEntities(
+      extract(body, new RegExp(`<meta ${attribute}="${name}" content="([^"]*)"`, "g"))[0] ?? "",
+    );
+    if (title !== expectedTitle) problems.push("incorrect homepage title");
+    if (description !== expectedDescription) problems.push("incorrect homepage description");
+    if (meta("property", "og:title") !== expectedTitle || meta("name", "twitter:title") !== expectedTitle) {
+      problems.push("incorrect homepage social title");
+    }
+    if (meta("property", "og:description") !== expectedDescription || meta("name", "twitter:description") !== expectedDescription) {
+      problems.push("incorrect homepage social description");
+    }
+    if (meta("property", "og:site_name") !== "Beevo") problems.push("incorrect Open Graph site name");
+    const nodes = ld.flatMap((block) => {
+      try {
+        const doc = JSON.parse(block);
+        return doc["@graph"] ?? [doc];
+      } catch {
+        return [];
+      }
+    });
+    if (!nodes.some((node) => node["@type"] === "WebSite" && node.name === "Beevo" && node.url === ORIGIN)) {
+      problems.push("incorrect WebSite structured data name or URL");
+    }
+  }
+
   if (problems.length) fail(`${label}: ${problems.join("; ")}`);
   else pass(`${label} — title, description, canonical, OG, Twitter, JSON-LD, h1, lang`);
 }
