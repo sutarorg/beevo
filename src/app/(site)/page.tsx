@@ -12,7 +12,6 @@ import {
   TickerSection,
 } from "@/components/marketing/home-sections";
 import { JsonLd } from "@/components/seo/json-ld";
-import { APP_NAME } from "@/lib/config";
 import {
   createPageMetadata,
   schemaGraph,
@@ -22,11 +21,10 @@ import {
 
 /**
  * Homepage metadata is explicit (not inherited) so the title, description,
- * canonical, Open Graph and Twitter card all agree with the visible hero and
- * with the homepage-only SoftwareApplication structured data.
+ * canonical, Open Graph and Twitter card remain consistent.
  */
 export const metadata: Metadata = createPageMetadata({
-  title: `${APP_NAME} — Sell courses to your own audience`,
+  title: "Create & Sell Online Courses in India | Beevo",
   absoluteTitle: true,
   description: SITE_DESCRIPTION,
   path: "/",

@@ -27,7 +27,7 @@ export const SITE_LOCALE = "en_IN";
 export const SITE_LANGUAGE = "en-IN";
 
 export const SITE_DESCRIPTION =
-  "Beevo gives creators a personal storefront to sell courses directly to their own audience. Free plan at ₹0/month, flat 8% only on successful eligible sales. No marketplace.";
+  "Create and sell online courses with ease. Join our platform to share your knowledge, reach learners, and turn your expertise into income. Start selling today!";
 
 /** Default social card (1200×630) used wherever a page has no better image. */
 export const DEFAULT_OG_IMAGE = {
