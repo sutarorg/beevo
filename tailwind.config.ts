@@ -16,6 +16,7 @@ const config: Config = {
           "honey-text": "var(--beevo-honey-text)",
           "honey-display": "var(--beevo-honey-display)",
           ink: "var(--beevo-ink)",
+          dark: "var(--beevo-ink)",
           body: "var(--beevo-body)",
           muted: "var(--beevo-muted)",
           white: "var(--beevo-white)",
@@ -35,6 +36,7 @@ const config: Config = {
         "beevo-card": "var(--beevo-shadow-card)",
         "beevo-popular": "var(--beevo-shadow-popular)",
         "beevo-cta": "var(--beevo-shadow-cta)",
+        "beevo-yellow-sm": "0 6px 16px rgba(255, 201, 40, 0.34)",
       },
       borderRadius: {
         card: "16px",

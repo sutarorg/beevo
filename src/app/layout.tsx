@@ -1,13 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import {
-  JsonLd,
-  buildOrganizationSchema,
-  buildWebsiteSchema,
-} from "@/components/seo/JsonLd";
 import { BRAND_NAME, OG_IMAGE_PATH, SITE_URL } from "@/lib/site";
 
 const sora = localFont({
@@ -86,17 +79,11 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col bg-beevo-canvas text-beevo-body antialiased selection:bg-beevo-yellow/40 selection:text-beevo-ink">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-beevo-yellow focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-beevo-ink focus:shadow-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-beevo-yellow focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-beevo-ink focus:shadow-lg"
         >
           Skip to main content
         </a>
-        <JsonLd data={buildOrganizationSchema()} />
-        <JsonLd data={buildWebsiteSchema()} />
-        <Header />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
