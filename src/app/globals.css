@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --beevo-yellow: #FFC928;
+  --beevo-yellow-hover: #F2B800;
+  --beevo-honey: #E5A500;
+  --beevo-honey-text: #B87800;
+  --beevo-honey-display: #DF9E00;
+  --beevo-ink: #171717;
+  --beevo-body: #36332D;
+  --beevo-muted: #6C675E;
+  --beevo-white: #FFFFFF;
+  --beevo-canvas: #FFFEFB;
+  --beevo-cream: #FFF9E9;
+  --beevo-cream-deep: #FFF4D8;
+  --beevo-border: #ECE7DB;
+  --beevo-border-warm: #F3DF9E;
+  --beevo-shadow: 0 8px 24px rgba(52, 39, 8, 0.055);
+  --beevo-shadow-card: 0 6px 20px rgba(52, 39, 8, 0.048);
+  --beevo-shadow-popular: 0 12px 32px rgba(229, 165, 0, 0.14);
+  --beevo-shadow-cta: 0 6px 18px rgba(242, 184, 0, 0.34);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--beevo-canvas);
+    color: var(--beevo-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--beevo-canvas);
+    color: var(--beevo-body);
+    font-family: var(--font-manrope), system-ui, -apple-system, sans-serif;
+    overflow-x: clip;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-sora), system-ui, -apple-system, sans-serif;
+    color: var(--beevo-ink);
+  }
+}
+
+/* Accessible 44px-tall touch target for range sliders with crisp visual track */
+.beevo-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 44px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.beevo-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--beevo-cream-deep);
+  border: 1px solid var(--beevo-border);
+}
+
+.beevo-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 9999px;
+  background: var(--beevo-yellow);
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(52, 39, 8, 0.22);
+}
+
+.beevo-range::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--beevo-cream-deep);
+  border: 1px solid var(--beevo-border);
+}
+
+.beevo-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--beevo-yellow);
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(52, 39, 8, 0.22);
+}
+
+/* Shared container rail calibrated to reference & desktop scales */
+.beevo-container {
+  width: 100%;
+  max-width: 1220px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: clamp(18px, 4.8vw, 64px);
+  padding-right: clamp(18px, 4.8vw, 64px);
+}
+
+/* Primary luminous honey CTA matching Beevo reference */
+.beevo-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #FFD347 0%, #FFC31F 100%);
+  color: #171717;
+  font-weight: 700;
+  border: 1px solid rgba(217, 155, 0, 0.25);
+  box-shadow: var(--beevo-shadow-cta);
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.beevo-btn-primary:hover {
+  background: linear-gradient(180deg, #FFC928 0%, #F2B800 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(242, 184, 0, 0.42);
+}
+
+.beevo-btn-primary:active {
+  transform: translateY(0);
+}
+
+.beevo-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  background-color: #FFFFFF;
+  color: #171717;
+  font-weight: 700;
+  border: 1px solid #E4DEC9;
+  box-shadow: 0 3px 10px rgba(52, 39, 8, 0.045);
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.beevo-btn-secondary:hover {
+  background-color: #FFFDF6;
+  border-color: #D9CCA8;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(52, 39, 8, 0.075);
+}
+
+.beevo-btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Accessible focus treatment */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #171717;
+  outline-offset: 2px;
+}
+
+/* Subtle custom scrollbar for mobile carousels */
+.beevo-scroll-rail {
+  scrollbar-width: none;
+}
+.beevo-scroll-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
