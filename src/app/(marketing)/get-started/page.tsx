@@ -32,9 +32,8 @@ export default async function GetStartedPage({
             Ready to build your first cartoon video
           </h1>
           <p className="mt-3 text-[14.5px] leading-[1.66] text-beevo-body">
-            Review your selected one-time credit pack below. Account registration and checkout
-            connect in Phase 2 of the Beevo build—this route previews the clean handoff from the
-            public website into Beevo Studio.
+            Review your selected one-time credit pack below. Create your account or explore the
+            Beevo Studio creation workspace before checkout connects in Phase 4.
           </p>
 
           {/* Pack Switcher */}
@@ -94,12 +93,15 @@ export default async function GetStartedPage({
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/contact" className="beevo-btn-primary min-h-[46px] flex-1 text-[14px]">
-              Contact Us About Early Access
+            <Link href="/signup" className="beevo-btn-primary min-h-[46px] flex-1 text-[14px]">
+              Create Account
+            </Link>
+            <Link href="/app/create" className="beevo-btn-secondary min-h-[46px] px-5 text-[14px]">
+              Open Studio Workspace
             </Link>
             <Link href="/pricing" className="beevo-btn-secondary min-h-[46px] px-5 text-[14px]">
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Back to Pricing
+              Pricing
             </Link>
           </div>
         </div>
