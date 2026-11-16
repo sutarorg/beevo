@@ -2,19 +2,22 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Info } from "lucide-react";
 import { BeevoLogo } from "@/components/brand/BeevoLogo";
 
 export function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [backendNotice, setBackendNotice] = useState(false);
+  const [backendNotice, setBackendNotice] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setBackendNotice(false);
+    setBackendNotice(null);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
@@ -27,8 +30,32 @@ export function LoginForm() {
     }
 
     setErrorMessage(null);
-    // Strict Phase 2 rule: never simulate authentication success before Phase 4 Supabase Auth connects.
-    setBackendNotice(true);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        setBackendNotice(
+          json?.error?.message ??
+            "Supabase Auth environment variables are not configured on this deployment yet."
+        );
+        return;
+      }
+      if (!res.ok) {
+        setErrorMessage(json?.error?.message ?? "Unable to sign in. Please check your credentials.");
+        return;
+      }
+      router.push("/app");
+      router.refresh();
+    } catch {
+      setErrorMessage("Network error while reaching Beevo authentication service.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -135,22 +162,19 @@ export function LoginForm() {
             />
             <div>
               <p className="font-bold text-beevo-ink">
-                Authentication connects in Phase 4
+                Authentication service not configured
               </p>
-              <p className="mt-0.5">
-                Supabase SSR sign-in is not yet connected in this frontend workspace, so no
-                session was created. You can inspect the Studio UI directly while backend auth is
-                pending.
-              </p>
+              <p className="mt-0.5">{backendNotice}</p>
             </div>
           </div>
         )}
 
         <button
           type="submit"
-          className="beevo-btn-primary mt-2 min-h-[48px] w-full text-[14.5px]"
+          disabled={submitting}
+          className="beevo-btn-primary mt-2 min-h-[48px] w-full text-[14.5px] disabled:opacity-60"
         >
-          Log in
+          {submitting ? "Signing in..." : "Log in"}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </button>
       </form>

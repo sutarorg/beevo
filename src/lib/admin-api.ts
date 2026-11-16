@@ -18,14 +18,14 @@ import type {
 } from "./admin-types";
 
 /**
- * Phase 3 Frontend-Only Admin Boundary:
- * Until Phase 4 connects Supabase SSR Auth + Postgres RLS + Razorpay + OpenAI + fal.ai +
- * ElevenLabs + FFmpeg workers + Cloudflare R2, all admin data adapters strictly return
- * unconfigured / empty operational states with null financial values — NEVER fake users,
- * fake revenue, fake payments, fake generations, fake AI costs, fake media, or fake logs.
+ * Beevo Admin Backend Boundary (Phase 4):
+ * - Exposes live typed admin API client methods (`beevoAdminClientApi`) calling server-protected
+ *   `/api/admin/*` Route Handlers backed by Supabase SSR Auth + RBAC + audit logging.
+ * - Strictly returns empty / unconfigured states with null financial values when Supabase
+ *   environment credentials are absent — NEVER fake users, fake payments, or fake costs.
  */
 export const IS_ADMIN_BACKEND_CONNECTED = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_ADMIN_API_READY === "true"
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
 export function getAdminApiState(): AdminApiState {
@@ -172,10 +172,6 @@ export function getAdminMusicTracks(): AdminApiResponse<AdminMusicTrack[]> {
   return { state: getAdminApiState(), data: [] };
 }
 
-/**
- * Confirmed published Beevo product configuration defaults.
- * Contains zero secret API credentials; runtime persistence connects in Phase 4.
- */
 export function getAdminConfiguration(): AdminApiResponse<AdminConfigurationState> {
   return {
     state: getAdminApiState(),
@@ -195,8 +191,11 @@ export function getAdminConfiguration(): AdminApiResponse<AdminConfigurationStat
         aspectRatios: ["16:9", "9:16", "1:1"],
         resolutions: ["720p", "1080p"],
         maxDurationSeconds: 600,
-        imageModels: ["fal-ai/flux-pro (configured server-side in Phase 4)"],
-        voiceModels: ["eleven_multilingual_v2 (configured server-side in Phase 4)"],
+        imageModels: [
+          "blackforestlabs/flux-3/klein/text-to-image",
+          "blackforestlabs/flux-3/klein/edit-image",
+        ],
+        voiceModels: ["eleven_multilingual_v2", "eleven_flash_v2_5"],
         supportedLanguages: SUPPORTED_ELEVENLABS_LANGUAGES.map((l) => l.label),
         imageConcurrency: 4,
         retryAllowance: 2,
@@ -224,3 +223,65 @@ export function getAdminConfiguration(): AdminApiResponse<AdminConfigurationStat
 export function getAdminAuditLogs(): AdminApiResponse<AdminAuditLogEntry[]> {
   return { state: getAdminApiState(), data: [] };
 }
+
+async function adminFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.error?.message ?? `Admin request failed (${res.status})`);
+  }
+  return json as T;
+}
+
+/**
+ * Live Phase 4 admin API client calling server-verified `/api/admin/*` endpoints.
+ */
+export const beevoAdminClientApi = {
+  getOverview: (from?: string, to?: string) => {
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return adminFetch<AdminOverviewSnapshot>(`/api/admin/overview${suffix}`);
+  },
+  getUsers: () => adminFetch<{ users: AdminUserRow[] }>("/api/admin/users"),
+  getUserDetail: (id: string) => adminFetch<{ user: AdminUserDetail }>(`/api/admin/users/${id}`),
+  updateUserStatus: (id: string, status: "active" | "suspended", reason: string) =>
+    adminFetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, reason }),
+    }),
+  adjustCredits: (payload: { userId: string; delta: number; reason: string }) =>
+    adminFetch("/api/admin/credits/adjust", { method: "POST", body: JSON.stringify(payload) }),
+  getCreditLedger: () => adminFetch<{ ledger: AdminCreditLedgerRow[] }>("/api/admin/credits/ledger"),
+  getGenerations: () => adminFetch<{ generations: AdminGenerationRow[] }>("/api/admin/generations"),
+  getGenerationDetail: (id: string) => adminFetch(`/api/admin/generations/${id}`),
+  retryGeneration: (id: string, reason: string, stage?: string) =>
+    adminFetch(`/api/admin/generations/${id}/retry`, {
+      method: "POST",
+      body: JSON.stringify({ reason, stage }),
+    }),
+  getPayments: () => adminFetch<{ payments: AdminPaymentRecord[] }>("/api/admin/payments"),
+  refundPayment: (id: string, reason: string, amountPaise?: number) =>
+    adminFetch(`/api/admin/payments/${id}/refund`, {
+      method: "POST",
+      body: JSON.stringify({ reason, amountPaise }),
+    }),
+  getAiCosts: () => adminFetch<AdminAiCostsSnapshot>("/api/admin/costs"),
+  getMediaAssets: () => adminFetch<{ assets: AdminMediaAsset[] }>("/api/admin/media"),
+  getMusicTracks: () => adminFetch<{ tracks: AdminMusicTrack[] }>("/api/admin/music"),
+  createMusicTrack: (payload: Record<string, unknown>) =>
+    adminFetch("/api/admin/music", { method: "POST", body: JSON.stringify(payload) }),
+  updateMusicTrack: (id: string, payload: Record<string, unknown>) =>
+    adminFetch(`/api/admin/music/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  getConfig: () => adminFetch<{ config: unknown[] }>("/api/admin/config"),
+  updateConfig: (key: string, value: Record<string, unknown>) =>
+    adminFetch("/api/admin/config", { method: "PATCH", body: JSON.stringify({ key, value }) }),
+  getAuditLogs: () => adminFetch<{ logs: AdminAuditLogEntry[] }>("/api/admin/audit-logs"),
+};
