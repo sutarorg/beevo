@@ -7,10 +7,11 @@ import { BeevoLogo } from "@/components/brand/BeevoLogo";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setStatusMessage(null);
 
@@ -21,10 +22,33 @@ export function ForgotPasswordForm() {
     }
 
     setErrorMessage(null);
-    // Honest Phase 2 state — never claims a reset email was sent before Supabase connects.
-    setStatusMessage(
-      `Password reset delivery for ${trimmed} requires Supabase Auth, which connects in Phase 4. No email was dispatched from this frontend preview.`
-    );
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        setStatusMessage(
+          json?.error?.message ??
+            "Password reset requires Supabase Auth credentials to be configured on this deployment."
+        );
+        return;
+      }
+      if (!res.ok) {
+        setErrorMessage(json?.error?.message ?? "Could not request password reset.");
+        return;
+      }
+      setStatusMessage(
+        json?.message ?? "If an account exists for that email, a password reset link has been sent."
+      );
+    } catch {
+      setErrorMessage("Network error while reaching Beevo password reset service.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -90,10 +114,11 @@ export function ForgotPasswordForm() {
 
         <button
           type="submit"
-          className="beevo-btn-primary min-h-[48px] w-full text-[14.5px]"
+          disabled={submitting}
+          className="beevo-btn-primary min-h-[48px] w-full text-[14.5px] disabled:opacity-60"
         >
           <Mail className="h-4 w-4" aria-hidden="true" />
-          Send Reset Email
+          {submitting ? "Sending..." : "Send Reset Email"}
         </button>
       </form>
 

@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Check, Eye, EyeOff, Info } from "lucide-react";
 import { BeevoLogo } from "@/components/brand/BeevoLogo";
 
 export function SignupForm() {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,15 +15,16 @@ export function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [backendNotice, setBackendNotice] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<{ title: string; body: string } | null>(null);
 
   const hasMinLength = password.length >= 8;
   const hasLetterAndNumber = /[a-zA-Z]/.test(password) && /\d/.test(password);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setBackendNotice(false);
+    setStatusNotice(null);
 
     if (fullName.trim().length < 2) {
       setErrorMessage("Please enter your full name.");
@@ -45,8 +48,46 @@ export function SignupForm() {
     }
 
     setErrorMessage(null);
-    // Strict Phase 2 rule: never simulate signup success before Supabase Auth connects in Phase 4.
-    setBackendNotice(true);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          email: email.trim(),
+          password,
+          preferredLanguage: "en",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        setStatusNotice({
+          title: "Authentication service not configured",
+          body:
+            json?.error?.message ??
+            "Supabase Auth environment variables are not configured on this deployment yet.",
+        });
+        return;
+      }
+      if (!res.ok) {
+        setErrorMessage(json?.error?.message ?? "Unable to create account. Please try again.");
+        return;
+      }
+      if (json?.emailConfirmationRequired) {
+        setStatusNotice({
+          title: "Check your email to confirm your account",
+          body: `We sent a confirmation link to ${email.trim()}. Confirm your email to enter Beevo Studio.`,
+        });
+        return;
+      }
+      router.push("/app");
+      router.refresh();
+    } catch {
+      setErrorMessage("Network error while reaching Beevo signup service.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -237,7 +278,7 @@ export function SignupForm() {
           </div>
         )}
 
-        {backendNotice && (
+        {statusNotice && (
           <div
             role="status"
             aria-live="polite"
@@ -248,20 +289,18 @@ export function SignupForm() {
               aria-hidden="true"
             />
             <div>
-              <p className="font-bold text-beevo-ink">Account creation connects in Phase 4</p>
-              <p className="mt-0.5">
-                Your form inputs passed client validation, but Supabase Auth is not connected yet
-                so no account was created.
-              </p>
+              <p className="font-bold text-beevo-ink">{statusNotice.title}</p>
+              <p className="mt-0.5">{statusNotice.body}</p>
             </div>
           </div>
         )}
 
         <button
           type="submit"
-          className="beevo-btn-primary mt-1 min-h-[48px] w-full text-[14.5px]"
+          disabled={submitting}
+          className="beevo-btn-primary mt-1 min-h-[48px] w-full text-[14.5px] disabled:opacity-60"
         >
-          Create Account
+          {submitting ? "Creating account..." : "Create Account"}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </button>
       </form>
